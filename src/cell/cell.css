@@ -322,12 +322,14 @@ body.cell-cine #cell-hud .c-debrief { background: rgba(0, 0, 0, 0.25); }
 
 /* Radio subtitles */
 /* Radio subtitles: one terminal entry at a time, typed out, then cleared. */
-#cell-subs { position: fixed; right: 18px; top: 52px; z-index: 30; width: min(420px, calc(100vw - 32px)); padding: 5px 10px; background: rgba(2, 8, 10, 0.62); border-left: 2px solid var(--c, #8dff9e); color: #dff7ee; font: 500 13px/1.45 var(--mono, ui-monospace, monospace); text-align: left; text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); opacity: 0; transition: opacity 0.35s; pointer-events: none; }
+#cell-subs { position: fixed; right: 8px; top: 6px; z-index: 30; width: min(290px, calc(100vw - 32px)); padding: 3px 8px; background: rgba(2, 8, 10, 0.62); border-left: 2px solid var(--c, #8dff9e); color: #dff7ee; font: 500 11px/1.35 var(--mono, ui-monospace, monospace); text-align: left; text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); opacity: 0; transition: opacity 0.35s; pointer-events: none; }
 #cell-subs.on { opacity: 1; }
 #cell-subs b { letter-spacing: 0.08em; margin-right: 8px; font-weight: 700; }
 #cell-subs .cur { display: inline-block; width: 7px; height: 12px; margin-left: 2px; vertical-align: -1px; background: var(--c, #8dff9e); animation: subs-blink 0.8s steps(1) infinite; }
 @keyframes subs-blink { 50% { opacity: 0; } }
-body.cell-pip #cell-subs { top: 178px; }
+body.cell-pip #cell-subs { top: 6px; }
+/* The partner card steps down while a line is on screen. */
+body:has(#cell-subs.on) #cell-hud .c-partner { top: 52px !important; }
 @media (pointer: coarse) { #cell-subs { font-size: 12px; } }
 
 /* Touch (iPad / phone): the action buttons sit in a compact strip along the bottom centre,
@@ -500,3 +502,4 @@ body.touch #cell-hud.has-pip .c-partner { top: 14px; }
 /* CALL FOR HELP: mid-screen while you're down. */
 #touch .cell-helpbtn { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 9; padding: 14px 22px !important; font-size: 15px !important; letter-spacing: 0.14em; color: #ff6a6a !important; border: 2px solid #ff4a4a !important; background: rgba(40, 6, 8, 0.7) !important; animation: helppulse 1s ease-in-out infinite alternate; }
 @keyframes helppulse { to { box-shadow: 0 0 18px rgba(255, 74, 74, 0.6); } }
+body.cell-compact #cell-hud .c-obj-h { display: none !important; } /* phones: title + sub-line only, room for the ability triangle */

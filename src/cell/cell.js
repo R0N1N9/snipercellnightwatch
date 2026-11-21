@@ -890,6 +890,7 @@ export class CellGame {
       }
       case 'jam': S.jams.push({ x: target.x, z: target.z, r: PAYLOAD.jam.r, t: 5 }); this._toast('Earpieces jammed for 5 s.', 'cyan'); break;
       case 'melee': this._meleeHit(target, by); break;
+      case 'camshot': { const c = S.cams.find((q) => q.id === target.id); if (c) { c.dead = true; c.empT = 1e6; c.aw = 0; } break; }
       case 'emp':
         {
           const room = this._roomFor(target);
@@ -1252,6 +1253,7 @@ export class CellGame {
     const act = { ...a };
     this._qhTick(dt, I, act);
     this._cmdKeys(I);
+    if (I.pressed('cell-menu') && this._cwMenuOpen) this._cwMenuOpen(); // MENU: the command wheel, tap to pick
     if (this.qh.on) this._eHeld = false;
     this._kitKeys(dt, I, tab, quad, live, act);
     this._abInput(dt, I, act, live && !tab && !quad);
@@ -1281,6 +1283,8 @@ export class CellGame {
     if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
     // No shooting while the phone is up (quickhack mode uses fire to run a hack on its own).
     if (this.qh && !this.qh.on && (this.qh.vis || 0) > 0.15) { act.fire = act.fireHeld = false; }
+    // During a takedown animation you're committed: no moving, looking or shooting.
+    if (this.tdAnim) { act.mx = act.my = 0; act.lookX = act.lookY = 0; act.fire = act.fireHeld = act.scope = act.sprint = act.jump = act.reload = false; }
     // In knife reach of an enemy: FIRE becomes a melee takedown.
     this._tdTarget = live && !tab && !quad && !isr && !(this.bino && this.bino.on) && !this.deSeq ? this._meleeTarget() : null;
     if (this._tdTarget && act.fire && !(this.qh && this.qh.on)) { this._melee(); act.fire = act.fireHeld = false; }
@@ -1371,7 +1375,7 @@ export class CellGame {
     // First-person weapon.
     const scopedRifle = P.def.scope && P.scopeT > 0.6;
     this.viewmodelVisible = live && !quad && !tab && !seat && !isr && !this.devAnim;
-    this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !(this.bino && this.bino.on) && !this.knifeEq;
+    this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !this.tdAnim && !(this.bino && this.bino.on) && !this.knifeEq;
     // Suppressor cans (mid-gesture the can shows while it's in your hand).
     const supU = this._supTick(dt), SA = this.supAnim;
     const canShow = (w) => (SA && SA.w === w ? (SA.to ? supU > 0.18 : supU < 0.82) : !!w.sup);
@@ -1379,7 +1383,8 @@ export class CellGame {
     for (const w of P.arms) { const c = canOf(w); if (c) c.visible = canShow(w); }
     this.carry.visible = this.obj.drive === this.role && live && !quad && !isr;
     this._knifeTick(dt);
-    this._wpnTick();
+    this._tdTick(dt);
+    if (!this.tdAnim) this._wpnTick();
     // Deadeye: the M50 in the right hand, the KR-50 lowered in the left.
     const DE = this.deSeq;
     if (this.deRifle) this.deRifle.visible = !!DE && this.viewmodel.root.visible;
@@ -1487,23 +1492,22 @@ export class CellGame {
     else if (sup && def.heavy) this._noise(P.pos, 14, false, true);
     else this._noise(P.pos, sup ? 8 : 70, !sup);
     if (!sup) this.sentinel.stats.loudShots = (this.sentinel.stats.loudShots || 0) + 1, this._loud = true;
-    // The .50 carries on through bodies (collateral, every round); the penetrator round also
-    // goes through walls and bulwark shields. Each pass costs damage.
+    // The .50 carries on through bodies, walls, doors and bulwark shields, and kills any camera it
+    // passes. Each pass costs damage.
     let start = o, mul = 1, first = null, lastP = end;
-    const passes = rifle ? (ammo === 'pen' ? 5 : 3) : 1;
+    const passes = rifle ? 5 : 1;
     for (let k = 0; k < passes; k++) {
       const res = this._hitscan(start, end);
       const hitP = res ? res.point : end;
       lastP = hitP;
       if (!first) first = res;
       this._shotHit(res, hitP, start, mul, { rifle, def, o, ammo, P });
-      if (!res || !rifle || ammo === 'xr' || ammo === 'emp') break;
+      if (rifle) this._camShot(start, hitP);
+      if (!res || !rifle) break;
       let skip = 0;
       if (res.enemy) { skip = 0.6; mul *= 0.7; }
-      else if (res.blocked) { if (ammo !== 'pen') break; skip = 1.2; mul *= 0.8; }
+      else if (res.blocked) { skip = 1.2; mul *= 0.8; }
       else if (res.box && !res.terrain) {
-        // Walls: only the penetrator goes through (standard rounds just carry on through bodies).
-        if (ammo !== 'pen' && res.box.kind !== 'fence') break;
         const th = this._boxDepth(hitP, dir, res.box);
         if (th > 1.3 && res.box.kind !== 'fence') break;
         skip = th + 0.05; mul *= 0.85;
@@ -1554,7 +1558,7 @@ export class CellGame {
       // The shield soaks it and weakens: ~2 rifle rounds, 4 magnum, a dozen pistol, 15 SMG; an
       // explosive round breaks it outright.
       const wd = ammo === 'xr' ? 999 : ({ kr50: 60, mag50: 35, smg: 8, m18: 10 })[def.key] ?? 20;
-      if (ammo !== 'pen') this.hud.flash((g.wallPct ?? 100) * 1.2 - wd <= 0 ? 'SHIELD BROKEN' : 'BLOCKED \u2014 HIT THE NOTCH OR BREAK IT', 'red', 0.9);
+      if (!rifle) this.hud.flash((g.wallPct ?? 100) * 1.2 - wd <= 0 ? 'SHIELD BROKEN' : 'BLOCKED \u2014 HIT THE NOTCH OR BREAK IT', 'red', 0.9);
       if (this.isHost) { this.sentinel._alert(g, null, { x: P.pos.x, z: P.pos.z }); this.sentinel.wallDamage(g.id, wd); }
       else this._broadcast({ k: 'block', id: g.id, from: { x: P.pos.x, z: P.pos.z }, dmg: wd });
     } else if (res && res.enemy && res.enemy.state === 'dead') {
@@ -1591,13 +1595,23 @@ export class CellGame {
       this._noise(hitP, 7, false);
     }
     if (res && res.quadHit) this._quadDamage(100);
-    if (!rifle || !res || res.quadHit) return;
-    // Special rounds.
-    if (ammo === 'xr') this._xrStick(hitP, res.enemy || res.blocked || null);
-    else if (ammo === 'emp') {
-      this.payload('emp', { x: hitP.x, z: hitP.z, y: hitP.y, r: 8 });
-      this.effects.puff(hitP, 'metal', 1.6, 0.5);
-      this.audio.zap && this.audio.zap(hitP);
+  }
+
+  // A rifle round kills any security camera it passes close to (sparks; out for good).
+  _camShot(a, b) {
+    const S = this.sentinel, ab = b.clone().sub(a), L = ab.length();
+    if (L < 0.01) return;
+    ab.divideScalar(L);
+    for (const c of S.cams) {
+      if (c.dead) continue;
+      const v = new THREE.Vector3(c.x - a.x, c.y - a.y, c.z - a.z), t = v.dot(ab);
+      if (t < 0 || t > L + 0.3) continue;
+      if (v.addScaledVector(ab, -t).length() > 0.4) continue;
+      c.dead = true;
+      this.effects.puff(new THREE.Vector3(c.x, c.y, c.z), 'metal', 1.2, 0.4);
+      this.audio.zap && this.audio.zap(new THREE.Vector3(c.x, c.y, c.z));
+      this.hud.flash('CAMERA DESTROYED', 'cyan', 0.8);
+      this.payload('camshot', { id: c.id });
     }
   }
 
@@ -2949,7 +2963,7 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'slingshot lure'), K('Z', 'rounds menu'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'slingshot lure'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
     const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hold: hack phone'), K('T', 'slingshot lure'), K('TAB', 'tablet (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
@@ -3018,11 +3032,11 @@ class CellHud {
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
     const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative && g.role === 'shooter'
-      ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
+      ? [['cell-tab', 'TABLET'], ['cell-menu', 'MENU'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-tab', 'TABLET'], ['cell-breath', 'BREATH'], ...common]
-        : [['cell-tab', 'TABLET'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
-    const KEEP = new Set(['cell-tab', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
+        ? [['cell-tab', 'TABLET'], ['cell-menu', 'MENU'], ['cell-breath', 'BREATH'], ...common]
+        : [['cell-tab', 'TABLET'], ['cell-menu', 'MENU'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
+    const KEEP = new Set(['cell-tab', 'cell-menu', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
     // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
@@ -3134,11 +3148,43 @@ class CellHud {
     const aTop = anchors.length ? Math.min(...anchors.map((r) => r.top)) : H * 0.6;
     const fit = Math.max(1, Math.min(n, Math.floor((aR - aL + gap) / (size + gap)) || 1));
     let layout = null;
+    // Phones: a triangle (apex up) centred between CROUCH and the left FIRE button, nudged until
+    // it clears everything.
+    if (small) {
+      const cr = document.querySelector('#touch .crouch'), fl = document.querySelector('#touch .fire-l');
+      const a = cr && cr.getBoundingClientRect(), b = fl && fl.getBoundingClientRect();
+      if (a && b && a.width && b.width) {
+        const mx = (a.left + a.right + b.left + b.right) / 4, my = (a.top + a.bottom + b.top + b.bottom) / 4;
+        // The binocular-only buttons (last in order) sit beside the triangle, not in it.
+        const core = this.abBtns.filter((q) => q.k !== 'swarm' && q.k !== 'lase').length;
+        const ROWS = { 1: [1], 2: [2], 3: [1, 2], 4: [1, 3], 5: [2, 3], 6: [1, 2, 3], 7: [1, 2, 4], 8: [2, 3, 3] }[core] || [Math.ceil(core / 2), Math.floor(core / 2)];
+        const step = size + gap, hTot = (ROWS.length - 1) * step;
+        const tri = (ox, oy) => {
+          const pts = [];
+          ROWS.forEach((cnt, r) => { for (let c = 0; c < cnt; c++) pts.push([ox + (c - (cnt - 1) / 2) * step, oy - hTot / 2 + r * step]); });
+          return pts;
+        };
+        const offs = [];
+        for (let d = 0; d <= 240; d += 4) for (const [ux, uy] of [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [-1, -1], [1, 1], [-1, 1]]) offs.push([ux * d, uy * d]);
+        for (const [ox, oy] of offs) {
+          const pts = tri(mx + ox, my + oy), ok = [];
+          for (const p of pts) { if (!okSpot(p[0], p[1], ok)) break; ok.push(p); }
+          if (ok.length === core) {
+            // The rest: nearest clear spots next to the triangle.
+            const cx0 = mx + ox, cy0 = my + oy, cand = [];
+            for (let gy = -6; gy <= 6; gy++) for (let gx = -6; gx <= 6; gx++) cand.push([cx0 + gx * step * 0.5, cy0 + gy * step * 0.5]);
+            cand.sort((p, q) => Math.hypot(p[0] - cx0, p[1] - cy0) - Math.hypot(q[0] - cx0, q[1] - cy0));
+            for (let k = core; k < n; k++) { const sp = cand.find(([x, y]) => okSpot(x, y, ok)); if (!sp) break; ok.push(sp); }
+            if (ok.length === n) { layout = ok; break; }
+          }
+        }
+      }
+    }
     // Nearest first: just above them, then nudged down into the gaps between them, rows of
     // different widths, sliding sideways a little.
     const lifts = [];
     for (let d = 0; d < H; d += 6) { lifts.push(d); if (d) lifts.push(-d); }
-    for (const lift of lifts) for (const perRow of [...new Set([fit, n, 2, 3])]) {
+    for (const lift of layout ? [] : lifts) for (const perRow of [...new Set([fit, n, 2, 3])]) {
       if (layout) break;
       for (const shift of [0, 20, -20, 40, -40, 60, -60, 90, -90, 120]) {
         const pts = [];
@@ -3419,7 +3465,7 @@ class CellHud {
     // Ability chips.
     if (g.role === 'shooter') {
       const K = g.kit;
-      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${(P.arms.find((q) => q.ammo && q.ammo !== 'std') ? 'on' : '')}">Z ROUNDS \u00B7 ${AMMO_NAME[(P.arms.find((q) => q.def.slot === 'rifle') || {}).ammo || 'std']}</i>`;
+      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i>`;
       if (kh !== this._kh) { this._kh = kh; this.el.kit.innerHTML = kh; }
     }
     // Incoming request / call card.

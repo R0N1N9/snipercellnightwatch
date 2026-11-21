@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { ROOMS, BUILDING } from './facility.js';
 import { guardCapsules, angDiff } from './sentinel.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
+import { glove } from './nvg.js';
 
 const SUP_DUR = 1.25;
 export const Kit2 = {
@@ -80,11 +81,65 @@ export const Kit2 = {
   },
   _melee() {
     const P = this.player;
-    if (this.knifeT > 0 || this.downed) return;
+    if (this.knifeT > 0 || this.tdAnim || this.downed) return;
     const best = this._meleeTarget();
-    this._knife();
-    if (!best) return;
-    this.payload('melee', { id: best.id, x: P.pos.x, z: P.pos.z, yaw: P.yaw, by: this.role });
+    if (!best) { this._knife(); return; }
+    // From behind: grab him by the neck with the left hand and stab with the right. Head-on:
+    // tackle him to the ground, stab, and get back up. The kill lands at the stab.
+    const behind = Math.abs(angDiff(Math.atan2(-(P.pos.x - best.x), -(P.pos.z - best.z)), best.yaw + (best.look || 0))) > 1.9;
+    const kind = behind ? 'grab' : 'tackle';
+    const dx = best.x - P.pos.x, dz = best.z - P.pos.z, d = Math.hypot(dx, dz) || 1;
+    this.tdAnim = { kind, t: 0, dur: kind === 'grab' ? 1.05 : 1.6, stabAt: kind === 'grab' ? 0.38 : 0.72, hit: false, id: best.id,
+      from: P.pos.clone(), to: new THREE.Vector3(best.x - (dx / d) * (kind === 'grab' ? 0.55 : 0.9), P.pos.y, best.z - (dz / d) * (kind === 'grab' ? 0.55 : 0.9)), yaw: Math.atan2(-dx, -dz) };
+    this.sfx.blade(this.camera.position);
+  },
+  // The takedown animation (first person): drives the camera, a left glove and the knife.
+  _tdTick(dt) {
+    const A = this.tdAnim;
+    if (!A) { if (this.tdGlove) this.tdGlove.visible = false; return; }
+    if (!this.tdGlove) {
+      const g = (this.tdGlove = glove());
+      g.scale.setScalar(1.15);
+      g.traverse((o) => { o.renderOrder = 11; o.frustumCulled = false; });
+      this.camera.add(g);
+    }
+    const P = this.player, G = this.tdGlove, Kn = this.knife, u = A.t / A.dur;
+    A.t += dt;
+    const ease = (x) => x * x * (3 - 2 * x), seg = (a, b) => Math.max(0, Math.min(1, (A.t - a) / (b - a)));
+    // Turn to face him and close in.
+    P.yaw += angDiff(A.yaw, P.yaw) * Math.min(1, dt * 12);
+    const close = ease(seg(0, A.kind === 'grab' ? 0.22 : 0.3));
+    P.pos.x = A.from.x + (A.to.x - A.from.x) * close;
+    P.pos.z = A.from.z + (A.to.z - A.from.z) * close;
+    Kn.visible = true; G.visible = A.kind === 'grab';
+    const stab = Math.sin(Math.PI * seg(A.stabAt - 0.12, A.stabAt + 0.14));
+    if (A.kind === 'grab') {
+      // Left hand up to his neck and hold; the right drives the knife in under it.
+      const reach = ease(seg(0, 0.22)) * (1 - ease(seg(0.8, 1.0)));
+      G.position.set(-0.28 + 0.2 * reach, -0.45 + 0.3 * reach, -0.3 - 0.16 * reach);
+      G.rotation.set(1.1 - 0.5 * reach, 0.3, 0.4 * reach);
+      Kn.position.set(0.16 - 0.1 * stab, -0.26 + 0.1 * stab, -0.3 - 0.22 * stab);
+      Kn.rotation.set(-0.6 + 0.6 * stab, 0.4, -0.3);
+      this.camera.rotation.x += -0.12 * reach;
+    } else {
+      // Tackle: lunge forward and down, on the ground for the stab, then back up.
+      const down = ease(seg(0, 0.3)) * (1 - ease(seg(1.05, 1.55)));
+      this.camera.position.y -= 1.0 * down;
+      this.camera.rotation.x += -0.75 * down;
+      this.camera.rotation.z += 0.25 * down * (1 - seg(0.3, 0.5)) + 0.08 * Math.sin(A.t * 30) * seg(0.25, 0.35) * (1 - seg(0.35, 0.4));
+      Kn.position.set(0.14 - 0.06 * stab, -0.22 + 0.12 * stab, -0.3 - 0.2 * stab);
+      Kn.rotation.set(-0.9 + 0.9 * stab, 0.3, -0.2);
+    }
+    if (!A.hit && A.t >= A.stabAt) {
+      A.hit = true;
+      this.audio.hitConfirm(true);
+      this.hud.hitMarker(true);
+      this.camKick = (this.camKick || 0) - 0.03;
+      this.payload('melee', { id: A.id, x: A.to.x, z: A.to.z, yaw: P.yaw, by: this.role });
+      this.hud.flash('TAKEDOWN', 'cyan', 0.7);
+    }
+    if (A.t >= A.dur) { this.tdAnim = null; Kn.visible = false; G.visible = false; }
+    void u;
   },
   // Host: resolve a knife strike.
   _meleeHit(target, by) {
@@ -112,6 +167,7 @@ export const Kit2 = {
     this.hud.flash('TAKEDOWN', 'cyan', 0.7);
   },
   _knifeTick(dt) {
+    if (this.tdAnim) return; // the takedown animation owns the knife
     if (!(this.knifeT > 0)) { this.knife.visible = false; return; }
     this.knifeT -= dt;
     const u = 1 - this.knifeT / 0.55;

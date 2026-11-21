@@ -19,7 +19,7 @@ const START = { xr: 4, pen: 6, emp: 4 };
 
 export const XRounds = {
   _xrInit() {
-    const own = this.role === 'shooter' || this.operative;
+    const own = false; // special magazines removed: the KR-50's standard round penetrates and kills cameras
     this.xr = { pouch: own ? { ...START } : { xr: 0, pen: 0, emp: 0 }, swap: null, menu: false };
     Object.defineProperty(this.xr, 'rounds', { get: () => this.xr.pouch.xr, set: (v) => (this.xr.pouch.xr = v) });
     this.xcharges = [];

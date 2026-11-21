@@ -279,15 +279,17 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Spotlight drones:** a helicopter drone circles high over each way in (west, east and south), sweeping a spotlight across the ground. Stand in the light too long and it locks on: an alarm, and every guard near you comes. Stay out of the light, or shoot it down. The wreck makes a crash the guards nearby hear.
 - **Touch command wheel:** press and hold empty screen for one grouped wheel: pings across the top and bottom (LOOK, ENEMY, MOVE, HOLD / ON ME, COVER, SYNC, SNIPER POS), your commands (spotter) or requests (sniper) down the right, and operator toggles down the left (LIGHT, LASER, NV, SUPP, STAB, CHAT, plus ROUNDS / BREATH / MAP for the sniper and TABLET for the spotter). On phones and other small screens the middle button strip folds into it, leaving only USE, pause and the context buttons.
 - **Phone in hand:** when the phone comes up (quickhack, commands, requests), your support hand lets go of the weapon and drops out of view; it comes back when the phone goes away.
+- **KR-50 rounds:** one round type. Every round goes through bodies, walls, doors and bulwark shields, and kills any camera it passes (lights and drones can be shot out as ever). The special magazines are gone.
+- **MENU (touch):** a MENU button beside TABLET opens the command wheel mid-screen: tap an option to run it, tap outside to close (press-and-hold on empty screen still works). On phones the ability buttons sit in a small triangle between CROUCH and FIRE, and the objective board drops its hint line to make room.
+- **Radio subtitles** sit small in the top-right corner (the partner card steps down while a line is up).
 - **Slingshot:** both operators carry a slingshot for the noise lure (sniper X, spotter T, SLING on touch): it flies flatter and further than a throw.
 - **Hit markers:** every hit on an enemy flashes a crisp X round the crosshair (red on a headshot) with a light, dry impact tick, CoD-style, instead of a ping.
 - **Deadeye on touch:** while it's active and has targets, FIRE reads EXECUTE.
-- **Takedown:** within knife reach of an enemy in front of you, FIRE becomes **TAKEDOWN** (the touch button relabels): a silent kill from behind or on an unaware enemy, a heavy hit otherwise.
+- **Takedown:** within knife reach of an enemy in front of you, FIRE becomes **TAKEDOWN** (the touch button relabels). From behind you grab him by the neck with your left hand and stab with the right; head-on you tackle him to the ground, stab, and get back up. From behind or on an unaware enemy it's a silent kill; otherwise a heavy hit.
 - **Phone and tablet:** you can't fire while the phone is up. On desktop, **hold H** for the hack phone (let go to put it away); **TAB toggles the tablet** (the ISR view is a button inside it, or I).
 - **Knife:** weapon lasers switch off while the knife is out.
 - **Radio:** speech-synthesised lines use the device's most natural male voices near their own pitch, with slight variation; the static has a radio-passband hiss that drifts and flutters, varied crackle, brief signal breakups and a squelch-open sweep on key-up.
 - **Tap to collapse:** tap (or click) the objective board, the console / ISR squares or a bodycam to shrink it to its title strip; tap again to bring it back.
-- **Tracers:** each round type has its own colour: standard white-blue, explosive orange, penetrator violet, EMP electric cyan.
 - **Supply on me:** the sniper's request wheel has **SUPPLY → ME** (desktop: Shift+4): the supply drone drops it a couple of metres in front of you instead of at the crosshair.
 - **Knife as a weapon:** both operators carry the knife as a third weapon. Sniper: KR-50 / secondary / knife on **1 / 2 / 3**; spotter: primary (binoculars or K9 SMG) / P-9 / knife. The mouse wheel (not scoped) steps through them. On touch, tap the weapon-swap button for the next one (its label names it) or **press and hold** it for the weapon wheel and let go on a weapon. With the knife out, fire swings it; **V** still stabs from any weapon. (The sniper's requests moved to **4–9**.)
 - **Enemies** wear a fabric camo texture over proper kit: helmets with NVG mounts and rails, plate carriers with mag pouches and radios, belts, packs, knee and elbow pads, railed carbines with slotted handguards; the heavies get armoured knees and plating detail. Guards also have MOLLE webbing, a thigh holster, a dump pouch, boot soles and an IR patch. A bulwark's hard-light shield has a notch cut down from the top edge over its face, with a glowing amber rim: shoot through the notch for the head. Or break the shield: it soaks about two rifle rounds (four magnum, a dozen pistol, fifteen SMG; an explosive round breaks it outright), turns red and flickers as it weakens, and shatters into glowing shards with a flash when it goes. Brutes (juggernauts and the overseer) are hunched and rounded under layered armour: curved chest plates with neon trim, stacked dome pauldrons, armoured arms and legs, tusks, and a crested helmet on the overseer. **Sword brutes:** about half the juggernauts carry a two-pronged energy sword. The moment one sees you it charges, lunges the last few metres, and one hit downs you; drop it before it closes or break line of sight. Every enemy mixes rounded and angular forms: guards get domed shoulder and knee pads and capsule forearms, scavengers a capsule methane tank and a rounded rebreather mask, bulwarks a bird-like head with a beak and quills, titans are built to brute detail: a rounded armoured mass under three layered gunmetal plates with orange seams, segmented belly bands, stacked shoulder domes with angular rims, a back power pack with vents and glowing coils, armoured arms with a ribbed arm cannon and a forearm shield, thigh plates, knee domes and greaves, and a domed helmet with an angular faceplate and crest that a headshot knocks off.
@@ -301,12 +303,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - KR-50 Nightjar: bolt-action, integrally suppressed, with Halo-style hitscan and a night-vision scope. Press **N** (the NV button on touch) while scoped to switch the scope between night vision and plain vision. When an operator sprints, their third-person model drops the weapon to a low carry, matching the first-person view, and brings it back up when they stop.
   - Dead-on through the scope, wide from the hip (the crosshair opens to show it), with a real kick.
   - **Standard bolt** (default): tap fire and you come off the glass to work the bolt; keep fire held to stay scoped. The **straight-pull bolt** (Staging area) cycles while you stay on target.
-  - **Collateral:** every KR-50 round carries on through bodies (losing some punch each time). Walls stop it unless it's a penetrator.
-  - **Z: rounds menu** (left of the screen; 1–4, click or tap). Each swap is a full reload animation, and supply crates restock the special rounds.
-    - **Standard:** the default round, with collateral.
-    - **Explosive:** sticks where it hits, blinks for a second and blows. It kills a juggernaut or titan it's stuck to and catches anything within about 5 m. Loud.
-    - **Penetrator:** punches through walls and doors, exterior walls and bulwark shields included.
-    - **EMP:** kills drones, cameras, lights, shields and radios around the hit (non-lethal to people).
+  - **Penetration:** every KR-50 round carries on through bodies, walls, doors and bulwark shields (losing some punch each time) and kills any camera it passes.
   - **Breath and wind:** hold **SHIFT** on the scope to steady it (a few seconds, then a cooldown). The scope shows the crosswind and a hold-off dot for the range; the round drifts with the wind.
   - **Recoil and noise:** the rifle kicks. Its suppressed crack and the M50's still carry a short way, fading with distance (startling anyone very close); beyond that they're silent.
 - **Ghillie freeze:** prone and dead still for two seconds and you all but vanish past ~15 m. Move or fire and it breaks.
@@ -319,7 +316,6 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Stealth kit:**
   - **G** active camo (PlanetSide-style): it **breaks line of sight**, so guards, cameras, recon drones and spotlight helis can't see you past arm's length, and guards already shooting at you lose you and go searching. Moving drains the battery (sprinting faster). Hold still while cloaked and it slowly recharges; switched off it recharges at the full rate. **Firing breaks it.** Only the sniper has camo; the spotter has to stay hidden on their own.
   - **H** Deadeye (Splinter Cell style): the three closest enemies in your line of sight are marked automatically; pull the trigger and Ra drops the KR-50 to his left hand, draws the M50 and puts a round in each marked head, one after another. 60 s cooldown; kills no longer recharge it.
-  - **Magazines:** a strip of orange magazine silhouettes on the left (STD / EXP / PEN / EMP) shows how many rounds of each you have; tap or click one to load it (the full mag-out / mag-in reload). Z still opens the rounds menu on desktop.
   - **X** lures.
   - **E** knife takedown.
 - **Requests at the crosshair:** keys **4–9** request supply, scan, EMP, decoy, lights or the recon drone on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
@@ -412,7 +408,7 @@ Play with headphones. Every sound is positioned in 3D (HRTF panning):
 | F | Sync mark on the enemy under your crosshair | Same |
 | V | Knife strike | Same |
 | X | (Lure) | Thermal binoculars |
-| Z / ` | Rounds menu / laser | — / laser |
+| ` | Laser | laser |
 | SHIFT | Hold breath (scoped) | — |
 | Y / U | Acknowledge | Approve / deny requests |
 | I | — | ISR view (P: ping sweep) |
