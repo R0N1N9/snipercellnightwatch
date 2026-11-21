@@ -250,7 +250,7 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
   - **N** to reach up and pull the goggles down: your hand comes up, the goggles flip down with a click and a tube whine, and the picture irises open as the tubes warm.
   - The goggles and scope are smooth, near-white phosphor with a slight blue cast.
   - Bright lights, including a weapon light in your face, wash it out.
-  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. Your lasers come from a module on the gun (under the barrel of the pistols, on the right of the rifle's and SMG's forend) and meet whatever is under the crosshair; while you run, or the gun points well away from the crosshair, they follow the barrel instead. Your partner's lasers come out along their muzzle. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
+  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. Your lasers come from a module on the gun (under the barrel of the pistols, on the right of the rifle's and SMG's forend) and point straight out along the barrel, wherever the gun points. With night vision on, handguns and the SMG come up higher and cant over (right side up), MW-style, so the IR laser shows across the view; firing keeps the cant, aiming down the sights straightens it. The sniper rifle doesn't cant. Your partner's lasers come out along their muzzle. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
 - **Weapon lights (L):** a weapon light makes you easy to see. Guards also walk over to wherever the beam lands, so it works as a distraction.
 - **Sync shots:**
   1. Look at an enemy and **hold F** (or pick SYNC on the touch PING wheel) to mark it for your teammate: a pulsing circle sits over its head. The wheel's SYNC option works too.
@@ -289,7 +289,8 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Sync shot:** a **SYNC** ability button is always on the left (both roles): it marks the enemy you're looking at as your teammate's sync target.
 - **Reloading on the move:** sprinting during a reload slows you to a walk until the reload finishes instead of cancelling it.
 - **Canted pistols:** handguns (P-9, M50) sit near the centre of the screen, canted with the right side up, CoD-style; aiming down the sights straightens them. Turn it off in Settings (Canted pistol hold).
-- **Quick-draw (sniper):** pull your sidearm with an enemy within 20 m and the KR-50 stays on screen in your support hand while you shoot one-handed on the right.
+- **Quick-swap (sniper, CoD-style):** pull the M50 and it comes out fast in your right hand while the KR-50 drops to your left hand, held low in the corner. Swap back while it's still in your hand and it snaps up quicker. Keep the pistol out about three seconds without shooting and the rifle is slung; your left hand then joins the pistol. (The SMG is a two-handed gun, so it swaps normally.)
+- **NV scope tell:** with the KR-50's scope on night vision (the default) the eyepiece glows faintly green, with a brief white flash when it switches on or the rifle comes up.
 - **Takedown:** within knife reach of an enemy in front of you, FIRE becomes **TAKEDOWN** (the touch button relabels). From behind you grab him by the neck with your left hand and stab with the right; head-on you tackle him to the ground, stab, and get back up. From behind or on an unaware enemy it's a silent kill; otherwise a heavy hit.
 - **Phone and tablet:** you can't fire while the phone is up. On desktop, **hold H** for the hack phone (let go to put it away); **TAB toggles the tablet** (the ISR view is a button inside it, or I).
 - **Knife:** weapon lasers switch off while the knife is out.
@@ -341,7 +342,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Binocular view:** two big overlapping lenses (a Venn-diagram viewfinder, rimmed only on the outside) that fill most of the screen. Like night vision, the whole world stays visible: a bright grey thermal picture with warm bodies in red, only lightly dimmed outside the lenses. Zoom through four steps with the mouse wheel, + / −, or the touch ZOOM buttons; the readout shows the magnification.
 - **Laser rangefinder:** the binoculars show a live range under the crosshair (TARGET when it's on an enemy). Press **R** (or **LASE** on touch) to lase the target and send the sniper a **firing call**: the range from the sniper's position, a lead call if the target is walking, and "send it" (the KR-50 is hitscan, so there's no holdover). The target gets a yellow bracket with the range and lead on both players' screens for 15 s. Lasing a brute, titan or the overseer also marks its **weak points** (head; a titan's power pack, a brute's spine) for 20 s. With AI Ra, lasing a target marks it for him.
 - **Range callouts:** now and then, marking an enemy calls out its range from whoever marked it ("Rōnin: X-ray marked, 50 meters.").
-- **Nano drones (thermal binoculars):** you carry three nano drones; each one used reloads on its own 15 s timer. With the binoculars raised, **look at an enemy** for a moment to mark it (or tap it); you can mark as many as you have drones. While the binoculars are up, **FIRE becomes SWARM** (E works too): the swarm streams out and each marked target drops silently about 1.5 s later, any enemy type. Anyone who sees a body fall can still react.
+- **Nano drones (thermal binoculars):** you carry three nano drones; each one used reloads on its own 15 s timer. With the binoculars raised, **look at an enemy** for a moment to mark it (or tap it); you can mark as many as you have drones. While the binoculars are up, **FIRE becomes SWARM** (E works too): the swarm streams out and each marked target drops silently about 1.5 s later, any enemy type. Anyone who sees a body fall can still react. When sent, the swarm pours up out of your backpack, hangs overhead for a moment, then streaks to each target (about a second) and wraps its head.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
@@ -439,8 +440,10 @@ The lone operative carries both kits. Shift+E plants C4.
 
 - **Visuals:** dust motes, low mist, fireflies and moths around the lamps, here and in the valley duel (`src/atmofx.js`).
 - **Night soundscape** (`src/cell/ambient.js`): no constant hum or tones.
-  - Outdoors: wind that gusts and settles, trees stirring with it, insects chirping around you, and now and then a distant owl, dog or high aircraft.
+  - Outdoors: wind that gusts and settles, trees stirring with it, field crickets chirping all around (each with its own pitch and tempo) over a faint distant chorus, katydids rasping in the brush, a frog far off, and now and then a distant owl, dog or high aircraft.
   - Indoors: the outside fades to quiet air handling, with more airflow in the rack rooms.
+- **Foley** (`src/cell/foley.js`, all synthesised, all placed in 3D): magazine out / in and the bolt, charging handle or slide on every reload; grabbing, dragging (a scrape with each step) and dropping bodies; a relay clunk and ballast hum winding down when lights are taken out, and a flicker when they come back; sliding electric doors (latch, servo, seal) and heavy mechanical doors (handle, creak, slam); drawers, card readers and tools when you interact; the nano swarm's buzz.
+- **Enemy voices (Halo-style):** calm guards near each other talk back and forth in their own alien babble (each species sounds different: chittering officers, deep juggernauts and titans), lone guards mutter into their radios, a guard who spots you shouts, hits draw grunts and deaths a cry. A charging brute snarls and its energy blade hums. Voices fall off steeply with distance: talk across the yard is faint, a brute right on top of you is loud.
 - **Drones:** patrol drones and your quad make a soft rotor whoosh. Only the two nearest drones are audible.
 - **Radio discipline:** about half of kills get an "X-ray down" (at most one every 10 s). Contact callouts, routine ping voices, Overwatch's spotted and clear calls and "Going dark" are occasional and rate-limited. Guards' radio squelches are sparse and close-range.
 
@@ -467,6 +470,7 @@ The code is in `src/cell/`:
 | `nvg.js` | The night-vision gesture and warm-up |
 | `spatial.js` | Positional audio cues |
 | `ambient.js` | The night soundscape |
+| `foley.js` | Foley (reloads, bodies, doors, lights, interactions) and enemy voices |
 | `phone.js` | Quickhacks (TAB hold) |
 | `van.js`, `wheel.js`, `sfx.js` | The van, the ping wheel and synthesized sounds |
 | `cell.js` | Game loop, roles, netcode, objectives and HUD |

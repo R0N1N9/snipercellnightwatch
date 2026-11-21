@@ -146,6 +146,19 @@ export const Kit2 = {
   // collar, rocking with each step, and the view tipped down a little to watch him.
   _dragTick(dt) {
     const on = !!(this.obj.drag && this.obj.drag[this.role]) && !this.downed && !this.kia;
+    // Sounds: the grab, a scrape with each step while you drag, and the drop.
+    {
+      const id = on ? this.obj.drag[this.role] : 0, body = id && this.sentinel.byId(id);
+      if (body) this._dragAt = { x: body.x, y: (body.y || 0) + 0.3, z: body.z };
+      if (on && !this._dragWas && this._dragAt) this.foley.bodyGrab(this._dragAt);
+      if (!on && this._dragWas && this._dragAt) this.foley.bodyDrop(this._dragAt);
+      if (on && this._dragAt) {
+        const ph = Math.floor((this.player.bobPhase || 0) / Math.PI);
+        if (ph !== this._dragPh && (this.player.speed || 0) > 0.4) this.foley.dragScrape(this._dragAt);
+        this._dragPh = ph;
+      }
+      this._dragWas = on;
+    }
     this.dragK = Math.max(0, Math.min(1, (this.dragK || 0) + (on ? dt * 4 : -dt * 5)));
     const k = this.dragK;
     if (!this.dragG) {
@@ -266,27 +279,20 @@ export const Kit2 = {
     const o = P.eyePos(new THREE.Vector3());
     const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active) && !this.knifeEq && !(this.dragK > 0.5); // no lasers on a knife, or with both hands on a body
     if (live) {
-      // From a laser module on the gun (under the barrel of a handgun, on the right of the
-      // rifle's forend) to whatever sits under the crosshair. While you run, or the gun is
-      // down, it just follows the barrel.
+      // From the laser module on the gun (under the barrel of a handgun, on the right of the
+      // rifle's forend), straight out along the barrel: wherever the gun points, it points.
       const vm = this.viewmodel;
       const gm = vm.root.visible && vm.current && vm.models[vm.current];
       let from, end;
-      const aim = P.aimDir(new THREE.Vector3());
-      const xh = this.fac.ray(o, o.clone().addScaledVector(aim, 220), 'shot');
-      const xp = xh ? xh.point : o.clone().addScaledVector(aim, 220);
       if (gm) {
         const mod = this._lzMount(vm.current, gm);
         gm.updateWorldMatrix(true, true);
         from = mod.getWorldPosition(new THREE.Vector3());
-        const barrel = new THREE.Vector3(0, 0, -1).applyQuaternion(gm.getWorldQuaternion(new THREE.Quaternion())).normalize();
-        // Converge on the crosshair only while the barrel roughly points there.
-        const toX = xp.clone().sub(from).normalize();
-        const dir = P.sprinting || barrel.dot(toX) < 0.97 ? barrel : toX;
-        end = from.clone().addScaledVector(dir, 220);
+        const barrel = new THREE.Vector3(0, 0, -1).applyQuaternion(mod.getWorldQuaternion(new THREE.Quaternion())).normalize();
+        end = from.clone().addScaledVector(barrel, 220);
       } else {
         from = o.clone().add(new THREE.Vector3(0.04, -0.09, -0.45).applyEuler(this.camera.rotation));
-        end = from.clone().add(xp.clone().sub(from).normalize().multiplyScalar(220));
+        end = from.clone().addScaledVector(P.aimDir(new THREE.Vector3()), 220);
       }
       const h = this.fac.ray(from.clone().addScaledVector(end.clone().sub(from).normalize(), 0.05), end, 'shot');
       this.irLasers.me.set(from, h ? h.point : end, true);

@@ -1324,6 +1324,7 @@ export class Facility {
     for (const L of this.lightSources) {
       const on = !L.broken && !(L.offT > 0);
       if (on === L.on && L._synced) continue;
+      if ((L._synced || L.on !== undefined) && this.onLight) this.onLight(L, on); // (a real change, not the first sync)
       L.on = on;
       L._synced = true;
       if (!L.fx) continue;
@@ -1337,6 +1338,7 @@ export class Facility {
     const d = this.doors[id];
     if (!d || d.open === open) return;
     d.open = open;
+    if (this.onDoor) this.onDoor(d, open);
     d.box.solid = d.box.sight = d.box.shot = !open;
   }
 

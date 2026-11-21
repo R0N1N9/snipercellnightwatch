@@ -245,7 +245,8 @@ export const Devices = {
     N.marks = [];
     this.hud.flash(`NANO SWARM → ${ids.length} TARGET${ids.length > 1 ? 'S' : ''}`, 'cyan', 1.2);
     this._radio && this._radio(this.role, 'Swarm away.');
-    const from = { x: this.player.pos.x, y: this.player.pos.y + 1.6, z: this.player.pos.z };
+    // Out of the backpack: a little behind and below the eyes.
+    const P = this.player, from = { x: P.pos.x + Math.sin(P.yaw) * 0.3, y: P.pos.y + 1.3, z: P.pos.z + Math.cos(P.yaw) * 0.3 };
     this._swarmFx(ids, from);
     this.payload('swarm', { ids, from });
   },
@@ -338,40 +339,48 @@ export const Devices = {
     c.restore();
   },
 
-  // The swarm itself: a cloud of tiny glints per target that streams out and wraps the head.
+  // The swarm itself: per target, a cloud of nano drones that pours up out of the spotter's
+  // backpack, hangs overhead for a beat, then streaks to the target (fast) and wraps his head.
   _swarmFx(ids, from) {
     this.swarms = this.swarms || [];
     for (const id of ids) {
-      const n = 40, pos = new Float32Array(n * 3), seeds = [];
-      for (let i = 0; i < n; i++) seeds.push([Math.random() * 6.28, Math.random() * 6.28, 0.4 + Math.random() * 0.6, Math.random() * 0.25]);
+      const n = 46, pos = new Float32Array(n * 3), seeds = [];
+      for (let i = 0; i < n; i++) seeds.push([Math.random() * 6.28, Math.random() * 6.28, 0.5 + Math.random() * 0.8, Math.random() * 0.22, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4]);
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#9fe8ff', size: 0.05, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#a8f0ff', size: 0.07, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
       pts.frustumCulled = false;
       this.scene.add(pts);
-      this.swarms.push({ id, from: new THREE.Vector3(from.x, from.y, from.z), pts, seeds, t: 0 });
+      this.swarms.push({ id, from: new THREE.Vector3(from.x, from.y, from.z), pts, seeds, t: 0, buzz: 0 });
     }
+    this.foley && this.foley.swarm(new THREE.Vector3(from.x, from.y, from.z));
   },
   _swarmTick(dt) {
     const N = this.nano;
     if (N && N.ch < 3) { N.rl += dt; if (N.rl >= 15) { N.rl = 0; N.ch++; } }
     if (!this.swarms || !this.swarms.length) return;
-    const S = this.sentinel, v = new THREE.Vector3();
+    const S = this.sentinel, v = new THREE.Vector3(), up = new THREE.Vector3(), ease = (x) => x * x * (3 - 2 * x);
+    const RISE = 0.4, DASH = 0.55; // launch, then the dash (they arrive about 1.2 s in)
     for (const w of this.swarms) {
       w.t += dt;
       const g = S.byId(w.id);
-      const to = g ? new THREE.Vector3(g.x, (g.y || 0) + 1.6 * (S.constructor.TYPES ? 1 : 1), g.z) : w.from;
+      if (g) w.last = new THREE.Vector3(g.x, (g.y || 0) + 1.6, g.z);
+      const to = w.last || w.from;
       const a = w.pts.geometry.attributes.position.array;
-      w.seeds.forEach(([p1, p2, sp, lag], i) => {
-        const k = Math.min(1, Math.max(0, (w.t - lag) / 1.4)), e = k * k * (3 - 2 * k);
-        v.copy(w.from).lerp(to, e);
-        v.y += Math.sin(e * Math.PI) * 2.5; // arc up and over
-        const r = k < 1 ? 0.35 * (1 - e) + 0.12 : 0.18;
-        v.x += Math.cos(p1 + w.t * 9 * sp) * r; v.y += Math.sin(p2 + w.t * 7 * sp) * r * 0.7; v.z += Math.sin(p1 + w.t * 9 * sp) * r;
+      w.seeds.forEach(([p1, p2, sp, lag, ox, oz], i) => {
+        const t = Math.max(0, w.t - lag);
+        const r = Math.min(1, t / RISE), k = Math.min(1, Math.max(0, (t - RISE) / DASH));
+        // Up out of the pack into a loose cloud ~2 m overhead.
+        up.set(w.from.x + ox * 0.5, w.from.y + 2.0 + oz * 0.25, w.from.z + oz * 0.5);
+        v.copy(w.from).lerp(up, ease(r));
+        // Then the dash: accelerating in, low arc.
+        if (k > 0) { const e = k * k; v.copy(up).lerp(to, e); v.y += Math.sin(k * Math.PI) * 0.6; }
+        const swirl = k < 1 ? 0.22 * (1 - k) + 0.1 + (r < 1 ? 0.05 : 0) : 0.17;
+        v.x += Math.cos(p1 + w.t * 11 * sp) * swirl; v.y += Math.sin(p2 + w.t * 9 * sp) * swirl * 0.7; v.z += Math.sin(p1 + w.t * 11 * sp) * swirl;
         a[i * 3] = v.x; a[i * 3 + 1] = v.y; a[i * 3 + 2] = v.z;
       });
       w.pts.geometry.attributes.position.needsUpdate = true;
-      w.pts.material.opacity = w.t > 2.0 ? Math.max(0, 0.9 - (w.t - 2.0) * 1.5) : 0.9;
+      w.pts.material.opacity = w.t > 2.0 ? Math.max(0, 0.95 - (w.t - 2.0) * 1.6) : 0.95;
     }
     for (const w of this.swarms) if (w.t > 2.6) { this.scene.remove(w.pts); w.pts.geometry.dispose(); w.pts.material.dispose(); }
     this.swarms = this.swarms.filter((w) => w.t <= 2.6);
