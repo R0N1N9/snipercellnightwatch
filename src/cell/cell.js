@@ -799,7 +799,7 @@ export class CellGame {
       // The console's pulse only hears the network: drones, cameras, devices. People don't show.
       case 'scan': S.scanT = 4; for (const d of S.drones) if (d.state !== 'dead') { d.scanT = 4; d.tagT = Math.max(d.tagT, 8); } for (const c of S.cams) c.scanT = 4; this._toast('Network pulse \u2014 every drone, camera and device for 4 s. (People don\u2019t show: use the ISR sweep.)', 'cyan'); break;
       // ISR ping sweep: a circle on the ground; everything inside, flesh or machine, gets marked.
-      case 'qmark': this._neuroMark(target.ids || []); break;
+      case 'qmark': this._neuroMark(target.ids || [], !!target.auto); break;
       case 'pdrone': { const d = S.byId(target.id); if (d && d.state !== 'dead') { d.empT = 8; this._toast('Drone shorted out for 8 s.', 'cyan'); } break; }
       case 'blind': { const e = S.byId(target.id); if (e && e.state !== 'dead') { e.blindT = 6; e.aw = 0; if (e.state === 'alert' || e.state === 'berserk') { e.state = 'search'; e.searchT = 6; e.target = null; } this._toast('Optics rebooted: he\u2019s blind for 6 s.', 'cyan'); } break; }
       case 'plight': this.fac.lightsOff((L) => L.id === target.id, 20); this._toast('Light cut for 20 s.', 'dim'); break;
@@ -883,7 +883,8 @@ export class CellGame {
       }
       case 'tag': {
         const e = S.byId(target.id);
-        if (e && e.hp > 0) { e.tagT = HACK.tag; e.tagBy = target.by || by; }
+        // auto: a sight mark (crosshair), not a 'take him' call, so an AI Ra doesn't fire on it.
+        if (e && e.hp > 0) { e.tagT = Math.max(e.tagT || 0, HACK.tag); e.tagBy = target.by || by; e.autoTag = !!target.auto; }
         break;
       }
       case 'perch':
@@ -1141,6 +1142,7 @@ export class CellGame {
     const live = !this.downed && !this.kia;
     const act = { ...a };
     this._qhTick(dt, I, act);
+    this._cmdKeys(I);
     if (this.qh.on) this._eHeld = false;
     this._kitKeys(dt, I, tab, quad, live, act);
     const seat = this._seat();
@@ -1178,10 +1180,11 @@ export class CellGame {
     if (act.fire && live && P.w.chamber === 0 && P.w.mag === 0) { this.audio.click(); if (P.w.reserve > 0) P.startReload(); }
     else if (live && mode === 'full') { if (act.fireHeld || act.fire) { if (P.canFire()) this._fire(); } }
     else if (live && mode === 'burst') {
-      if (act.fire && !(this._burst > 0)) this._burst = 3;
-      if (this._burst > 0 && P.canFire()) { this._fire(); this._burst--; }
+      this._burstGap = Math.max(0, (this._burstGap || 0) - dt);
+      if ((act.fire || (act.fireHeld && this._burstGap <= 0)) && !(this._burst > 0)) this._burst = 3;
+      if (this._burst > 0 && P.canFire()) { this._fire(); this._burst--; if (!this._burst) this._burstGap = 0.22; }
       if (P.w.chamber === 0 && P.w.mag === 0) this._burst = 0;
-    } else if (act.fire && live && P.canFire()) this._fire();
+    } else if ((act.fire || act.fireHeld) && live && P.canFire()) this._fire(); // hold to keep firing at the weapon's rate
     // Footsteps make noise (running only, cloak halves it).
     if (P.moving && P.onGround && live) {
       this._stepT = (this._stepT || 0) - dt * (P.sprinting ? 1.6 : 1);
@@ -1828,7 +1831,7 @@ export class CellGame {
       if (g.state === 'dead') continue;
       const near = Math.hypot(g.x - me.x, g.z - me.z);
       const threat = (g.state === 'alert' || g.state === 'berserk') && g.target === this.role && near < 45 || (A.coverT > 0 && near < 40);
-      if (g.tagT > 0 || threat) cands.push({ e: g, p: { x: g.x, y: g.y + 1.25, z: g.z }, pri: threat ? 2 : 1 });
+      if ((g.tagT > 0 && !g.autoTag) || threat) cands.push({ e: g, p: { x: g.x, y: g.y + 1.25, z: g.z }, pri: threat ? 2 : 1 });
     }
     for (const d of S.drones) if (d.state !== 'dead' && (d.tagT > 0 || d.aw > 0.6)) cands.push({ e: d, p: { x: d.x, y: d.y, z: d.z }, pri: d.aw > 0.6 ? 3 : 1 });
     cands.sort((a, b) => b.pri - a.pri);
@@ -2315,6 +2318,7 @@ export class CellGame {
   _visuals(dt) {
     this._iceClient(dt);
     this._neuroTick(dt);
+    this._eyesTick(dt);
     this._nvgTick(dt);
     this._spatialTick(dt);
     if (this.ambient) {
@@ -2552,7 +2556,7 @@ class CellHud {
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
     const shooterKeys = [K('Esc', 'pause'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'quad'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('N', 'NV')];
+    const spotterKeys = [K('Esc', 'pause'), K('1–9', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'quad'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
@@ -2782,7 +2786,7 @@ class CellHud {
       this.el.sync.classList.toggle('go', g.syncReady);
       this.el.sync.querySelector('.a').className = 'a' + (g.syncAim ? ' on' : '');
       this.el.sync.querySelector('.b').className = 'b' + (g.syncPartner ? ' on' : '');
-      this.el.sync.querySelector('b').textContent = g.syncReady ? 'SYNC \u2014 FIRE' : g.aiSpot || g.operative ? 'SYNC \u2014 needs a second rifle' : `SYNC \u00B7 ${sm} MARKED`;
+      this.el.sync.querySelector('b').textContent = g.syncReady ? 'SYNC \u2014 FIRE' : g.operative ? 'SYNC \u2014 needs a second rifle' : `SYNC \u00B7 ${sm} MARKED`;
     }
     // PiP squares (~4 Hz).
     if (this.el.pip.style.display !== 'none') {

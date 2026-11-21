@@ -23,13 +23,17 @@ const OPTS = {
 const EXEC = 0.6;
 // Commands at the spot under your crosshair (when nothing hackable is targeted): the console's
 // payloads, sent from the phone. Same costs and cooldowns as the tablet.
-const CMDS = [
-  { k: 'supply', name: 'SUPPLY DROP', p: 'supply' },
+// Console commands at the crosshair, in the tablet's order (so the number keys match).
+export const CMDS = [
   { k: 'scan', name: 'PULSE SCAN', p: 'scan' },
+  { k: 'jam', name: 'JAM EARPIECES', p: 'jam' },
   { k: 'emp', name: 'EMP', p: 'emp' },
-  { k: 'decoy', name: 'DECOY', p: 'decoy' },
+  { k: 'supply', name: 'SUPPLY DROP', p: 'supply' },
   { k: 'lights', name: 'CUT LIGHTS', p: 'lights' },
+  { k: 'spoof', name: 'SPOOF CAMS', p: 'spoof' },
+  { k: 'decoy', name: 'DECOY PING', p: 'decoy' },
   { k: 'drone', name: 'RECON QUAD', p: 'quad' },
+  { k: 'medevac', name: 'MEDEVAC DRONE', p: 'medevac' },
 ];
 
 function buildPhone() {
@@ -194,7 +198,7 @@ export const Phone = {
     }
     const opts = Q.target ? (Q.target.kind === 'cmd' ? CMDS : OPTS[Q.target.kind]) : null;
     if (opts) {
-      for (let i = 0; i < Math.min(opts.length, 6); i++) if (I.pressed('Digit' + (i + 1))) Q.opt = i;
+      for (let i = 0; i < Math.min(opts.length, 9); i++) if (I.pressed('Digit' + (i + 1))) Q.opt = i;
       if (this._qhWheel) { Q.opt = (Q.opt + (this._qhWheel > 0 ? 1 : opts.length - 1)) % opts.length; this._qhWheel = 0; }
       const go = fired || this._qhClick || I.pressed('KeyE') || I.pressed('cell-use');
       this._qhClick = false;
@@ -207,6 +211,27 @@ export const Phone = {
         this.audio.click();
       }
     } else this._qhClick = false;
+  },
+
+  // Spotter, outside the tablet: number keys 1–9 fire that console command straight at the
+  // crosshair (same numbering as the tablet's payloads). The phone comes up and you tap it.
+  _cmdKeys(I) {
+    if (!(this.role === 'spotter' || this.operative) || !this.ops) return;
+    if ((this.qh && this.qh.on) || this.tablet.visible || this.isr.active || this.mini.open || this.downed || this.kia || this.paused) return;
+    if (this._voteOpen && this._voteOpen()) return;
+    const first = this.operative ? 3 : 1; // a lone operative keeps 1 / 2 for weapons
+    for (let i = first; i <= CMDS.length; i++) if (I.pressed('Digit' + i)) { this._pointCmd(CMDS[i - 1]); return; }
+  },
+  _pointCmd(o) {
+    const at = this._aimPoint();
+    const why = this._runRequest(o.k, at);
+    this._phonePulse && this._phonePulse();
+    this.hud.flash(why ? `${o.name}: ${why}` : o.name, why ? 'red' : 'cyan', 0.9);
+    if (!why) {
+      this.sfx.ui(true);
+      const p = PAYLOAD[o.p];
+      if (p && p.aim && at) this._addPin({ x: at.x, z: at.z, label: o.name, by: this.role });
+    }
   },
 
   _qhRun(tg, o) {

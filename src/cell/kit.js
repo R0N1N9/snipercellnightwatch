@@ -371,9 +371,9 @@ export const KitMethods = {
       if (!why) this._addPin({ x: at.x, z: at.z, label: 'DRONE →', by: this.role });
       return why;
     }
-    const map = { supply: 'supply', scan: 'scan', emp: 'emp', decoy: 'decoy', lights: 'lights' };
-    const p = PAYLOAD[map[k]];
-    return O.use(map[k], p.aim ? at : null);
+    const p = PAYLOAD[k];
+    if (!p) return 'UNKNOWN';
+    return O.use(k, p.aim ? at : null);
   },
 
   _onRequest(m) {
