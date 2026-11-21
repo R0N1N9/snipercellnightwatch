@@ -15,7 +15,7 @@ import { Wheel } from './wheel.js';
 const RANGE = 45;
 const OPTS = {
   cam: [{ k: 'cam', name: 'LOOP CAMERA', bw: 6 }],
-  drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }, { k: 'pcrash', name: 'CRASH IT', bw: 18 }],
+  drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }, { k: 'pcrash', name: 'DISRUPT', bw: 18 }],
   iot: [{ k: 'iot', name: 'DISTRACT', bw: 6 }],
   door: [{ k: 'door', name: 'OPEN DOOR', bw: 6 }],
   light: [{ k: 'plight', name: 'CUT LIGHT', bw: 4 }],

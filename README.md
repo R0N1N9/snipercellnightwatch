@@ -336,7 +336,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
   - **Hold** (or press **H**, or tap the **📱 HACK** ability button / HACK on the touch wheel) for **quickhacks**: your left hand brings up your phone and the HUD switches to scan mode (time slows in solo). Everything hackable in view gets tagged.
   - Look at a target, pick a hack (mouse wheel or 1/2) and click or press E. Your thumb taps the screen and the hack uploads.
-  - Hacks: loop a camera, short-circuit a drone or **CRASH IT** (18 BW: hack a patrol drone or a spotlight heli out of the sky; drones can be hacked from further away), open an electronic door, cut a light, set off an IoT device, or jam a guard's comms / reboot his optics (blind for 6 s).
+  - Hacks: loop a camera, short-circuit a drone or **DISRUPT** (18 BW: hack a patrol drone or a spotlight heli out of the sky; drones can be hacked from further away), open an electronic door, cut a light, set off an IoT device, or jam a guard's comms / reboot his optics (blind for 6 s).
   - **Commands:** look at open ground instead and the menu becomes **Commands** for that spot: supply drop, pulse scan, EMP, decoy, cut lights or recon quad. The phone comes up, your thumb taps, and it lands where you're aiming. Ping-wheel requests get the same quick phone gesture.
   - On touch, tap an option row to pick it and run it.
   - Quickhacks still work when ICE knocks the console offline.
