@@ -292,8 +292,8 @@ async function stagePreview(role) {
   const { cellLook } = await import('./cell/arms.js');
   stageRole = role || stageRole || cellSet.role;
   const DESC = {
-    shooter: 'SHOOTER \u00B7 KR-50 Nightjar, active camo, FDE chest rig, urban-digital poncho, covert earpiece, NVGs.',
-    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier and headset, ball cap, NVGs, recon drone on the pack.',
+    shooter: 'SHOOTER \u00B7 KR-50 Nightjar, active camo, FDE chest rig with black pouches, urban-digital poncho, covert earpiece, NVGs.',
+    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier with black pouches, FDE headset, ball cap, NVGs, recon drone on the pack.',
   };
   document.querySelectorAll('#stage-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.r === stageRole));
   $('stage-who').textContent = `${stageRole.toUpperCase()} \u00B7 ${cellName(stageRole)}`;
@@ -690,6 +690,9 @@ function primeTalk() { try { const u = new SpeechSynthesisUtterance(' '); u.volu
 const CELL_CALL = { shooter: 'Ra', spotter: 'R\u014dnin' };
 // Staging-area loadouts (both roles), applied at mission start.
 let cellLoadout = store.get('cellLoadout', null);
+// Fast camo became the sniper's default perk: move the old default (lures) over once.
+if (cellLoadout && cellLoadout.shooter && cellLoadout.shooter.perk === 'lures' && !store.get('cellPerkCamo', false)) { cellLoadout.shooter.perk = 'camo'; store.set('cellLoadout', cellLoadout); }
+store.set('cellPerkCamo', true);
 async function renderStaging() {
   const { normLoadout, PERKS } = await import('./cell/arms.js');
   const L = (cellLoadout = normLoadout(cellLoadout));
@@ -697,13 +700,13 @@ async function renderStaging() {
   const perks = (r) => Object.entries(PERKS[r]).map(([v, p]) => opt(r + '.perk', v, p.name, L[r].perk === v, p.desc)).join('');
   const prim = (name, desc) => `<div class="stg-prim"><b>${name}</b><small>${desc}</small></div>`;
   $('panel-staging').querySelector('.stg').innerHTML = `
-    <div class="stg-col" data-r="shooter"><h3>SHOOTER \u00B7 ${CELL_CALL.shooter}</h3><p>Multicam black, FDE chest rig, urban-digital poncho, covert earpiece. Active camo, lock-pick set, weapon light, laser.</p>
+    <div class="stg-col" data-r="shooter"><h3>SHOOTER \u00B7 ${CELL_CALL.shooter}</h3><p>Multicam black, FDE chest rig with black pouches, urban-digital poncho, covert earpiece. Active camo, lock-pick set, weapon light, laser.</p>
       <div class="stg-k">PRIMARY</div>${prim('KR-50 NIGHTJAR', '.50 subsonic bolt gun, integral suppressor, 2\u00D7/8\u00D7 night scope. Through bodies and thin walls; special magazines (Z): explosive, penetrator, EMP. Kicks hard; wide from the hip.')}
       <div class="stg-k">KR-50 BOLT</div><div class="stg-opts">${opt('shooter.bolt', 'standard', 'STANDARD', L.shooter.bolt !== 'straight', 'Tap fire: off the glass to work the bolt. Hold fire to stay scoped.')}${opt('shooter.bolt', 'straight', 'STRAIGHT-PULL', L.shooter.bolt === 'straight', 'Cycles while you stay on target. A little more climb.')}</div>
       <div class="stg-k">SECONDARY</div><div class="stg-opts">${opt('shooter.secondary', 'smg', 'K9 HUSH SMG', L.shooter.secondary === 'smg', '40 rounds, full / burst / semi (B). Quiet, light kick.')}${opt('shooter.secondary', 'mag50', 'M50 MAGNUM', L.shooter.secondary === 'mag50', '7 rounds, slow and heavy. Big kick, wide from the hip: aim down sights.')}</div>
       <div class="stg-k">SECONDARY SUPPRESSOR</div><div class="stg-opts">${opt('shooter.secSup', '1', 'FITTED', L.shooter.secSup, 'Quiet. Hold B in game to twist it off.')}${opt('shooter.secSup', '0', 'OFF', !L.shooter.secSup, 'Loud: every shot carries 70 m.')}</div>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('shooter')}</div></div>
-    <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3><p>Multicam black, FDE plate carrier, ball cap, FDE headset. CYBER OPS tablet, recon drone, ISR, keycard duty.</p>
+    <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3><p>Multicam black, FDE plate carrier with black pouches, ball cap, FDE headset. CYBER OPS tablet, recon drone, ISR, keycard duty.</p>
       <div class="stg-k">PRIMARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, two magazines. Suppressor fitted by default.')}
       <div class="stg-k">SECOND</div>${prim('THERMAL BINOCULARS', 'X to swap from the P-9; raise them to mark every enemy in the viewfinder at any range.')}
       <div class="stg-k">P-9 SUPPRESSOR</div><div class="stg-opts">${opt('spotter.pistolSup', '1', 'FITTED', L.spotter.pistolSup, 'Quiet up close.')}${opt('spotter.pistolSup', '0', 'OFF', !L.spotter.pistolSup, 'Loud: every shot carries 70 m.')}</div>

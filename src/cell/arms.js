@@ -28,7 +28,7 @@ export const PERKS = {
   spotter: { bandwidth: { name: 'BANDWIDTH', desc: 'Console bandwidth regenerates 40% faster.' }, drops: { name: 'LOGISTICS', desc: '+2 supply drops for the team.' }, armor: { name: 'LIGHT ARMOR', desc: 'Take 20% less damage.' } },
 };
 export const DEFAULT_LOADOUT = {
-  shooter: { secondary: 'smg', secSup: true, perk: 'lures', bolt: 'standard' },
+  shooter: { secondary: 'smg', secSup: true, perk: 'camo', bolt: 'standard' },
   spotter: { pistolSup: true, perk: 'bandwidth' },
 };
 export function normLoadout(lo) {
@@ -189,7 +189,7 @@ export function cellLook(role) {
   // Uniforms multicam black; carrier, rig, belts and straps a dark, muted flat dark earth; IR
   // markers. The shooter wears a clear coiled earpiece under the hood and carries the KR-50; the
   // spotter wears a ball cap and an FDE headset with a boom mic.
-  const common = { outfit: 'wraith', theme: 'mcblack', gear: '#5f533e', irMark: true, eyes: 'goggles' };
+  const common = { outfit: 'wraith', theme: 'mcblack', gear: '#5f533e', gearAccent: '#1c1d1f', irMark: true, eyes: 'goggles' };
   return role === 'shooter'
     ? { ...common, vest: 'rig', poncho: true, ponchoTheme: 'urbandark', hat: 'none', earpiece: true, rifle: 'kr50', kit: { stealth: 'suppressor' } }
     : { ...common, vest: 'plate', poncho: false, hat: 'cap', headset: true, kit: { scout: 'drone' } };

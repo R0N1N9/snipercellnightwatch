@@ -58,7 +58,7 @@ function frame(t) {
     P.idle += dt;
     if (P.idle > 1.2) P.yaw += dt * 0.45;
   }
-  P.av.update(dt, { p: new THREE.Vector3(0, 0, 0), yaw: 0, pitch: P.low ? -0.75 : 0, st: 0, moving: false, w: !!P.w, lowReady: !!P.low });
+  P.av.update(dt, { p: new THREE.Vector3(0, 0, 0), yaw: 0, pitch: 0, st: 0, moving: false, w: !!P.w, lowReady: !!P.low });
   P.av.root.rotation.y = P.yaw;
   // Fit ~2.1 m tall and ~1.7 m wide (the rifle swings round as it turns).
   const tv = Math.tan(THREE.MathUtils.degToRad(P.cam.fov / 2));
