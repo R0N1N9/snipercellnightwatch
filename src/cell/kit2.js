@@ -142,6 +142,36 @@ export const Kit2 = {
     if (A.t >= A.dur) { this.tdAnim = null; Kn.visible = false; G.visible = false; }
     void u;
   },
+  // Dragging a body, first person: the gun away, both gloves low in front gripping his
+  // collar, rocking with each step, and the view tipped down a little to watch him.
+  _dragTick(dt) {
+    const on = !!(this.obj.drag && this.obj.drag[this.role]) && !this.downed && !this.kia;
+    this.dragK = Math.max(0, Math.min(1, (this.dragK || 0) + (on ? dt * 4 : -dt * 5)));
+    const k = this.dragK;
+    if (!this.dragG) {
+      if (!k) return;
+      this.dragG = [glove(), glove()];
+      for (const g of this.dragG) { g.scale.setScalar(1.15); g.traverse((o) => { o.renderOrder = 11; o.frustumCulled = false; }); this.camera.add(g); }
+    }
+    const [L, R] = this.dragG;
+    L.visible = R.visible = k > 0.02;
+    if (!L.visible) return;
+    const P = this.player, ph = P.bobPhase || 0, mv = Math.min(1, (P.speed || 0) / 1.5);
+    const ease = k * k * (3 - 2 * k);
+    // Each step heaves him along: the hands pull back and up, then ease forward.
+    const heave = Math.sin(ph) * 0.025 * mv, sway = Math.cos(ph * 0.5) * 0.02 * mv;
+    for (const [G, s] of [[L, -1], [R, 1]]) {
+      G.position.set(s * (0.13 - 0.04 * ease) + sway, -0.6 + 0.34 * ease + heave, -0.36 - 0.1 * ease + heave * 0.6);
+      G.rotation.set(-0.35 + heave * 4, s * 0.25, s * 0.35); // palms down, fingers curled over his collar
+    }
+    // Tip the view down to watch him only while he's in front of you.
+    const g = on && this.sentinel.byId(this.obj.drag[this.role]);
+    const ahead = g ? Math.max(0, -(Math.sin(P.yaw) * (g.x - P.pos.x) + Math.cos(P.yaw) * (g.z - P.pos.z)) / 1.85) : 0;
+    this.dragLook = (this.dragLook || 0) + (ahead - (this.dragLook || 0)) * Math.min(1, dt * 4);
+    this.camera.rotation.x += -0.2 * ease * this.dragLook;
+    this.camera.rotation.z += sway * 0.6 * ease;
+    this.camera.position.y += -0.04 * ease + heave * 0.4;
+  },
   // Host: resolve a knife strike.
   _meleeHit(target, by) {
     by = target.by || by;
@@ -202,6 +232,28 @@ export const Kit2 = {
     return this.nv || !!(this.quad && this.quad.active) || (P.def.scope && P.scopeT > 0.6);
   },
 
+  // The laser module on a first-person gun, built once per model: a small dark box with a lens,
+  // under the barrel of the pistols, clamped to the right of the rifle's / SMG's forend.
+  _lzMount(key, g) {
+    const U = g.userData;
+    if (U._lz) return U._lz;
+    const m = U.muzzle.position;
+    const side = key === 'kr50' || key === 'smg';
+    const at = side ? new THREE.Vector3(0.034, m.y - 0.012, m.z + (key === 'kr50' ? 0.5 : 0.3)) : new THREE.Vector3(0, m.y - 0.042, m.z + 0.075);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(side ? 0.022 : 0.026, side ? 0.024 : 0.02, 0.06), new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.6, metalness: 0.4 }));
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.006, 10), new THREE.MeshBasicMaterial({ color: 0xff3b2a }));
+    lens.position.set(0, 0, -0.0305); lens.rotation.y = Math.PI;
+    box.add(lens);
+    box.position.copy(at);
+    const ref = U.muzzle.parent === g ? null : U.muzzle.parent;
+    for (const o of [box, lens]) { o.renderOrder = 10; o.frustumCulled = false; }
+    (ref || g).add(box);
+    // The beam leaves from the lens.
+    const tip = new THREE.Object3D(); tip.position.set(0, 0, -0.035); box.add(tip);
+    U._lz = tip;
+    return tip;
+  },
+
   _irTick(dt) {
     const t = this.t;
     blinkStrobes(this.strobes.partner, t, 0.5);
@@ -212,17 +264,31 @@ export const Kit2 = {
     // Lasers: from your weapon along your aim, and from your partner's.
     const P = this.player;
     const o = P.eyePos(new THREE.Vector3());
-    const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active) && !this.knifeEq; // no lasers on a knife
+    const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active) && !this.knifeEq && !(this.dragK > 0.5); // no lasers on a knife, or with both hands on a body
     if (live) {
-      // From the weapon's muzzle, straight out along the barrel: wherever the gun points (down
-      // and across while you run), or along your aim through the scope.
+      // From a laser module on the gun (under the barrel of a handgun, on the right of the
+      // rifle's forend) to whatever sits under the crosshair. While you run, or the gun is
+      // down, it just follows the barrel.
       const vm = this.viewmodel;
-      let dir = P.aimDir(new THREE.Vector3());
       const gm = vm.root.visible && vm.current && vm.models[vm.current];
-      if (gm) { gm.updateWorldMatrix(true, false); dir = new THREE.Vector3(0, 0, -1).applyQuaternion(gm.getWorldQuaternion(new THREE.Quaternion())).normalize(); }
-      const from = vm.root.visible && vm.current ? vm.muzzleWorld(new THREE.Vector3()) : o.clone().add(new THREE.Vector3(0, -0.07, -0.45).applyEuler(this.camera.rotation));
-      const end = from.clone().addScaledVector(dir, 220);
-      const h = this.fac.ray(from, end, 'shot');
+      let from, end;
+      const aim = P.aimDir(new THREE.Vector3());
+      const xh = this.fac.ray(o, o.clone().addScaledVector(aim, 220), 'shot');
+      const xp = xh ? xh.point : o.clone().addScaledVector(aim, 220);
+      if (gm) {
+        const mod = this._lzMount(vm.current, gm);
+        gm.updateWorldMatrix(true, true);
+        from = mod.getWorldPosition(new THREE.Vector3());
+        const barrel = new THREE.Vector3(0, 0, -1).applyQuaternion(gm.getWorldQuaternion(new THREE.Quaternion())).normalize();
+        // Converge on the crosshair only while the barrel roughly points there.
+        const toX = xp.clone().sub(from).normalize();
+        const dir = P.sprinting || barrel.dot(toX) < 0.97 ? barrel : toX;
+        end = from.clone().addScaledVector(dir, 220);
+      } else {
+        from = o.clone().add(new THREE.Vector3(0.04, -0.09, -0.45).applyEuler(this.camera.rotation));
+        end = from.clone().add(xp.clone().sub(from).normalize().multiplyScalar(220));
+      }
+      const h = this.fac.ray(from.clone().addScaledVector(end.clone().sub(from).normalize(), 0.05), end, 'shot');
       this.irLasers.me.set(from, h ? h.point : end, true);
       this.visLasers.me.set(from, h ? h.point : end, !!this.laserOn && !this.cine.active && !(this.bino && this.bino.on));
     } else { this.irLasers.me.set(o, o, false); this.visLasers.me.set(o, o, false); }

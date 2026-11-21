@@ -250,7 +250,7 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
   - **N** to reach up and pull the goggles down: your hand comes up, the goggles flip down with a click and a tube whine, and the picture irises open as the tubes warm.
   - The goggles and scope are smooth, near-white phosphor with a slight blue cast.
   - Bright lights, including a weapon light in your face, wash it out.
-  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. Both the IR and red lasers always come out along the muzzle, so they swing low with the weapon while you run. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
+  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. Your lasers come from a module on the gun (under the barrel of the pistols, on the right of the rifle's and SMG's forend) and meet whatever is under the crosshair; while you run, or the gun points well away from the crosshair, they follow the barrel instead. Your partner's lasers come out along their muzzle. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
 - **Weapon lights (L):** a weapon light makes you easy to see. Guards also walk over to wherever the beam lands, so it works as a distraction.
 - **Sync shots:**
   1. Look at an enemy and **hold F** (or pick SYNC on the touch PING wheel) to mark it for your teammate: a pulsing circle sits over its head. The wheel's SYNC option works too.
@@ -274,7 +274,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 
 - **Tablet / map / ISR:** your weapon drops away, your left hand brings the tablet up until it fills the view, and the screen flickers on. On the tablet, the ISR button flips to the Predator feed (both roles), and TAB flips back.
 - **Laser sights (` or LASER):** a visible red laser from your weapon, on by default. Your partner sees yours; guards can catch it too.
-- **Body drag (hold E on a body):** drag it out of sight, then let go. You move at half speed while dragging.
+- **Body drag (press E on a body):** a toggle. Press E to grab the collar, then back up to drag him: your gun goes away, both hands grip him low in front, and you walk at about half speed with no sprint. Walk on and he trails behind on the rope. Press E again to put him down. No lasers or firing while you drag.
 - **Bodycams:** shoulder-mounted, wide-angle, low-light cams (an MW-style feed with REC and a timestamp, not a copy of the wearer's eyes): the wearer's shoulder, arm and weapon sit in the bottom of the frame. Both show as small squares in the ISR view. Turn on **Partner bodycam** in the pause menu to keep your partner's on screen: it sits top right under the partner card and shrinks or moves so it never covers a button.
 - **Spotlight drones:** a helicopter drone circles high over each way in (west, east and south), sweeping a spotlight across the ground. Stand in the light too long and it locks on: an alarm, and every guard near you comes. Stay out of the light, or shoot it down. The wreck makes a crash the guards nearby hear.
 - **Touch command wheel:** press and hold empty screen for one grouped wheel: pings across the top and bottom (LOOK, ENEMY, MOVE, HOLD / ON ME, COVER, SYNC, SNIPER POS), your commands (spotter) or requests (sniper) down the right, and operator toggles down the left (LIGHT, LASER, NV, SUPP, STAB, CHAT, plus ROUNDS / BREATH / MAP for the sniper and TABLET for the spotter). On phones and other small screens the middle button strip folds into it, leaving only USE, pause and the context buttons.
@@ -284,6 +284,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Radio subtitles** sit small in the top-right corner (the partner card steps down while a line is up).
 - **Lure (sniper):** X / LURE: your left hand comes off the rifle and throws the lure overhand like a grenade; it lands, ticks and pulls guards to it.
 - **Hit markers:** every hit on an enemy flashes a crisp X round the crosshair (red on a headshot) with a light, dry impact tick, CoD-style, instead of a ping.
+- **Getting hit:** a short, dull thump (Minecraft-style "oof"), heavier for big hits, instead of a ping; drone zaps crackle rather than beep.
 - **Deadeye on touch:** while it's active and has targets, FIRE reads EXECUTE.
 - **Sync shot:** a **SYNC** ability button is always on the left (both roles): it marks the enemy you're looking at as your teammate's sync target.
 - **Reloading on the move:** sprinting during a reload slows you to a walk until the reload finishes instead of cancelling it.

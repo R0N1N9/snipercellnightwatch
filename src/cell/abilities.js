@@ -9,7 +9,7 @@
 //   SPOTTER RELAY    tagged enemies off your screen get an arrow at the edge (shooter)
 //   CAMERA DART      9: fire a camera dart into a wall or the ground; it marks what's in front of
 //                    it and feeds the tablet (three darts)
-//   BODY DRAG        hold E on a body to drag it (both roles); let go to drop it in the dark
+//   BODY DRAG        press E on a body to drag it at a walk (both roles); press E again to put it down
 // and the first-use hint cards for every ability.
 import * as THREE from 'three';
 
@@ -24,7 +24,7 @@ export const HINTS = {
   chain: ['MARKED FOR DEATH', 'Kill three tagged enemies within 10 s of each other: the camo battery is full.'],
   overwatch: ['OVERWATCH LOCK', 'Hold the scope steady on an area: everything around your point of aim is marked for the team while you keep it there.'],
   dart: ['CAMERA DART (9)', 'Fires a tiny camera into whatever you hit. It marks enemies in front of it and shows up as a feed on the tablet.'],
-  drag: ['BODY DRAG (hold E)', 'Hold E on a body to drag it. Let go to drop it somewhere dark, out of a patrol’s path.'],
+  drag: ['BODY DRAG (press E)', 'Press E on a body to grab his collar, then back up to drag him at a walk. Press E again to put it down somewhere dark, out of a patrol’s path.'],
   bino: ['THERMAL BINOCULARS (X)', 'Raise them (right click / SCOPE): every enemy in the viewfinder is marked, at any range, and shows hot red.'],
   drone: ['RECON DRONE (G)', 'G to launch, G to park it (it keeps marking), hold G to recall. Enemies inside its red cone are marked.'],
   laser: ['LASER SIGHT (`)', 'A visible red laser from your weapon. Handy for showing your partner a target; guards can catch it too. The ` key (or LASER) toggles it.'],
@@ -278,25 +278,35 @@ export const Abilities = {
 
   // ---- body drag (host decides; both roles) -------------------------------------------
   // Called from _interact for each agent. Returns true while that agent is dragging.
+  // A toggle: press E on a body to pick it up, press E again to put it down.
   _dragInteract(a, held, opt) {
     const ob = this.obj, S = this.sentinel, role = a.role;
     ob.drag = ob.drag || {};
+    const E = (this._dragE = this._dragE || {});
+    const press = held && !E[role];
+    if (!opt) E[role] = held; // the first call each frame tracks the key's edge
     const id = ob.drag[role];
     if (id) {
       const g = S.byId(id);
-      if (!held || !g) { ob.drag[role] = 0; return false; }
-      const yaw = a.yaw || 0;
-      g.x = a.pos.x + Math.sin(yaw) * 1.2; g.z = a.pos.z + Math.cos(yaw) * 1.2;
+      if (!g || press) { ob.drag[role] = 0; return true; } // that press only puts him down
+      // Held by the collar on a short tether: his head at your feet, his legs trailing away
+      // from you. Back up and he slides along in front of you; walk on and he follows behind.
+      let dx = g.x - a.pos.x, dz = g.z - a.pos.z, d = Math.hypot(dx, dz);
+      if (d < 0.01) { dx = -Math.sin(a.yaw || 0); dz = -Math.cos(a.yaw || 0); d = 1; }
+      dx /= d; dz /= d;
+      const L = Math.min(1.85, d); // a rope: it pulls him, never pushes
+      g.x = a.pos.x + dx * L; g.z = a.pos.z + dz * L;
       g.y = this.fac.groundAt(g.x, g.z, a.pos.y + 0.5, 0.6);
+      g.yaw = Math.atan2(dx, dz); g.look = 0;
       g.found = false;
-      this.prompts[role] = { label: 'Dragging the body — let go of E to drop it', p: 0, key: 'drag' };
+      this.prompts[role] = { label: 'Dragging the body — press E to put it down', p: 0, key: 'drag' };
       return true;
     }
     if (!opt) return false;
     for (const g of S.guards) {
       if (g.state !== 'dead' || g.tower) continue;
       if (Math.hypot(g.x - a.pos.x, g.z - a.pos.z) > 1.8 || Math.abs(g.y - a.pos.y) > 1.2) continue;
-      opt('drag', 'Hold E — drag the body', 0.35, () => { ob.drag[role] = g.id; if (role === this.role) this._hint('drag'); });
+      opt('drag', 'E — drag the body', 0, () => { ob.drag[role] = g.id; if (role === this.role) this._hint('drag'); });
       break;
     }
     return false;

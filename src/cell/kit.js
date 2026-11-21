@@ -578,7 +578,7 @@ export const KitMethods = {
       if (k === 'beam') { this._tracer(a, miss, '#b8f4ff', 0.35); this._tracer(a.clone().add(new THREE.Vector3(0, 0.03, 0)), miss, '#30e0ff', 0.5); this.sfx.beam(a); }
       else this._tracer(a, miss, k === 'zap' ? '#ff4060' : '#ffb060', k === 'zap' ? 0.12 : 0.07);
       const d = this.camera.position.distanceTo(a);
-      if (k === 'bullet') this.audio.shotDistant(a, d / 343, false); else if (k === 'zap') this.audio.beep(a, true);
+      if (k === 'bullet') this.audio.shotDistant(a, d / 343, false); else if (k === 'zap') this.audio.zap(a);
       this._boltLand(m, miss, a);
       return;
     }

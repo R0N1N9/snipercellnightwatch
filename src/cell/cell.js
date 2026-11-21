@@ -1333,8 +1333,11 @@ export class CellGame {
     if (this.role === 'spotter') { act.slot1 = act.slot2 = act.swap = false; if (!P.scoped) act.zoomIn = act.zoomOut = false; }
     act.zeroUp = act.zeroDown = false;
     act.breath = !!(this.ab && this.ab.breath.on);
-    P.noSprint = !!this.obj.drive && this.obj.drive === this.role;
-    P.speedMul = (tab ? 0.55 : 1) * (this.obj.drag && this.obj.drag[this.role] ? 0.5 : 1);
+    // Dragging a body: both hands on him, so no sprint, no gun, a slow walk.
+    const dragging = !!(this.obj.drag && this.obj.drag[this.role]);
+    P.noSprint = (!!this.obj.drive && this.obj.drive === this.role) || dragging;
+    P.speedMul = (tab ? 0.55 : 1) * (dragging ? 0.5 : 1);
+    if (dragging) { act.fire = act.fireHeld = act.scope = act.reload = false; P.scoped = false; }
     if (this.downed) { P.stance = 2; }
     // Pulling the trigger while running drops you out of the sprint (and the shot goes).
     if ((act.fire || act.fireHeld) && live && !quad && !tab && (P.sprinting || act.sprint)) this._noSprintT = 0.4;
@@ -1396,7 +1399,7 @@ export class CellGame {
     this.camera.updateProjectionMatrix();
     // First-person weapon.
     const scopedRifle = P.def.scope && P.scopeT > 0.6;
-    this.viewmodelVisible = live && !quad && !tab && !seat && !isr && !this.devAnim;
+    this.viewmodelVisible = live && !quad && !tab && !seat && !isr && !this.devAnim && !(this.dragK > 0.5);
     this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !this.tdAnim && !(this.bino && this.bino.on) && !this.knifeEq;
     // Suppressor cans (mid-gesture the can shows while it's in your hand).
     const supU = this._supTick(dt), SA = this.supAnim;
@@ -1406,6 +1409,7 @@ export class CellGame {
     this.carry.visible = this.obj.drive === this.role && live && !quad && !isr;
     this._knifeTick(dt);
     this._tdTick(dt);
+    this._dragTick(dt);
     this._lureAnimTick(dt);
     if (!this.tdAnim) this._wpnTick();
     // Deadeye: the M50 in the right hand, the KR-50 lowered in the left.
@@ -1422,7 +1426,7 @@ export class CellGame {
       this._qdSlot = toSlot;
     }
     const QD = !DE && this.quickDraw && P.slot === 1 && !this.knifeEq;
-    if (this.deRifle) this.deRifle.visible = (!!DE || QD) && this.viewmodel.root.visible;
+    if (this.deRifle) this.deRifle.visible = !!((DE || QD) && this.viewmodel.root.visible);
     this.viewmodel.update(dt, {
       def: DE ? MAGNUM : P.def, scopeT: DE ? 0.35 : P.scopeT, leftHand: DE || QD ? new THREE.Vector3(-0.13, -0.24, -0.42) : null, cant: !DE && !QD && this.settings.pistolCant !== false, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
       reloadT: DE ? 0 : P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: DE ? DE.switchT : P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
@@ -1795,7 +1799,7 @@ export class CellGame {
     const miss = m.hit ? b : b.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, (Math.random() - 0.3) * 1.5, (Math.random() - 0.5) * 2.5));
     this._tracer(a, miss, m.zap ? '#ff4060' : '#ffb060', m.zap ? 0.12 : 0.07);
     const d = this.camera.position.distanceTo(a);
-    if (!m.zap) this.audio.shotDistant(a, d / 343, false); else this.audio.beep(a, true);
+    if (!m.zap) this.audio.shotDistant(a, d / 343, false); else this.audio.zap(a);
     if (m.role === 'quad') {
       if (m.hit) { if (this.role === 'spotter' && this.quad && this.quad.active) this._quadDamage(m.dmg); else if (this.isHost) this._broadcast({ k: 'quadhit', dmg: m.dmg }); }
       return;
@@ -1809,6 +1813,7 @@ export class CellGame {
   _damage(dmg, from) {
     if ((this.role === 'spotter' || this.operative) && this.loadout.spotter.perk === 'armor') dmg *= 0.8;
     this.hp -= dmg;
+    this.audio.hurt && this.audio.hurt(dmg >= 40);
     this.hud.damage(Math.atan2(from.x - this.player.pos.x, from.z - this.player.pos.z) - this.player.yaw);
     this.dmgFx = 1;
     if (this.hp <= 0) {
