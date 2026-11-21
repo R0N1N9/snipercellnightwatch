@@ -234,9 +234,21 @@ export const Phone = {
     const spot = this.role === 'spotter' || this.operative;
     const ICON = { supplyme: '⬇', scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
     const SHORT = { 'SUPPLY ON ME': 'SUPPLY → ME', 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON DRONE': 'DRONE' };
-    // Spotter: console commands. Shooter: requests to the spotter, landing on your crosshair.
+    // One grouped wheel: commands (spotter) / requests (sniper) down the right, operator toggles
+    // down the left, pings across the top and bottom.
     const list = spot ? CMDS : SHOOTER_REQ;
-    const W = (this.cmdWheel = new Wheel(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
+    const cols = (arr, side) => arr.map((o, i) => {
+      const rows = Math.ceil(arr.length / 2), row = Math.floor(i / 2), col = i % 2;
+      return { ...o, x: side * (col ? 1.12 : 0.6), y: rows > 1 ? -0.72 + (1.44 * row) / (rows - 1) : 0 };
+    });
+    const cmdItems = cols(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), 1);
+    const TOG = spot
+      ? [['cell-tab', 'TABLET', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])]
+      : [['cell-xr', 'ROUNDS', '⁂'], ['cell-breath', 'BREATH', '≋'], ['cell-tab', 'MAP', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])];
+    const togItems = cols(TOG.map(([a, l, ic]) => ({ k: 't:' + a, label: l, group: 'tog', icon: ic })), -1);
+    const PINGS = [['look', 'LOOK', '◎'], ['enemy', 'ENEMY', '◆'], ['move', 'MOVE', '➤'], ['hold', 'HOLD', '✋'], ['regroup', 'ON ME', '⬤'], ['cover', 'COVER', '⛨'], ['sync', 'SYNC', '⦿'], ['perch', 'SNIPER POS', '⌖']];
+    const pingItems = PINGS.map(([k, l, ic], i) => ({ k: 'p:' + k, label: l, group: 'comms', icon: ic, x: -0.69 + (i % 4) * 0.46, y: i < 4 ? -1.08 : 1.08 }));
+    const W = (this.cmdWheel = new Wheel([...pingItems, ...cmdItems, ...togItems], { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
     let hold = null;
     this.input.onLookTouch = (type, t) => {
       if (type === 'start') {
@@ -245,7 +257,11 @@ export const Phone = {
         h.timer = setTimeout(() => {
           if (hold !== h || !this._cmdWheelOk()) return;
           h.open = true;
-          W.show(h.x, h.y, spot ? 'DROPS ON YOUR CROSSHAIR' : 'REQUEST \u2192 YOUR CROSSHAIR');
+          const e = this._crosshairEnemy && this._crosshairEnemy();
+          this._cwAt = this._aimPoint();
+          this._cwEnemy = e ? e.id : null;
+          const L = this._wheelLabels ? this._wheelLabels() : {};
+          W.show(h.x, h.y, spot ? 'COMMANDS \u2192 CROSSHAIR' : 'REQUESTS \u2192 CROSSHAIR', L.enemy ? { 'p:enemy': L.enemy } : {});
           this._phonePulse && this._phonePulse();
           navigator.vibrate && navigator.vibrate(12);
         }, 450);
@@ -263,6 +279,8 @@ export const Phone = {
       hold = null;
       if (!was) return false;
       const k = W.close();
+      if (k && k.startsWith('t:')) { this.input.pressedSet.add(k.slice(2)); return true; } // a toggle: as if its button was tapped
+      if (k && k.startsWith('p:')) { if (this._cmdWheelOk()) this._wheelPick(k.slice(2), this._cwAt || this._aimPoint(), this._cwEnemy); return true; }
       const o = k && list.find((c) => c.k === k);
       if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.req || o.k, o.me ? this._myPoint() : this._aimPoint()); }
       return true;

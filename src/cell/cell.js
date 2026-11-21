@@ -770,7 +770,7 @@ export class CellGame {
       case 'radio': this._voice(m.who, m.text); break;
       case 'emelee': this._onMelee(m.ev); break;
       case 'nearmiss': if (this.isHost) this.sentinel.nearMiss(m.at, m.from); break;
-      case 'block': if (this.isHost) { const g = this.sentinel.byId(m.id); if (g) { this.sentinel._alert(g, null, m.from); this.sentinel.emit({ t: 'fx', k: 'shield', id: m.id }); } } break;
+      case 'block': if (this.isHost) { const g = this.sentinel.byId(m.id); if (g) { this.sentinel._alert(g, null, m.from); this.sentinel.emit({ t: 'fx', k: 'shield', id: m.id }); if (m.dmg) this.sentinel.wallDamage(m.id, m.dmg); } } break;
     }
   }
 
@@ -1492,9 +1492,12 @@ export class CellGame {
       const g = res.blocked;
       this.effects.puff(hitP, 'metal', 0.8, 0.3);
       this.sfx.shieldHit(hitP);
-      if (ammo !== 'pen') this.hud.flash('BLOCKED \u2014 HIT THE PORT', 'red', 0.9);
-      if (this.isHost) { this.sentinel._alert(g, null, { x: P.pos.x, z: P.pos.z }); }
-      else this._broadcast({ k: 'block', id: g.id, from: { x: P.pos.x, z: P.pos.z } });
+      // The shield soaks it and weakens: ~2 rifle rounds, 4 magnum, a dozen pistol, 15 SMG; an
+      // explosive round breaks it outright.
+      const wd = ammo === 'xr' ? 999 : ({ kr50: 60, mag50: 35, smg: 8, m18: 10 })[def.key] ?? 20;
+      if (ammo !== 'pen') this.hud.flash((g.wallPct ?? 100) * 1.2 - wd <= 0 ? 'SHIELD BROKEN' : 'BLOCKED \u2014 HIT THE NOTCH OR BREAK IT', 'red', 0.9);
+      if (this.isHost) { this.sentinel._alert(g, null, { x: P.pos.x, z: P.pos.z }); this.sentinel.wallDamage(g.id, wd); }
+      else this._broadcast({ k: 'block', id: g.id, from: { x: P.pos.x, z: P.pos.z }, dmg: wd });
     } else if (res && res.enemy && res.enemy.state === 'dead') {
       // A downed enemy: a headshot finishes it; a body shot just thumps the body.
       const e = res.enemy;
@@ -2961,7 +2964,8 @@ class CellHud {
       : g.role === 'shooter'
         ? [['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
         : [['cell-tab', 'TABLET'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
-    bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill" id="cell-tpause">❚❚</div>';
+    const KEEP = new Set(['cell-use', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
+    bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
     // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
     const AB = g.operative
@@ -3015,7 +3019,12 @@ class CellHud {
       b.cnt.textContent = n;
     }
     this._abPlaceT = (this._abPlaceT || 0) - dt;
-    if (this._abPlaceT <= 0) { this._abPlaceT = 1; this._abilPlace(); }
+    if (this._abPlaceT <= 0) {
+      this._abPlaceT = 1;
+      // Phones (or any small touch screen): the middle strip folds into the press-and-hold wheel.
+      document.body.classList.toggle('cell-compact', innerWidth < 1000 || innerHeight < 560);
+      this._abilPlace();
+    }
   }
 
   // Put the ability buttons on the left, below the objective board, without covering anything:
