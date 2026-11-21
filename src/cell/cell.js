@@ -745,6 +745,8 @@ export class CellGame {
   _onEvent(m) {
     switch (m.k) {
       case 'resupply': if (m.role === this.role) this._resupply(); break;
+      case 'ifakuse': if (this.isHost) this.obj.ifak[m.role] = Math.max(0, (this.obj.ifak[m.role] || 0) - 1); break;
+      case 'medheal': if (m.role === this.role) this._medHeal(); break;
       case 'revive': if (m.role === this.role) this._revived(m.hp || 55); break;
       case 'kill': this._onKillEvent(m); break;
       case 'takedown': if (m.role === this.role) this._knife(); break;
@@ -878,7 +880,7 @@ export class CellGame {
         break;
       }
       case 'blind': { const e = S.byId(target.id); if (e && e.state !== 'dead') { e.blindT = 6; e.aw = 0; if (e.state === 'alert' || e.state === 'berserk') { e.state = 'search'; e.searchT = 6; e.target = null; } this._toast('Optics rebooted: he\u2019s blind for 6 s.', 'cyan'); } break; }
-      case 'plight': this.fac.lightsOff((L) => L.id === target.id, 20); this._toast('Light cut for 20 s.', 'dim'); break;
+      case 'plight': this.fac.lightsOff((L) => L.id === target.id, 20); this._toast('Light taken out for 20 s.', 'dim'); break;
       case 'isrsweep': {
         let n = 0;
         for (const g of S.guards) if (g.state !== 'dead' && Math.hypot(g.x - target.x, g.z - target.z) < target.r) { g.tagT = Math.max(g.tagT, 15); n++; }
@@ -914,8 +916,8 @@ export class CellGame {
       case 'lights': {
         // Inside, cyber reaches the whole room (20 s); outside, the lamps near the point (12 s).
         const room = this._roomFor(target);
-        if (room) { this.fac.lightsOff((L) => L.room === room.id, 20); this._toast(`Lights cut: ${room.name} for 20 s.`, 'cyan'); }
-        else { this.fac.lightsOff((L) => !L.interior && Math.hypot(L.x - target.x, L.z - target.z) < 35, 12); this._toast('Yard lights near the mark cut for 12 s.', 'cyan'); }
+        if (room) { this.fac.lightsOff((L) => L.room === room.id, 20); this._toast(`Lights taken out: ${room.name} for 20 s.`, 'cyan'); }
+        else { this.fac.lightsOff((L) => !L.interior && Math.hypot(L.x - target.x, L.z - target.z) < 35, 12); this._toast('Yard lights near the mark taken out for 12 s.', 'cyan'); }
         break;
       }
       case 'spoof': S.spoofT = 10; this._toast('Cameras looped for 10 s.', 'cyan'); break;
@@ -1174,7 +1176,8 @@ export class CellGame {
     if ((I.pressed('KeyJ') || I.pressed('cell-drop')) && this.obj.drive === this.role) { if (this.isHost) this._dropDrive(this.role, this.player.pos); else this._broadcast({ k: 'drop', role: this.role, at: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z } }); }
     const pr = this.prompts[this.role];
     if ((I.pressed('KeyE') || I.pressed('cell-use')) && pr && (pr.key === 'jack' || pr.key === 'extract') && !tab) this._serverMinigame(pr.key);
-    if (this.role === 'shooter' && (I.pressed('KeyG') || I.pressed('cell-ability')) && !this.downed) this._toggleCloak();
+    if (this.role === 'shooter' && (I.pressed('KeyF') || I.pressed('cell-ability')) && !this.downed) this._toggleCloak(); // F: the ability key
+    if ((I.pressed('KeyG') || I.pressed('cell-ifak')) && !tab) this._useIfak();
     // Recon quad: tap Q = launch / park it (it keeps marking) / take it back; hold Q (or RECALL)
     // = quick calldown, straight back to you.
     // Recon quad (spotter / lone operative): tap Q = launch / park / take it back; hold Q (or
@@ -1182,8 +1185,8 @@ export class CellGame {
     {
       const canQ = this.role === 'spotter' || this.operative;
       const qa = this.operative ? 'cell-quad' : 'cell-ability';
-      // Desktop: G (a lone operative: Y) — Q is ping and marking.
-      const qHeld = canQ && (I.held(this.operative ? 'KeyY' : 'KeyG') || I.held('T:' + qa)) && !tab;
+      // Desktop: F, the ability key (a lone operative: Y, since F is his camo) — Q is ping and marking.
+      const qHeld = canQ && (I.held(this.operative ? 'KeyY' : 'KeyF') || I.held('T:' + qa)) && !tab;
       if (qHeld) {
         this._qT = (this._qT || 0) + dt;
         if (this._qT > 0.45 && !this._qDone && this._quadOut()) { this._qDone = true; this._recallQuad(); }
@@ -1199,11 +1202,10 @@ export class CellGame {
       // A park / recall / launch just now changes what this frame drives.
       quad = !!(this.quad && this.quad.active);
     }
-    // F: tap = tag what's under the crosshair; hold on an enemy (or SYNC) = mark it as your
-    // teammate's sync target.
+    // T (or SYNC): mark the enemy under the crosshair as your teammate's sync target.
     {
-      // (Tagging lives on Q / PING now: F is just the sync mark, tap or hold.)
-      const fHeld = I.held('KeyF') && !tab && !this.downed;
+      // (Tagging lives on Q / PING; F is the ability key.)
+      const fHeld = I.held('KeyT') && !tab && !this.downed;
       const mark = () => { const e = this._crosshairEnemy(); if (e && e.kind === 'g') this._syncMark(e); else this.hud.flash('SYNC: look at an enemy', 'red'); };
       if (I.pressed('cell-sync') && !quad && !tab && !this.downed) mark();
       if (fHeld) {
@@ -1214,7 +1216,6 @@ export class CellGame {
         }
       } else {
         if (this._fT > 0 && !this._fDone && !quad) mark();
-        else if (this._fT > 0 && !this._fDone && quad) this._tagAtCrosshair();
         this._fT = 0; this._fDone = false;
       }
     }
@@ -1882,12 +1883,45 @@ export class CellGame {
     this.hud.flash('AMMO RESTOCKED', 'cyan');
   }
 
+  // Use one of your IFAKs on yourself: back to full health.
+  _useIfak() {
+    const ob = this.obj, n = (ob.ifak && ob.ifak[this.role]) || 0;
+    if (this.downed || this.kia) return;
+    if (n <= 0) { this.hud.flash('NO IFAK', 'red', 0.8); return; }
+    if (this.hp >= this.maxHp) { this.hud.flash('ALREADY AT FULL HEALTH', 'dim', 0.8); return; }
+    if (this.isHost) ob.ifak[this.role] = n - 1; else { ob.ifak[this.role] = n - 1; this._broadcast({ k: 'ifakuse', role: this.role }); }
+    this.hp = this.maxHp;
+    this.dmgFx = 0;
+    this.audio.click();
+    this.hud.flash('IFAK \u2014 FULL HEALTH', 'cyan');
+  }
+  // The medevac drone reached you: up off the floor if you were down, and patched to full.
+  _medHeal() {
+    if (this.kia) return;
+    if (this.downed) this._revived(100);
+    this.hp = this.maxHp;
+    this.dmgFx = 0;
+    this.audio.click();
+    this.hud.flash('MEDEVAC \u2014 FULL HEALTH', 'cyan');
+  }
+  // Who the medevac drone should fly to: anyone down first, else whoever is hurt worst.
+  hurtAgent() {
+    const d = this.downedAgent();
+    if (d) return d;
+    const list = [];
+    if (!this.kia && this.hp < this.maxHp) list.push([this.role, this.hp]);
+    if (!this.solo && !this.partner.ai && !this.partner.kia && this.partner.hp != null && this.partner.hp < this.maxHp) list.push([this.partnerRole, this.partner.hp]);
+    list.sort((a, b) => a[1] - b[1]);
+    return list.length ? list[0][0] : null;
+  }
+
   _resupply() {
     this.player.refill();
     this._xrResupply();
+    if (this.kit && (this.role === 'shooter' || this.operative)) this.kit.lures = Math.min(5, this.kit.lures + 1); // +1 sticky
     this.hp = Math.min(this.maxHp, this.hp + 35);
     this.audio.click();
-    this.hud.flash('RESUPPLIED +35 HP', 'cyan');
+    this.hud.flash('RESUPPLIED +35 HP \u00B7 +1 IFAK', 'cyan');
   }
 
   _dropDriveIfCarrying() {
@@ -1946,8 +1980,8 @@ export class CellGame {
     if (auto) this.audio.startLoop('quad', new THREE.Vector3(this.quad.x, this.quad.y, this.quad.z), 'rotor', 0.22);
     // By hand: tossed up out of the left hand, then the feed cuts in.
     else this._raise('drone', () => { const q = this.quad; if (!q || !q.launching) return; q.launching = false; q.active = true; this.post.uniforms.uStatic.value = 1; this.audio.startLoop('quad', new THREE.Vector3(q.x, q.y, q.z), 'rotor', 0.22); });
-    if (auto) this.comms('Recon drone en route to the mark. G to take it, hold G to recall.', 'cyan', this.name);
-    else this.comms('Recon drone up. Look at enemies to neurolink them. G park \u00B7 hold G recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+    if (auto) this.comms('Recon drone en route to the mark. F to take it, hold F to recall.', 'cyan', this.name);
+    else this.comms('Recon drone up. Look at enemies to neurolink them. F park \u00B7 hold F recall \u00B7 SPACE/C climb.', 'cyan', this.name);
   }
   // Send the quad to a spot: launch it there, or redirect it if it's already up.
   _quadTo(at) {
@@ -1998,7 +2032,7 @@ export class CellGame {
     q.active = false;
     q.parked = true;
     this.sfx.ui(false);
-    this.comms('Recon drone parked. It keeps marking. G to fly it, hold G to recall.', 'cyan', this.name);
+    this.comms('Recon drone parked. It keeps marking. F to fly it, hold F to recall.', 'cyan', this.name);
   }
   _resumeQuad() {
     const q = this.quad;
@@ -2146,6 +2180,7 @@ export class CellGame {
         if (!a.alive || a.downed) continue;
         if (Math.hypot(a.pos.x - c.x, a.pos.z - c.z) < 1.6) {
           c.taken = true;
+          this.obj.ifak[a.role] = Math.min(3, (this.obj.ifak[a.role] || 0) + 1); // every crate packs an IFAK
           if (a.role === this.role) this._resupply(); else this._broadcast({ k: 'resupply', role: a.role });
           break;
         }
@@ -2166,7 +2201,7 @@ export class CellGame {
     const wantY = d > 12 ? goal.y + cruise : goal.y;
     m.y += (wantY - m.y) * Math.min(1, dt * 2);
     if (d < 1.5 && Math.abs(m.y - goal.y) < 1.5) {
-      if (m.role === this.role) this._revived(55); else this._broadcast({ k: 'revive', role: m.role, hp: 55 });
+      if (m.role === this.role) this._medHeal(); else this._broadcast({ k: 'medheal', role: m.role });
       this.medevac = null;
     }
   }
@@ -3011,8 +3046,8 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'throw lure'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hold: hack phone'), K('TAB', 'tablet (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
+    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('F', 'camo'), K('H', 'deadeye'), K('X', 'sticky grenade'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('T', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hold: hack phone'), K('TAB', 'tablet (hold: hack)'), K('F', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('T', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
@@ -3080,18 +3115,18 @@ class CellHud {
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
     const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative && g.role === 'shooter'
-      ? [['cell-tab', 'TABLET'], ['cell-menu', 'MENU'], ['cell-recall', 'RECALL'], ...common]
+      ? [['cell-tab', 'TABLET'], ['cell-menu', 'COMMANDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-tab', 'TABLET'], ['cell-menu', 'MENU'], ['cell-breath', 'BREATH'], ...common]
-        : [['cell-tab', 'TABLET'], ['cell-menu', 'MENU'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
+        ? [['cell-tab', 'TABLET'], ['cell-menu', 'COMMANDS'], ['cell-breath', 'BREATH'], ...common]
+        : [['cell-tab', 'TABLET'], ['cell-menu', 'COMMANDS'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
     const KEEP = new Set(['cell-tab', 'cell-menu', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
     // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
     const AB = g.operative && g.role === 'shooter'
-      ? [['cell-rounds', 'STD', 'rounds'], ['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-sync', 'SYNC', 'sync'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
+      ? [['cell-rounds', 'STD', 'rounds'], ['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'STICKY', 'lure'], ['cell-sync', 'SYNC', 'sync'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
-        ? [['cell-rounds', 'STD', 'rounds'], ['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-sync', 'SYNC', 'sync']]
+        ? [['cell-rounds', 'STD', 'rounds'], ['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'STICKY', 'lure'], ['cell-sync', 'SYNC', 'sync']]
         : [['cell-ability', 'DRONE', 'drone'], ['cell-sync', 'SYNC', 'sync'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm'], ['cell-lase', 'LASE', 'lase']])];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
@@ -3114,6 +3149,14 @@ class CellHud {
     help.style.display = 'none';
     t.appendChild(help);
     this.helpBtn = help;
+    // IFAK: tap to patch yourself up to full (bottom left, over the IFAK chip).
+    const ifk = document.createElement('div');
+    ifk.className = 'pill cell-ifakbtn';
+    ifk.dataset.act = 'cell-ifak';
+    ifk.textContent = '\u271A IFAK';
+    ifk.style.display = 'none';
+    t.appendChild(ifk);
+    this.ifakBtn = ifk;
     this.abBtns = [...ab.children].map((el) => ({ el, k: el.dataset.k, bar: el.querySelector('b'), cnt: el.querySelector('em'), last: '' }));
     bar.querySelector('#cell-tpause').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.setPause(true); }, { passive: false });
     // PING: hold and drag your thumb to pick from the wheel.
@@ -3389,6 +3432,13 @@ class CellHud {
       this._fireLbl = fl;
       for (const b of document.querySelectorAll('#touch .tb.fire')) { const s = b.querySelector('span'); if (s) s.textContent = fl; b.classList.toggle('fire-alt', fl !== 'FIRE'); }
     }
+    if (this.ifakBtn) {
+      const n = (g.obj.ifak && g.obj.ifak[g.role]) || 0, on = n > 0 && !g.downed && !g.kia;
+      if ((this.ifakBtn.style.display !== 'none') !== on) this.ifakBtn.style.display = on ? '' : 'none';
+      const lbl = `\u271A IFAK${n > 1 ? ' \u00D7' + n : ''}`;
+      if (this.ifakBtn.textContent !== lbl) this.ifakBtn.textContent = lbl;
+      this.ifakBtn.classList.toggle('full', g.hp >= g.maxHp);
+    }
     if (this.helpBtn) {
       const on = !!g.downed && !g.kia;
       if ((this.helpBtn.style.display !== 'none') !== on) this.helpBtn.style.display = on ? '' : 'none';
@@ -3466,7 +3516,7 @@ class CellHud {
     if (g.cloak.on) chips.push('CAMO');
     if (ob.badge === g.role) chips.push('BADGE');
     if (ob.drive === g.role) chips.push('DRIVE');
-    if (ob.ifak && ob.ifak[g.role] > 0) chips.push('IFAK');
+    if (ob.ifak && ob.ifak[g.role] > 0 && !g.input.touch) chips.push(ob.ifak[g.role] > 1 ? `IFAK \u00D7${ob.ifak[g.role]} (G)` : 'IFAK (G)');
     if (g.role === 'spotter' && g.ops) chips.push(`BW ${Math.round(g.ops.bw)}`);
     if (g.role === 'spotter') chips.push(g._quadOut() ? `DRONE ${g.quad.parked ? 'PARKED ' : ''}${Math.round((g.quad.bat / QUAD_BAT) * 100)}%` : g.quadCd > 0 ? `DRONE ${Math.ceil(g.quadCd)}s` : 'DRONE READY');
     const ch = chips.map((c) => `<i>${c}</i>`).join('');
@@ -3521,12 +3571,12 @@ class CellHud {
     // Ability chips.
     if (g.role === 'shooter') {
       const K = g.kit;
-      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i>`;
+      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X STICKY \u00D7${K.lures}</i>`;
       if (kh !== this._kh) { this._kh = kh; this.el.kit.innerHTML = kh; }
     }
     // Incoming request / call card.
     const rq = g.requests.find((r) => r.st === 'pending');
-    const card = rq ? `${g.partnerName} requests ${({ supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'CUT LIGHTS', drone: 'DRONE OVERWATCH' })[rq.k]} \u00B7 ${Math.round(Math.hypot(rq.x - P.pos.x, rq.z - P.pos.z))} m` : g.lastCm ? `${g.partnerName}: ${g.lastCm.label}` : '';
+    const card = rq ? `${g.partnerName} requests ${({ supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'TAKE OUT THE LIGHTS', drone: 'DRONE OVERWATCH' })[rq.k]} \u00B7 ${Math.round(Math.hypot(rq.x - P.pos.x, rq.z - P.pos.z))} m` : g.lastCm ? `${g.partnerName}: ${g.lastCm.label}` : '';
     this.el.req.classList.toggle('on', !!card && !g.ended);
     this.el.req.classList.toggle('ack', !rq);
     if (card !== this._rq) { this._rq = card; this.el.reqT.textContent = card; }

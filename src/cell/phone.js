@@ -4,7 +4,7 @@
 // to run it: thumb on the screen, a short upload, done. Release TAB to put the phone away.
 //   camera   LOOP CAMERA (its feed goes to the console)    drone   SHORT CIRCUIT (8 s)
 //   device   DISTRACT (IoT noise)                          door    OPEN (electronic locks only)
-//   light    CUT LIGHT (20 s)                              guard   JAM COMMS · REBOOT OPTICS (blind 6 s)
+//   light    TAKE OUT LIGHT (20 s)                              guard   JAM COMMS · REBOOT OPTICS (blind 6 s)
 // Quickhacks bypass the CYBER OPS console, so they still work after ICE knocks it offline.
 // Each costs bandwidth.
 import * as THREE from 'three';
@@ -18,7 +18,7 @@ const OPTS = {
   drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }, { k: 'pcrash', name: 'DISRUPT', bw: 18 }],
   iot: [{ k: 'iot', name: 'DISTRACT', bw: 6 }],
   door: [{ k: 'door', name: 'OPEN DOOR', bw: 6 }],
-  light: [{ k: 'plight', name: 'CUT LIGHT', bw: 4 }],
+  light: [{ k: 'plight', name: 'TAKE OUT LIGHT', bw: 4 }],
   guard: [{ k: 'jam', name: 'JAM COMMS', bw: 6 }, { k: 'blind', name: 'REBOOT OPTICS', bw: 10 }],
 };
 const EXEC = 0.6;
@@ -40,7 +40,7 @@ export const CMDS = [
   { k: 'jam', name: 'JAM EARPIECES', p: 'jam' },
   { k: 'emp', name: 'EMP', p: 'emp' },
   { k: 'supply', name: 'SUPPLY DROP', p: 'supply' },
-  { k: 'lights', name: 'CUT LIGHTS', p: 'lights' },
+  { k: 'lights', name: 'TAKE OUT THE LIGHTS', p: 'lights' },
   { k: 'spoof', name: 'SPOOF CAMS', p: 'spoof' },
   { k: 'decoy', name: 'DECOY PING', p: 'decoy' },
   { k: 'drone', name: 'RECON DRONE', p: 'quad' },

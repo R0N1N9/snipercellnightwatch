@@ -12,8 +12,8 @@ import { PAYLOADS, PAYLOAD } from './ops.js';
 import { OBJECTIVES } from './cell.js';
 
 const TIER_COL = ['rgba(0,255,224,0.05)', 'rgba(0,255,224,0.07)', 'rgba(64,140,255,0.08)', 'rgba(170,90,255,0.11)'];
-const REQUESTS = [['supply', 'SUPPLY DROP'], ['scan', 'PULSE SCAN'], ['emp', 'EMP'], ['decoy', 'DECOY'], ['lights', 'CUT LIGHTS'], ['drone', 'DRONE'], ['move', 'MOVE HERE'], ['look', 'LOOK HERE']];
-const REQ_NAME = { supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'CUT LIGHTS', drone: 'DRONE OVERWATCH' };
+const REQUESTS = [['supply', 'SUPPLY DROP'], ['scan', 'PULSE SCAN'], ['emp', 'EMP'], ['decoy', 'DECOY'], ['lights', 'TAKE OUT THE LIGHTS'], ['drone', 'DRONE'], ['move', 'MOVE HERE'], ['look', 'LOOK HERE']];
+const REQ_NAME = { supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'TAKE OUT THE LIGHTS', drone: 'DRONE OVERWATCH' };
 
 export class Tablet {
   constructor(game) {
@@ -483,7 +483,7 @@ export class Tablet {
       for (const b of P.pay.querySelectorAll('[data-k]')) {
         const k = b.dataset.k, cd = O.cd[k] || 0, p = PAYLOAD[k];
         b.classList.toggle('sel', this.selected === k);
-        b.classList.toggle('off', cd > 0 || O.bw < p.bw || (k === 'supply' && ob.drops <= 0) || (k === 'quad' && !g.canQuad()) || (k === 'medevac' && !g.downedAgent()) || (ob.ice && ['scan', 'jam', 'emp', 'lights', 'spoof', 'decoy'].includes(k)));
+        b.classList.toggle('off', cd > 0 || O.bw < p.bw || (k === 'supply' && ob.drops <= 0) || (k === 'quad' && !g.canQuad()) || (k === 'medevac' && !g.hurtAgent()) || (ob.ice && ['scan', 'jam', 'emp', 'lights', 'spoof', 'decoy'].includes(k)));
         b.querySelector('.c').textContent = cd > 0 ? Math.ceil(cd) + 's' : '';
       }
       const cr = P.hold.querySelector('.ct-crack'), fi = P.hold.querySelector('.ct-fight');

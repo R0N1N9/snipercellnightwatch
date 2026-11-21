@@ -15,12 +15,12 @@ import { buildVan, SEATS, setVanLights } from './van.js';
 
 export const KIT = {
   deadeye: { dur: 8, cd: 60 },
-  lure: { charges: 3, life: 7, radius: 16 },
+  lure: { charges: 3, fuse: 2.2, radius: 7 }, // the sticky grenade (it kept the lure's slot and button)
   exec: { max: 2, start: 1, range: 35, targets: 3, gap: 0.22 },
 };
 const CALL_LINE = { look: 'Eyes on my mark.', enemy: 'Enemy, marked.', move: 'Moving to my mark.', hold: 'Hold position.', regroup: 'On me.', cover: 'Cover me.', sync: 'Sync target. Get on him.', pickup: 'I\'m down! Need a pickup!', perch: 'Set up there. Good sightline.' };
 const COMMS_LABEL = { look: 'LOOK HERE', enemy: 'ENEMY', move: 'MOVE HERE', hold: 'HOLD', regroup: 'ON ME', cover: 'COVER ME', sync: 'SYNC TARGET', pickup: 'PICK ME UP', perch: 'SNIPER POSITION' };
-const REQ_LABEL = { supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'CUT LIGHTS', drone: 'DRONE OVERWATCH' };
+const REQ_LABEL = { supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'TAKE OUT THE LIGHTS', drone: 'DRONE OVERWATCH' };
 const BOLT = {
   plasma: { color: '#60ff80', speed: 38, size: 0.5 },
   heavy: { color: '#c060ff', speed: 46, size: 0.7 },
@@ -39,7 +39,7 @@ export function vanWorld(v, l) {
 
 export const KitMethods = {
   _kitInit() {
-    this.kit = { deadeye: 0, deadeyeCd: 0, lures: KIT.lure.charges, execs: KIT.exec.start, execQ: [], execT: 0 };
+    this.kit = { deadeye: 0, deadeyeCd: 0, lures: this.loadout && this.loadout.shooter && this.loadout.shooter.perk === 'lures' ? 5 : KIT.lure.charges, execs: KIT.exec.start, execQ: [], execT: 0 };
     this.lures = [];
     this.bolts = [];
     this.lasers = new Map();
@@ -210,14 +210,14 @@ export const KitMethods = {
     return false;
   },
 
-  // ---- LURE: a thrown noise-maker that pulls patrols off their route ------------------
-  // X / LURE: the left hand comes off the rifle and throws the lure overhand, like a grenade;
+  // ---- STICKY GRENADE (it took over the lure's slot: X / the STICKY button) -----------
+  // The left hand comes off the rifle and throws it overhand, like a grenade;
   // it leaves the hand at the top of the swing.
   _throwLure() {
     this._hint && this._hint('lure');
     const K = this.kit;
     if (this.lureAnim) return;
-    if (K.lures <= 0) { this.hud.flash('NO LURES — resupply', 'red'); return; }
+    if (K.lures <= 0) { this.hud.flash('NO STICKIES — resupply', 'red'); return; }
     K.lures--;
     this.lureAnim = { t: 0, released: false };
   },
@@ -228,7 +228,7 @@ export const KitMethods = {
       const g = new THREE.Group();
       const hand = this.tdGloveFactory ? this.tdGloveFactory() : null;
       if (hand) g.add(hand);
-      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8), lam('#2a2c30'));
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 10), lam('#2b2f26'));
       const led = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 4), new THREE.MeshBasicMaterial({ color: '#ff3040' }));
       led.position.y = 0.05; can.add(led);
       can.position.set(0.0, 0.06, -0.06);
@@ -254,45 +254,61 @@ export const KitMethods = {
     const o = this.player.eyePos(new THREE.Vector3());
     const d = this.player.aimDir(new THREE.Vector3());
     const mesh = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 8), lam('#2a2c30'));
-    const led = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: '#ff3040' }));
-    led.position.y = 0.07;
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.09, 10), lam('#2b2f26'));
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 4), new THREE.MeshBasicMaterial({ color: '#ff3040' }));
+    led.position.y = 0.055;
     mesh.add(b, led);
     mesh.position.copy(o);
     this.scene.add(mesh);
-    // Thrown overhand, like a grenade.
-    this.lures.push({ p: o.clone(), v: d.multiplyScalar(17).add(new THREE.Vector3(0, 3.6, 0)), mesh, led, landed: false, t: 0, tick: 0.8 });
+    // Thrown overhand; it sticks to the first thing it touches.
+    o.addScaledVector(d, 0.4);
+    this.lures.push({ p: o.clone(), v: d.multiplyScalar(19).add(new THREE.Vector3(0, 3.2, 0)), mesh, led, t: 0 });
     this.audio.click();
-    this.hud.flash(`LURE OUT (${K.lures} left)`, 'cyan');
+    this.hud.flash(`STICKY OUT (${K.lures} left)`, 'amber');
   },
 
+  // A sticky in flight: it grabs onto the first enemy (or wall, or ground) it meets, then
+  // arms as a charge with a short fuse (the explosive-round charge, with a bigger blast).
   _lureTick(dt) {
+    const S = this.sentinel;
     for (const L of this.lures) {
-      if (!L.landed) {
-        const prev = L.p.clone();
-        L.v.y -= 9.8 * dt;
-        L.p.addScaledVector(L.v, dt);
-        const hit = this.fac.ray(prev, L.p, 'solid');
-        const g = this.fac.groundAt(L.p.x, L.p.z, prev.y, 0.2);
-        if (hit || L.p.y <= g + 0.05) {
-          if (hit) L.p.copy(hit.point).addScaledVector(hit.normal, 0.06);
-          L.p.y = Math.max(this.fac.groundAt(L.p.x, L.p.z, L.p.y + 0.3, 0.3) + 0.06, Math.min(L.p.y, prev.y));
-          L.landed = true;
-          this.sfx.door(L.p);
-        }
-      } else {
-        L.t += dt;
-        L.tick -= dt;
-        L.led.visible = Math.sin(L.t * 12) > 0;
-        if (L.tick <= 0) {
-          L.tick = 1;
-          this.audio.beep(L.p, Math.floor(L.t) % 2 === 0);
-          this._noise(L.p, KIT.lure.radius, false);
+      L.t += dt;
+      const prev = L.p.clone();
+      L.v.y -= 9.8 * dt;
+      L.p.addScaledVector(L.v, dt);
+      L.mesh.position.copy(L.p);
+      L.mesh.rotation.x += dt * 9;
+      L.led.visible = Math.sin(L.t * 20) > 0;
+      // An enemy in the way: stick to him. (Swept along this frame's path, in small steps,
+      // since it covers about a metre a frame.)
+      let enemy = null;
+      const seg = L.p.clone().sub(prev), steps = Math.max(1, Math.ceil(seg.length() / 0.15));
+      const q = new THREE.Vector3();
+      for (let i = 1; i <= steps && !enemy; i++) {
+        q.copy(prev).addScaledVector(seg, i / steps);
+        for (const e of [...S.guards, ...S.drones]) {
+          if (e.state === 'dead') continue;
+          const ey = e.y || 0;
+          if (e.kind === 'g') {
+            if (q.y < ey - 0.1 || q.y > ey + 2.0) continue;
+            if (Math.hypot(q.x - e.x, q.z - e.z) > 0.55) continue;
+          } else if (Math.hypot(q.x - e.x, q.y - ey, q.z - e.z) > 0.8) continue;
+          enemy = e; break;
         }
       }
-      L.mesh.position.copy(L.p);
+      if (enemy) L.p.copy(q);
+      const hit = enemy ? null : this.fac.ray(prev, L.p, 'solid');
+      const g = this.fac.groundAt(L.p.x, L.p.z, prev.y, 0.2);
+      if (enemy || hit || L.p.y <= g + 0.05 || L.t > 6) {
+        if (hit) L.p.copy(hit.point).addScaledVector(hit.normal, 0.05);
+        else if (!enemy) L.p.y = Math.max(g + 0.05, L.p.y);
+        L.done = true;
+        this.sfx.door(L.p);
+        if (enemy) this.hud.flash('STUCK!', 'amber', 0.8);
+        this._xrStick(L.p, enemy, { fuse: KIT.lure.fuse, r: KIT.lure.radius });
+      }
     }
-    this.lures = this.lures.filter((L) => { if (L.t < KIT.lure.life) return true; this.scene.remove(L.mesh); return false; });
+    this.lures = this.lures.filter((L) => { if (!L.done) return true; this.scene.remove(L.mesh); return false; });
   },
 
   // ---- MARK & EXECUTE: snap headshots on up to three marked targets -------------------

@@ -422,7 +422,7 @@ export class ViewModel {
     const pos = base.clone().lerp(adsPos, ads);
     const rot = new THREE.Euler(0, 0, 0, 'YXZ');
     if (!pistol) rot.y = 0.04;
-    rot.z += -0.42 * cantK;
+    rot.z += 0.42 * cantK; // canted so the right side of the gun rides up
 
     // Breathing + walk bob.
     const breathe = Math.sin(this.t * 1.6);

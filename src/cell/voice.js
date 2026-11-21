@@ -147,7 +147,7 @@ export class Radio {
 
   // Which recording (if any) carries this line for this speaker.
   _recorded(item) {
-    const V = this.vo && this.vo[item.who];
+    const V = this.vo && this.vo[VOICE_OF[item.who] || item.who];
     if (!V || !this.a || !this.a.ctx) return null;
     return V[normLine(item.text)] || null;
   }
@@ -180,10 +180,11 @@ export class Radio {
       if (!window.speechSynthesis) throw new Error('no tts');
       // Radio-style delivery: no trailing full stop, so clipped calls don't sound read out.
       const u = new SpeechSynthesisUtterance(item.text.replace(/\.\s*$/, ''));
-      const v = this._casting()[item.who] || this._casting().shooter;
+      const vk = VOICE_OF[item.who] || item.who, SV = SPEAKERS[vk] || S;
+      const v = this._casting()[vk] || this._casting().shooter;
       if (v) { u.voice = v; u.lang = v.lang; }
-      u.pitch = S.pitch;
-      u.rate = S.rate * (0.96 + Math.random() * 0.08);
+      u.pitch = SV.pitch;
+      u.rate = SV.rate * (0.96 + Math.random() * 0.08);
       u.volume = 1;
       u.onend = finish;
       u.onerror = finish;
@@ -336,6 +337,8 @@ export class Radio {
 }
 
 const VO_DIR = 'audio/vo/';
+// Whose voice each speaker uses: Ra (the shooter) and Rōnin (the spotter) swapped voices.
+const VOICE_OF = { shooter: 'spotter', spotter: 'shooter', isr: 'isr' };
 const VOICE_KEY = 'draxxed.cellVoice';
 export function voiceSetting() {
   try { return localStorage.getItem(VOICE_KEY) !== 'off'; } catch { return true; }

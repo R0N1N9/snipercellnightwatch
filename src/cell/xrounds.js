@@ -172,46 +172,54 @@ export const XRounds = {
       if (!c.obj) {
         const g = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff3020' }));
         g.renderOrder = 5;
-        this.scene.add(g);
-        c.obj = g;
+        if (c.gren) {
+          // A sticky grenade: a squat dark puck with the blinking light on top.
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.09, 10), new THREE.MeshLambertMaterial({ color: '#2b2f26' }));
+          g.scale.setScalar(0.5); g.position.y = 0.05; body.add(g);
+          c.led = g; c.obj = body;
+        } else c.obj = g;
+        this.scene.add(c.obj);
       }
       c.obj.position.set(c.x, c.y, c.z);
       const on = (this.t * (c.t < 0.4 ? 14 : 6)) % 1 < 0.5;
       if (on && !c.on) this.audio.beep(c.obj.position, c.t < 0.4);
       c.on = on;
-      c.obj.visible = on;
+      (c.led || c.obj).visible = on;
       if (c.t <= 0) this._xrBoom(c);
     }
     this.xcharges = this.xcharges.filter((c) => c.t > 0);
   },
 
   // A shot from the explosive mag landed: stick a charge there (and tell the other side).
-  _xrStick(hitP, enemy) {
-    const c = { cid: this._xcId++ + (this.isHost ? 0 : 5000), x: hitP.x, y: hitP.y, z: hitP.z, t: XR.fuse, by: this.role };
+  // opt (sticky grenade): { fuse, r } — a longer fuse and a bigger blast, drawn as a grenade.
+  _xrStick(hitP, enemy, opt) {
+    const c = { cid: this._xcId++ + (this.isHost ? 0 : 5000), x: hitP.x, y: hitP.y, z: hitP.z, t: opt ? opt.fuse : XR.fuse, by: this.role, r: opt ? opt.r : 0, gren: opt ? 1 : 0 };
     if (enemy) { c.id = enemy.id; c.ox = hitP.x - enemy.x; c.oy = hitP.y - (enemy.y || 0); c.oz = hitP.z - enemy.z; }
     this.xcharges.push(c);
-    this._broadcast({ k: 'xc', c: { cid: c.cid, x: c.x, y: c.y, z: c.z, id: c.id || 0, ox: c.ox || 0, oy: c.oy || 0, oz: c.oz || 0, by: c.by } });
+    this._broadcast({ k: 'xc', c: { cid: c.cid, x: c.x, y: c.y, z: c.z, id: c.id || 0, ox: c.ox || 0, oy: c.oy || 0, oz: c.oz || 0, by: c.by, f: c.t, r: c.r, gren: c.gren } });
   },
   _xrRemote(c) {
-    this.xcharges.push({ ...c, id: c.id || null, t: XR.fuse });
+    this.xcharges.push({ ...c, id: c.id || null, t: c.f || XR.fuse });
   },
 
   _xrBoom(c) {
-    if (c.obj) { this.scene.remove(c.obj); c.obj.geometry.dispose(); }
+    if (c.obj) { this.scene.remove(c.obj); c.obj.traverse((o) => o.geometry && o.geometry.dispose()); }
+    const R = c.r || XR.radius;
     const p = new THREE.Vector3(c.x, c.y, c.z);
     this._boom({ x: c.x, y: c.y - 1, z: c.z });
     this.effects.puff(p, 'metal', 2.5, 0.6);
     // Close to you: a shove of static and a little damage.
     const me = this.player.pos.distanceTo(p);
-    if (me < 4 && !this.downed && !this.kia) this._damage(Math.round(35 * (1 - me / 4)), { x: p.x, z: p.z });
+    const selfR = c.gren ? 6 : 4, selfD = c.gren ? 70 : 35; // don't stand on your own sticky
+    if (me < selfR && !this.downed && !this.kia) this._damage(Math.round(selfD * (1 - me / selfR)), { x: p.x, z: p.z });
     if (!this.isHost) return;
     const S = this.sentinel;
     for (const e of [...S.guards, ...S.drones]) {
       if (e.state === 'dead' && !e.incap) continue;
       const d = Math.hypot(e.x - c.x, (e.y || 0) + (e.kind === 'g' ? 1 : 0) - c.y, e.z - c.z);
       const stuck = e.id === c.id;
-      if (!stuck && d > XR.radius) continue;
-      const dmg = stuck ? XR.direct : Math.round(XR.splash * (1 - d / XR.radius));
+      if (!stuck && d > R) continue;
+      const dmg = stuck ? XR.direct : Math.round(XR.splash * (1 - d / R));
       if (dmg <= 0) continue;
       this._applyHit(e.id, dmg, 'explosive', { x: c.x, z: c.z }, c.by || 'shooter', false, 0);
     }

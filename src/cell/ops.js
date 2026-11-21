@@ -9,11 +9,11 @@ export const PAYLOADS = [
   { k: 'jam', key: '2', name: 'JAM EARPIECES', bw: 20, cd: 10, cast: 1.0, aim: true, r: 25, desc: 'Guards near the point can’t radio or fire for 5 s.' },
   { k: 'emp', key: '3', name: 'EMP', bw: 30, cd: 12, cast: 0.9, aim: true, r: 18, desc: 'Drones and cameras near the point go dark for 7 s.' },
   { k: 'supply', key: '4', name: 'SUPPLY DROP', bw: 0, cd: 2, cast: 0, aim: true, desc: 'Crate by parachute: ammo for both weapons, +35 HP. Limited.' },
-  { k: 'lights', key: '5', name: 'CUT LIGHTS', bw: 15, cd: 8, cast: 0.7, aim: true, desc: 'Kill the power to that zone for 12 s. Dark = harder to see you.' },
+  { k: 'lights', key: '5', name: 'TAKE OUT THE LIGHTS', bw: 15, cd: 8, cast: 0.7, aim: true, desc: 'Kill the power to that zone for 12 s. Dark = harder to see you.' },
   { k: 'spoof', key: '6', name: 'SPOOF CAMS', bw: 25, cd: 14, cast: 1.7, aim: false, desc: 'Loop every camera for 10 s.' },
   { k: 'decoy', key: '7', name: 'DECOY PING', bw: 12, cd: 7, cast: 0.5, aim: true, r: 25, desc: 'A loud noise at the point. Guards go and look.' },
   { k: 'quad', key: '8', name: 'RECON DRONE', bw: 0, cd: 25, cast: 0, aim: false, desc: 'Fly the recon drone (Q). Anything it sees is marked; F tags.' },
-  { k: 'medevac', key: '9', name: 'MEDEVAC DRONE', bw: 30, cd: 22, cast: 0, aim: false, desc: 'Flies to a downed agent and gets them back up at 55 %.' },
+  { k: 'medevac', key: '9', name: 'MEDEVAC DRONE', bw: 30, cd: 22, cast: 0, aim: false, desc: 'Flies to a downed or wounded agent and patches them up to full health.' },
 ];
 // What SENTINEL's ICE knocks out with the console (physical kit still works).
 const ICE_BLOCKED = new Set(['scan', 'jam', 'emp', 'lights', 'spoof', 'decoy']);
@@ -56,8 +56,8 @@ export class Ops {
     if (k === 'supply' && target && G.fac.insideBuilding(target.x, target.z)) return 'CAN\u2019T DROP THROUGH A ROOF';
     if (k === 'quad' && !G.canQuad()) return 'DRONE UNAVAILABLE';
     if (k === 'medevac') {
-      const v = G.downedAgent();
-      if (!v) return 'NOBODY IS DOWN';
+      const v = G.hurtAgent();
+      if (!v) return 'EVERYONE IS AT FULL HEALTH';
       target = { role: v };
     }
     if (p.aim && !target) return 'PICK A SPOT';
