@@ -192,7 +192,70 @@ export const Devices = {
     this.audio.nvgReach && this.audio.nvgReach();
   },
 
+  // ---- nano swarm (spotter, through the binoculars) ------------------------------------
+  // Fire while looking through the raised binoculars: a swarm of nano drones flies out and
+  // silently takes out up to three soft targets in the viewfinder (guards, officers, bulwarks;
+  // brutes and titans are too heavily armoured). 35 BW, 45 s cooldown.
+  _swarmCall() {
+    const B = this.bino, S = this.sentinel;
+    if (!B || !B.up) { this.hud.flash('RAISE THE BINOCULARS TO AIM THE SWARM', 'red', 0.9); return; }
+    if ((this.swarmCd || 0) > 0) { this.hud.flash(`SWARM RECHARGING ${Math.ceil(this.swarmCd)} s`, 'red', 0.8); return; }
+    if (this.ops && this.ops.bw < 35) { this.hud.flash('NOT ENOUGH BANDWIDTH (35)', 'red', 0.8); return; }
+    const cam = this.camera, o = cam.getWorldPosition(new THREE.Vector3()), dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const soft = new Set(['guard', 'scav', 'bulwark']);
+    const picks = S.guards
+      .filter((g) => g.state !== 'dead' && soft.has(g.type) && B.seen && B.seen.has(g.id))
+      .map((g) => ({ g, a: new THREE.Vector3(g.x, (g.y || 0) + 1.4, g.z).sub(o).normalize().angleTo(dir) }))
+      .sort((a, b) => a.a - b.a).slice(0, 3).map((p) => p.g);
+    if (!picks.length) { this.hud.flash('NO SOFT TARGETS IN VIEW', 'red', 0.8); return; }
+    if (this.ops) this.ops.bw -= 35;
+    this.swarmCd = 45;
+    this.audio.click();
+    this.hud.flash(`NANO SWARM \u2192 ${picks.length} TARGET${picks.length > 1 ? 'S' : ''}`, 'cyan', 1.2);
+    this._radio && this._radio(this.role, 'Swarm away.');
+    this._swarmFx(picks.map((g) => g.id), { x: this.player.pos.x, y: this.player.pos.y + 1.6, z: this.player.pos.z });
+    this.payload('swarm', { ids: picks.map((g) => g.id), from: { x: this.player.pos.x, y: this.player.pos.y + 1.6, z: this.player.pos.z } });
+  },
+  // The swarm itself: a cloud of tiny glints per target that streams out and wraps the head.
+  _swarmFx(ids, from) {
+    this.swarms = this.swarms || [];
+    for (const id of ids) {
+      const n = 40, pos = new Float32Array(n * 3), seeds = [];
+      for (let i = 0; i < n; i++) seeds.push([Math.random() * 6.28, Math.random() * 6.28, 0.4 + Math.random() * 0.6, Math.random() * 0.25]);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#9fe8ff', size: 0.05, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+      pts.frustumCulled = false;
+      this.scene.add(pts);
+      this.swarms.push({ id, from: new THREE.Vector3(from.x, from.y, from.z), pts, seeds, t: 0 });
+    }
+  },
+  _swarmTick(dt) {
+    this.swarmCd = Math.max(0, (this.swarmCd || 0) - dt);
+    if (!this.swarms || !this.swarms.length) return;
+    const S = this.sentinel, v = new THREE.Vector3();
+    for (const w of this.swarms) {
+      w.t += dt;
+      const g = S.byId(w.id);
+      const to = g ? new THREE.Vector3(g.x, (g.y || 0) + 1.6 * (S.constructor.TYPES ? 1 : 1), g.z) : w.from;
+      const a = w.pts.geometry.attributes.position.array;
+      w.seeds.forEach(([p1, p2, sp, lag], i) => {
+        const k = Math.min(1, Math.max(0, (w.t - lag) / 1.4)), e = k * k * (3 - 2 * k);
+        v.copy(w.from).lerp(to, e);
+        v.y += Math.sin(e * Math.PI) * 2.5; // arc up and over
+        const r = k < 1 ? 0.35 * (1 - e) + 0.12 : 0.18;
+        v.x += Math.cos(p1 + w.t * 9 * sp) * r; v.y += Math.sin(p2 + w.t * 7 * sp) * r * 0.7; v.z += Math.sin(p1 + w.t * 9 * sp) * r;
+        a[i * 3] = v.x; a[i * 3 + 1] = v.y; a[i * 3 + 2] = v.z;
+      });
+      w.pts.geometry.attributes.position.needsUpdate = true;
+      w.pts.material.opacity = w.t > 2.0 ? Math.max(0, 0.9 - (w.t - 2.0) * 1.5) : 0.9;
+    }
+    for (const w of this.swarms) if (w.t > 2.6) { this.scene.remove(w.pts); w.pts.geometry.dispose(); w.pts.material.dispose(); }
+    this.swarms = this.swarms.filter((w) => w.t <= 2.6);
+  },
+
   _devTick(dt) {
+    this._swarmTick(dt);
     this._bcTick(dt);
     const A = this.devAnim, T = this.devTablet, D = this.devDrone;
     T.visible = false; D.visible = false;
@@ -328,6 +391,10 @@ export const Devices = {
     for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(W / 2 + i * 14, H / 2 - 4); c.lineTo(W / 2 + i * 14, H / 2 + 4); c.stroke(); }
     c.fillStyle = 'rgba(255,120,90,0.95)'; c.font = '600 12px JetBrains Mono, monospace'; c.textAlign = 'center';
     c.fillText(`THERMAL · ${B.seen ? B.seen.size : 0} MARKED`, W / 2, H / 2 + r * 0.8);
+    if (this.role === 'spotter') {
+      c.fillStyle = (this.swarmCd || 0) > 0 ? 'rgba(160,170,180,0.85)' : 'rgba(150,235,255,0.95)';
+      c.fillText((this.swarmCd || 0) > 0 ? `NANO SWARM ${Math.ceil(this.swarmCd)} s` : 'FIRE \u00B7 NANO SWARM (up to 3 soft targets)', W / 2, H / 2 + r * 0.8 + 18);
+    }
     c.restore();
   },
 };
