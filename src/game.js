@@ -1189,6 +1189,7 @@ export class Game {
     this.viewmodel.update(dt, {
       def: P.def,
       scopeT: P.scopeT,
+      cant: !this.settings || this.settings.pistolCant !== false,
       speed: P.speed,
       sprint: P.sprinting,
       bobPhase: P.bobPhase,

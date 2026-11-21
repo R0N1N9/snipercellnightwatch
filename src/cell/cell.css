@@ -503,3 +503,9 @@ body.touch #cell-hud.has-pip .c-partner { top: 14px; }
 #touch .cell-helpbtn { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 9; padding: 14px 22px !important; font-size: 15px !important; letter-spacing: 0.14em; color: #ff6a6a !important; border: 2px solid #ff4a4a !important; background: rgba(40, 6, 8, 0.7) !important; animation: helppulse 1s ease-in-out infinite alternate; }
 @keyframes helppulse { to { box-shadow: 0 0 18px rgba(255, 74, 74, 0.6); } }
 body.cell-compact #cell-hud .c-obj-h { display: none !important; } /* phones: title + sub-line only, room for the ability triangle */
+
+/* ROUNDS ability: the loaded round type in yellow-orange, with how many you have. */
+#touch .cell-abil .ab.mag { border-color: #f2b35b; background: rgba(60, 36, 6, 0.6); }
+#touch .cell-abil .ab.mag span { color: #ffd040; font-weight: 700; }
+#touch .cell-abil .ab.mag em { color: #ffd9a0; }
+#touch .cell-abil .ab.mag i b { background: #f2b35b; }

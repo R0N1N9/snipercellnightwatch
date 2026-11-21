@@ -415,9 +415,14 @@ export class ViewModel {
     const ads = pistol ? smoothstep(0, 1, st.scopeT) : 0;
     const base = pistol ? new THREE.Vector3(0.12, -0.14, -0.34) : new THREE.Vector3(0.165, -0.16, -0.3);
     const adsPos = new THREE.Vector3(0, -(U.sight + 0.004) * 0.82, -0.3);
+    // Canted hold (handguns, an option): centre of the screen, tilted, like CoD; aiming down
+    // the sights straightens it out.
+    const cantK = pistol && st.cant && def.key !== 'smg' ? 1 - ads : 0;
+    if (cantK > 0) base.lerp(new THREE.Vector3(0.035, -0.125, -0.33), cantK);
     const pos = base.clone().lerp(adsPos, ads);
     const rot = new THREE.Euler(0, 0, 0, 'YXZ');
     if (!pistol) rot.y = 0.04;
+    rot.z += -0.42 * cantK;
 
     // Breathing + walk bob.
     const breathe = Math.sin(this.t * 1.6);
@@ -569,7 +574,10 @@ export class ViewModel {
     if (rack > 0 && !U.bolt) handL.lerp(toRoot(U.slide || U.gripL).add(new THREE.Vector3(0, 0.02, 0.06)), rack);
     const fR = fwd.clone().add(new THREE.Vector3(0, -0.25, 0)).normalize();
     const fL = pistol ? fwd.clone().add(new THREE.Vector3(0.4, -0.15, 0)).normalize() : fwd.clone().add(new THREE.Vector3(0.15, 0.25, 0)).normalize();
-    this.armR.pose(pistol ? new THREE.Vector3(0.22, -0.46, 0.12) : new THREE.Vector3(0.24, -0.3, 0.16), handR, boltReach > 0 ? fR.lerp(new THREE.Vector3(-0.3, 0, -1).normalize(), boltReach).normalize() : fR, new THREE.Vector3(0.6, -1, 0.1).normalize());
-    this.armL.pose(pistol ? new THREE.Vector3(-0.2, -0.46, 0.12) : new THREE.Vector3(-0.1, -0.42, 0.02), handL, fL, new THREE.Vector3(-0.8, -1, 0.3).normalize());
+    // Canted: the shoulders sit lower and further back, so the arms come up from below.
+    const shR = pistol ? new THREE.Vector3(0.22, -0.46, 0.12).lerp(new THREE.Vector3(0.16, -0.62, 0.02), cantK) : new THREE.Vector3(0.24, -0.3, 0.16);
+    const shL = pistol ? new THREE.Vector3(-0.2, -0.46, 0.12).lerp(new THREE.Vector3(-0.12, -0.64, 0.0), cantK) : new THREE.Vector3(-0.1, -0.42, 0.02);
+    this.armR.pose(shR, handR, boltReach > 0 ? fR.lerp(new THREE.Vector3(-0.3, 0, -1).normalize(), boltReach).normalize() : fR, new THREE.Vector3(0.6, -1, 0.1).normalize());
+    this.armL.pose(shL, handL, fL, new THREE.Vector3(-0.8, -1, 0.3).normalize());
   }
 }

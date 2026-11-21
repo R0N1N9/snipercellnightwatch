@@ -15,16 +15,19 @@ export const AMMO = [
   { k: 'emp', name: 'EMP', desc: 'Kills drones, cameras, lights, shields and radios around the hit.' },
 ];
 export const AMMO_NAME = Object.fromEntries(AMMO.map((a) => [a.k, a.name]));
-const START = { xr: 4, pen: 6, emp: 4 };
+const START = { xr: 4, pen: 0, emp: 4 };
+// The types the ROUNDS button cycles through (standard penetrates, so there's no separate PEN).
+export const ROUND_CYCLE = ['std', 'xr', 'emp'];
+export const ROUND_SHORT = { std: 'STD', xr: 'EXP', emp: 'EMP' };
 
 export const XRounds = {
   _xrInit() {
-    const own = false; // special magazines removed: the KR-50's standard round penetrates and kills cameras
+    const own = this.role === 'shooter' || this.operative; // (standard already penetrates; EXP and EMP are the specials)
     this.xr = { pouch: own ? { ...START } : { xr: 0, pen: 0, emp: 0 }, swap: null, menu: false };
     Object.defineProperty(this.xr, 'rounds', { get: () => this.xr.pouch.xr, set: (v) => (this.xr.pouch.xr = v) });
     this.xcharges = [];
     this._xcId = 1;
-    if (own) { this._ammoMenuBuild(); this._magStripBuild(); }
+    // No menu or strip: the orange ROUNDS ability button (tap to cycle, hold for a radial).
   },
 
   // The magazine strip on the left: an orange silhouette per round type with how many rounds you
@@ -91,7 +94,23 @@ export const XRounds = {
     this._ammoSwap(k);
   },
   // Kept for the old Z binding: toggles the menu now.
-  _xrSwap() { this._ammoMenu(); },
+  _xrSwap() { this._roundsCycle(); },
+  // How many rounds of a type you have (in the gun + in the pouch / reserve).
+  _roundsCount(k) {
+    const w = this.player.arms.find((q) => q.def.slot === 'rifle');
+    if (!w) return 0;
+    const cur = w.ammo || 'std';
+    return k === 'std' ? w.reserve + (cur === 'std' ? w.mag + w.chamber : 0) : (this.xr.pouch[k] || 0) + (cur === k ? w.mag + w.chamber : 0);
+  },
+  _roundsCur() { const w = this.player.arms.find((q) => q.def.slot === 'rifle'); return (w && w.ammo) || 'std'; },
+  // Tap ROUNDS / Z: load the next type you have rounds for.
+  _roundsCycle() {
+    const cur = this._roundsCur(), i = ROUND_CYCLE.indexOf(cur);
+    for (let k = 1; k <= ROUND_CYCLE.length; k++) {
+      const t = ROUND_CYCLE[(i + k) % ROUND_CYCLE.length];
+      if (t === 'std' || this._roundsCount(t) > 0) { if (t !== cur) this._ammoSwap(t); return; }
+    }
+  },
 
   // Swap the KR-50's magazine to round type k (a full reload animation).
   _ammoSwap(k) {

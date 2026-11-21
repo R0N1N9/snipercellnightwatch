@@ -94,6 +94,7 @@ export const Kit2 = {
     this.sfx.blade(this.camera.position);
   },
   // The takedown animation (first person): drives the camera, a left glove and the knife.
+  tdGloveFactory() { const g = glove(); g.scale.setScalar(1.1); return g; },
   _tdTick(dt) {
     const A = this.tdAnim;
     if (!A) { if (this.tdGlove) this.tdGlove.visible = false; return; }

@@ -71,6 +71,7 @@ const settings = {
   sensitivity: store.get('sens', 1),
   invertY: store.get('invert', false),
   scopeToggle: store.get('toggle', 'ontouchstart' in window),
+  pistolCant: store.get('pistolCant', true),
   // The Pollo Hermano skin is never remembered between visits: every fresh load starts on the
   // standard poncho, the classic title and the default operator.
   loadout: (() => { const lo = store.get('loadout', null); if (lo && lo.skin === 'pollo') { lo.skin = 'std'; store.set('loadout', lo); } return lo; })(),
@@ -225,6 +226,7 @@ $('in-sens').value = settings.sensitivity;
 $('sens-val').textContent = (+settings.sensitivity).toFixed(2);
 $('in-invert').checked = settings.invertY;
 $('in-toggle').checked = settings.scopeToggle;
+$('in-cant').checked = settings.pistolCant;
 $('in-name').oninput = (e) => store.set('name', (settings.name = e.target.value.trim()));
 $('in-pal').onchange = (e) => store.set('pal', (settings.pal = e.target.value));
 $('in-quality').onchange = (e) => store.set('quality', (settings.quality = e.target.value));
@@ -238,6 +240,7 @@ $('in-sens').oninput = (e) => {
 };
 $('in-invert').onchange = (e) => store.set('invert', (settings.invertY = e.target.checked));
 $('in-toggle').onchange = (e) => store.set('toggle', (settings.scopeToggle = e.target.checked));
+$('in-cant').onchange = (e) => store.set('pistolCant', (settings.pistolCant = e.target.checked));
 
 // NightWatch screens (and loading into it) say INFILTRATION and carry the op's own line;
 // everything else is the TACTICAL DUEL.
