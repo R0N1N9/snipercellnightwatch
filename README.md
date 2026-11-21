@@ -275,7 +275,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Tablet / map / ISR:** your weapon drops away, your left hand brings the tablet up until it fills the view, and the screen flickers on. On the tablet, the ISR button flips to the Predator feed (both roles), and TAB flips back.
 - **Laser sights (` or LASER):** a visible red laser from your weapon, on by default. Your partner sees yours; guards can catch it too.
 - **Body drag (hold E on a body):** drag it out of sight, then let go. You move at half speed while dragging.
-- **Bodycams:** both operators' head cams show as small squares in the ISR view. Turn on **Partner bodycam** in the pause menu to keep your partner's in a corner of your screen.
+- **Bodycams:** chest-mounted, wide-angle, low-light cams (a DMZ-style feed with REC and a timestamp, not a copy of the wearer's eyes). Both show as small squares in the ISR view. Turn on **Partner bodycam** in the pause menu to keep your partner's on screen: it sits top right under the partner card and shrinks or moves so it never covers a button.
 - **Spotlight drones:** a helicopter drone circles high over each way in (west, east and south), sweeping a spotlight across the ground. Stand in the light too long and it locks on: an alarm, and every guard near you comes. Stay out of the light, or shoot it down. The wreck makes a crash the guards nearby hear.
 - **Look:** both operators wear multicam black with flat dark earth load-bearing kit (carrier and rig) with black accents (pouches and webbing) and IR-reflective red markers. The shooter has a clear coiled earpiece under the hood; the spotter has a ball cap and a headset with flat dark earth cups and a black band, ear cushions and boom mic.
 
