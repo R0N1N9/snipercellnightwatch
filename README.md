@@ -270,7 +270,9 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
 
 - P-9 pistol (2 magazines) with a removable suppressor (**B**: animated twist off / on).
 - **Eyes on:** anything in your field of view, in the clear and within about 40 m (60 m aimed), is marked for the team while you can see it, like the quad's neurolink. Your crosshair on an enemy tags it at once with a ping. Sight marks don't send an AI Ra after them; tag with F or ping ENEMY for that.
-- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon quad, medevac) at the spot you're aiming at, with the phone animation. On touch, hold TAB / HACK and aim at open ground for the same Commands menu.
+- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon quad, medevac) at the spot you're aiming at, with the phone animation. **0** (or the SWEEP button) calls an **ISR sweep** on the ground under your crosshair.
+- **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
+- **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
   - **Hold** for **quickhacks**: your left hand brings up your phone and the HUD switches to scan mode (time slows in solo). Everything hackable in view gets tagged.

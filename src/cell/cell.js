@@ -1159,6 +1159,10 @@ export class CellGame {
       if (isr && (I.pressed('KeyP') || I.pressed('cell-sweep'))) this._isrSweep();
       act.mx = act.my = 0; act.sprint = act.jump = act.crouch = act.prone = false; act.fire = act.fireHeld = act.scope = false; act.lookX = act.lookY = 0; act.zoomIn = act.zoomOut = false; act.slot1 = act.slot2 = act.swap = false; act.reload = false;
     }
+    else if (I.pressed('cell-sweep') && (this.role === 'spotter' || this.operative) && !tab && !quad && !this.downed) {
+      // SWEEP outside the ISR view: the drone sweeps the ground under your crosshair.
+      this._pointCmd({ k: 'sweep', name: 'ISR SWEEP', p: null });
+    }
     if (seat) { act.mx = act.my = 0; act.sprint = act.jump = act.crouch = act.prone = false; act.fire = act.fireHeld = false; act.scope = false; }
     if (this.role === 'spotter') { act.slot1 = act.slot2 = act.swap = false; if (!P.scoped) act.zoomIn = act.zoomOut = false; }
     act.zeroUp = act.zeroDown = false;
@@ -1526,15 +1530,19 @@ export class CellGame {
   }
 
   // ISR ping sweep at the sensor point (spotter / lone operative, in the ISR view).
-  _isrSweep() {
+  // ISR ping sweep: at the sensor point in the ISR view, or (at) the ground under your crosshair.
+  // Returns null, or why it couldn't run.
+  _isrSweep(at) {
     const I = this.isr;
-    if (I.sweepCd > 0) { this.hud.flash(`SWEEP ${Math.ceil(I.sweepCd)} s`, 'red'); return; }
+    if (I.sweepCd > 0) { const why = `SWEEP ${Math.ceil(I.sweepCd)} s`; if (!at) this.hud.flash(why, 'red'); return why; }
     I.sweepCd = 25;
-    const r = Math.max(18, Math.min(45, I.slant() * Math.tan((I.fov * Math.PI) / 360) * 0.8));
-    I.sweepFx = { x: I.spi.x, z: I.spi.z, r, t: 0 };
+    const r = at ? 30 : Math.max(18, Math.min(45, I.slant() * Math.tan((I.fov * Math.PI) / 360) * 0.8));
+    const x = at ? at.x : I.spi.x, z = at ? at.z : I.spi.z;
+    I.sweepFx = { x, z, r, t: 0 };
     this.sfx.ui(true);
     this._voice('isr', 'Sweep running.');
-    this.payload('isrsweep', { x: I.spi.x, z: I.spi.z, r });
+    this.payload('isrsweep', { x, z, r });
+    return null;
   }
 
   _heal(n) {
@@ -1822,7 +1830,7 @@ export class CellGame {
       if (A.moveT <= 0) { A.perch = A.moveTo; const p = SPOTS.perches[A.perch]; Q.pos.set(p.x, terrainHeight(p.x, p.z), p.z); Q.yaw = p.yaw; Q.avatarHidden = false; this._toast(`Ra: set at ${p.name}.`, 'amber', this.partnerName); }
       return;
     }
-    if (!A.walkEye) { Q.pos.set(perch.x, terrainHeight(perch.x, perch.z), perch.z); Q.st = 2; }
+    if (!A.walkEye) { Q.pos.set(perch.x, terrainHeight(perch.x, perch.z), perch.z); Q.st = 2; if (!A.aim) Q.yaw += angDiff(perch.yaw, Q.yaw) * Math.min(1, dt * 3); }
     const eye = A.walkEye || { x: perch.x, y: Q.pos.y + 1.3, z: perch.z };
     // Candidates: anything tagged, anything with eyes on the spotter, drones locked on.
     const me = this.player.pos;
@@ -2556,7 +2564,7 @@ class CellHud {
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
     const shooterKeys = [K('Esc', 'pause'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('1–9', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'quad'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('N', 'NV')];
+    const spotterKeys = [K('Esc', 'pause'), K('1–0', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'quad'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));

@@ -154,6 +154,7 @@ export class Input {
           setStick(t);
         } else {
           looks.set(t.identifier, { x: t.clientX, y: t.clientY, side: t.clientX < innerWidth / 2 ? 'L' : 'R' });
+          if (this.onLookTouch) this.onLookTouch('start', t);
         }
       }
       e.preventDefault();
@@ -163,6 +164,8 @@ export class Input {
         if (t.identifier === moveId) setStick(t);
         else if (looks.has(t.identifier)) {
           const l = looks.get(t.identifier);
+          // A mode can claim a look touch (e.g. a press-and-hold menu): then it doesn't aim.
+          if (this.onLookTouch && this.onLookTouch('move', t)) { l.x = t.clientX; l.y = t.clientY; continue; }
           const k = 2.2 * (l.side === 'L' ? this.touchSensL : this.touchSensR);
           this.look.x += (t.clientX - l.x) * k;
           this.look.y += (t.clientY - l.y) * k;
@@ -180,6 +183,7 @@ export class Input {
           stick.classList.remove('active', 'run');
           knob.style.transform = 'translate(-50%,-50%)';
         }
+        if (looks.has(t.identifier) && this.onLookTouch) this.onLookTouch('end', t);
         looks.delete(t.identifier);
         root.querySelectorAll('[data-act]').forEach((b) => {
           if (b._tid === t.identifier) {

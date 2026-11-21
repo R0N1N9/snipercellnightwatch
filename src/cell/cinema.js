@@ -123,7 +123,7 @@ export class Cinema {
       if (t < 6.4) { x = seatX; z = vz - 0.1; A.hidden = true; }
       else if (t < 7.6) { const u = ease((t - 6.4) / 1.2); x = lerp(seatX, doorX, u); z = vz - 0.4; yaw = side > 0 ? -Math.PI / 2 : Math.PI / 2; moving = true; A.hidden = false; }
       else if (t < 9) { const u = ease((t - 7.6) / 1.4); x = lerp(doorX, frontX, u); z = lerp(vz - 0.4, vz - 4.2, u); yaw = Math.atan2(-(frontX - doorX), 4) ; moving = true; }
-      else if (t < 11) { x = frontX; z = vz - 4.2; yaw = 0; st = t > 9.6 && t < 10.4 && A.role === 'shooter' ? 1 : 0; }
+      else if (t < 11) { x = frontX; z = vz - 4.2; yaw = 0; st = 0; }
       else { const u = Math.min(1, (t - 11) / 4.5); x = frontX; z = lerp(vz - 4.2, vz - 22, u); yaw = 0; moving = true; }
       A.p.set(x, terrainHeight(x, z), z);
       A.av.setVisible(!A.hidden);

@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { glove } from './nvg.js';
 import { PAYLOAD } from './ops.js';
+import { Wheel } from './wheel.js';
 
 const RANGE = 45;
 const OPTS = {
@@ -34,6 +35,7 @@ export const CMDS = [
   { k: 'decoy', name: 'DECOY PING', p: 'decoy' },
   { k: 'drone', name: 'RECON QUAD', p: 'quad' },
   { k: 'medevac', name: 'MEDEVAC DRONE', p: 'medevac' },
+  { k: 'sweep', name: 'ISR SWEEP', p: null, bw: 0 }, // key 0: the Predator sweeps the spot
 ];
 
 function buildPhone() {
@@ -198,7 +200,7 @@ export const Phone = {
     }
     const opts = Q.target ? (Q.target.kind === 'cmd' ? CMDS : OPTS[Q.target.kind]) : null;
     if (opts) {
-      for (let i = 0; i < Math.min(opts.length, 9); i++) if (I.pressed('Digit' + (i + 1))) Q.opt = i;
+      for (let i = 0; i < Math.min(opts.length, 10); i++) if (I.pressed('Digit' + ((i + 1) % 10))) Q.opt = i;
       if (this._qhWheel) { Q.opt = (Q.opt + (this._qhWheel > 0 ? 1 : opts.length - 1)) % opts.length; this._qhWheel = 0; }
       const go = fired || this._qhClick || I.pressed('KeyE') || I.pressed('cell-use');
       this._qhClick = false;
@@ -213,14 +215,60 @@ export const Phone = {
     } else this._qhClick = false;
   },
 
+  // Touch (spotter): press and hold on empty screen, drag toward a console command, lift to
+  // drop it on the crosshair. The finger doesn't aim while the wheel is up.
+  _cmdWheelInit() {
+    if (this.cmdWheel !== undefined) return;
+    this.cmdWheel = null;
+    if (!(this.role === 'spotter' || this.operative) || !this.input) return;
+    const ICON = { scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
+    const SHORT = { 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON QUAD': 'QUAD' };
+    const W = (this.cmdWheel = new Wheel(CMDS.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: 'cmd', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: 'COMMAND', fallback: null }));
+    let hold = null;
+    this.input.onLookTouch = (type, t) => {
+      if (type === 'start') {
+        if (hold || !this._cmdWheelOk()) return false;
+        const h = (hold = { id: t.identifier, x: t.clientX, y: t.clientY, open: false });
+        h.timer = setTimeout(() => {
+          if (hold !== h || !this._cmdWheelOk()) return;
+          h.open = true;
+          W.show(h.x, h.y, 'DROPS ON YOUR CROSSHAIR');
+          this._phonePulse && this._phonePulse();
+          navigator.vibrate && navigator.vibrate(12);
+        }, 450);
+        return false;
+      }
+      if (!hold || t.identifier !== hold.id) return false;
+      if (type === 'move') {
+        if (hold.open) { W.point(t.clientX, t.clientY); return true; }
+        if (Math.hypot(t.clientX - hold.x, t.clientY - hold.y) > 14) { clearTimeout(hold.timer); hold = null; } // it's an aim drag
+        return false;
+      }
+      // end
+      clearTimeout(hold.timer);
+      const was = hold.open;
+      hold = null;
+      if (!was) return false;
+      const k = W.close();
+      const o = k && CMDS.find((c) => c.k === k);
+      if (o && this._cmdWheelOk()) this._pointCmd(o);
+      return true;
+    };
+  },
+  _cmdWheelOk() {
+    return !((this.qh && this.qh.on) || this.tablet.visible || this.isr.active || (this.quad && this.quad.active) || this.mini.open || this.downed || this.kia || this.paused || this.ended || (this.wheel && this.wheel.open) || (this.cine && this.cine.active));
+  },
+
   // Spotter, outside the tablet: number keys 1–9 fire that console command straight at the
   // crosshair (same numbering as the tablet's payloads). The phone comes up and you tap it.
   _cmdKeys(I) {
+    this._cmdWheelInit();
+    if (this.cmdWheel && this.cmdWheel.open && !this._cmdWheelOk()) this.cmdWheel.cancel();
     if (!(this.role === 'spotter' || this.operative) || !this.ops) return;
     if ((this.qh && this.qh.on) || this.tablet.visible || this.isr.active || this.mini.open || this.downed || this.kia || this.paused) return;
     if (this._voteOpen && this._voteOpen()) return;
     const first = this.operative ? 3 : 1; // a lone operative keeps 1 / 2 for weapons
-    for (let i = first; i <= CMDS.length; i++) if (I.pressed('Digit' + i)) { this._pointCmd(CMDS[i - 1]); return; }
+    for (let i = first; i <= CMDS.length; i++) if (I.pressed('Digit' + (i % 10))) { this._pointCmd(CMDS[i - 1]); return; }
   },
   _pointCmd(o) {
     const at = this._aimPoint();
@@ -230,7 +278,7 @@ export const Phone = {
     if (!why) {
       this.sfx.ui(true);
       const p = PAYLOAD[o.p];
-      if (p && p.aim && at) this._addPin({ x: at.x, z: at.z, label: o.name, by: this.role });
+      if (((p && p.aim) || o.k === 'sweep') && at) this._addPin({ x: at.x, z: at.z, label: o.name, by: this.role });
     }
   },
 

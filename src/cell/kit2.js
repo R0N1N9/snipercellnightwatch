@@ -115,21 +115,30 @@ export const Kit2 = {
     const o = P.eyePos(new THREE.Vector3());
     const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active);
     if (live) {
+      // From the weapon's muzzle, straight out along the barrel (parallel to your aim).
       const dir = P.aimDir(new THREE.Vector3());
-      const from = o.clone().add(new THREE.Vector3(0.12, -0.14, 0).applyEuler(this.camera.rotation));
-      const end = o.clone().addScaledVector(dir, 220);
-      const h = this.fac.ray(o, end, 'shot');
+      const vm = this.viewmodel;
+      const from = vm.root.visible && vm.current ? vm.muzzleWorld(new THREE.Vector3()) : o.clone().add(new THREE.Vector3(0, -0.07, -0.45).applyEuler(this.camera.rotation));
+      const end = from.clone().addScaledVector(dir, 220);
+      const h = this.fac.ray(from, end, 'shot');
       this.irLasers.me.set(from, h ? h.point : end, true);
     } else this.irLasers.me.set(o, o, false);
     const Q = this.partner;
     if (Q.seen && !Q.kia && !Q.downed && !Q.seated && !(Q.ai && Q.avatarHidden)) {
-      const eye = Q.st === 2 ? 0.45 : Q.st === 1 ? 1.1 : 1.5;
-      const a = new THREE.Vector3(Q.pos.x, Q.pos.y + eye, Q.pos.z);
-      const yaw = Q.yaw || 0, pitch = Q.pitch || 0;
-      const d = new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+      // Your partner's: from the muzzle of the rifle / pistol on their model, along its barrel.
+      const av = Q.avatar;
+      if (!av._irMz) {
+        const r = new THREE.Object3D(); r.position.set(0, 0, -1.27); av.rifle.add(r);
+        const pz = new THREE.Object3D(); pz.position.set(0, 0, -0.1); av.pistol.add(pz);
+        av._irMz = { rifle: r, pistol: pz };
+      }
+      const gun = av.pistol.visible ? av.pistol : av.rifle, mz = av.pistol.visible ? av._irMz.pistol : av._irMz.rifle;
+      gun.updateWorldMatrix(true, false);
+      const a = mz.getWorldPosition(new THREE.Vector3());
+      const d = new THREE.Vector3(0, 0, -1).applyQuaternion(gun.getWorldQuaternion(new THREE.Quaternion())).normalize();
       const end = a.clone().addScaledVector(d, 220);
-      const h = this.fac.ray(a.clone().addScaledVector(d, 0.6), end, 'shot');
-      this.irLasers.partner.set(a.clone().addScaledVector(d, 0.5), h ? h.point : end, true);
+      const h = this.fac.ray(a.clone().addScaledVector(d, 0.05), end, 'shot');
+      this.irLasers.partner.set(a, h ? h.point : end, true);
     } else this.irLasers.partner.set(o, o, false);
     // Hunt ghosts: where SENTINEL last saw each operator, while they hunt.
     for (const role of ['shooter', 'spotter']) {
