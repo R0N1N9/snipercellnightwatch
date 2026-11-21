@@ -201,24 +201,36 @@ export class Audio {
     this._noiseBurst(p, t, 0.3, 'lowpass', mat === 'dirt' ? 700 : 1500, 0.8, 0.8, 0.18);
   }
 
-  // Satisfying confirmation tones.
+  // Hit confirmation, CoD-style: a dry, light impact rather than a ping — a short tick of
+  // high-passed noise over a soft low thud; a headshot adds a crisper second tick.
   hitConfirm(head, delay = 0) {
     if (!this.ctx) return;
-    const t = this.now + delay;
-    const o = this.ctx.createOscillator();
-    o.type = 'square';
-    o.frequency.setValueAtTime(head ? 1650 : 980, t);
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.18, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + (head ? 0.35 : 0.15));
-    const f = this.ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = 3000;
-    o.connect(f).connect(g).connect(this.master);
-    o.start(t);
-    o.stop(t + 0.4);
-    if (head) this._thump(this.master, t, 90, 0.5, 0.25);
+    const t = this.now + delay, ctx = this.ctx;
+    const tick = (at, freq, gain, dur) => {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noise;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'bandpass'; hp.frequency.value = freq; hp.Q.value = 0.9;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(gain, at + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      src.connect(hp).connect(g).connect(this.master);
+      src.start(at, Math.random() * 0.5);
+      src.stop(at + dur + 0.02);
+    };
+    tick(t, 3600, 0.32, 0.035);
+    // The soft body of the impact.
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(170, t);
+    o.frequency.exponentialRampToValueAtTime(90, t + 0.05);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.22, t + 0.003);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(og).connect(this.master);
+    o.start(t); o.stop(t + 0.08);
+    if (head) tick(t + 0.045, 5200, 0.22, 0.03);
   }
 
   plateHit(pos, delay) {

@@ -78,6 +78,8 @@ export const KitMethods = {
       if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._ammoMenu();
       if (this.xr && this.xr.menu) for (let i = 1; i <= 4; i++) if (I.pressed('Digit' + i)) { this._ammoPick(['std', 'xr', 'pen', 'emp'][i - 1]); act.slot1 = act.slot2 = false; }
     }
+    // Spotter's slingshot (T / SLING): the same noise lure.
+    if (live && !tab && !quad && this.role === 'spotter' && (I.pressed('KeyT') || I.pressed('cell-lure'))) this._throwLure();
     // Downed: V / PING / HELP calls for a pickup on your position.
     this._helpCd = Math.max(0, (this._helpCd || 0) - dt);
     if (this.downed && !this.kia && (I.pressed('KeyQ') || I.pressed('cell-ping') || I.pressed('cell-help'))) this._pickupCall();
@@ -225,9 +227,10 @@ export const KitMethods = {
     mesh.add(b, led);
     mesh.position.copy(o);
     this.scene.add(mesh);
-    this.lures.push({ p: o.clone(), v: d.multiplyScalar(15).add(new THREE.Vector3(0, 3.2, 0)), mesh, led, landed: false, t: 0, tick: 0.8 });
+    // Fired from a slingshot: flatter and further than a throw.
+    this.lures.push({ p: o.clone(), v: d.multiplyScalar(24).add(new THREE.Vector3(0, 2.6, 0)), mesh, led, landed: false, t: 0, tick: 0.8 });
     this.audio.click();
-    this.hud.flash(`LURE OUT (${K.lures} left)`, 'cyan');
+    this.hud.flash(`SLINGSHOT \u00B7 LURE OUT (${K.lures} left)`, 'cyan');
   },
 
   _lureTick(dt) {
