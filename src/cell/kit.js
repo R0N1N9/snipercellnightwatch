@@ -125,7 +125,7 @@ export const KitMethods = {
     if (P.sprinting) v *= 1.2;
     const light = this.fac.lightAt(P.pos.x, P.pos.y + 1, P.pos.z);
     v *= light < 0.35 ? 0.4 + light : 1;
-    if (this.cloak.on) v *= this.cloak.flick > 0 ? 0.6 : 0.14;
+    if (this.cloak.on) v *= this.cloak.flick > 0 ? 0.6 : 0.03;
     return Math.min(1, v);
   },
 

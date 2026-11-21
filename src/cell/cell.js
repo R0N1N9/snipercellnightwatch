@@ -1174,12 +1174,14 @@ export class CellGame {
     if (this.quad && this.quad.parked && this.quad.auto && !this.quad.recall) this._quadAuto(dt);
     if (this.quad && this.quad.parked) { this.quad.bat -= dt * 0.25; if (this.quad.bat <= 0) { this.comms('Drone battery dead \u2014 it\u2019s coming home.', 'cyan', this.name); this._endQuad(); } }
 
-    // Cloak battery (Cold Archive: drain 14/s, regen 7 × camo/s).
+    // Cloak battery (PlanetSide-style): moving drains it (sprinting faster); holding still
+    // while cloaked trickles it back in; switched off it recharges at the full rate.
     const C = this.cloak;
     C.flick = Math.max(0, C.flick - dt);
     C.lockT = Math.max(0, (C.lockT || 0) - dt);
     if (C.on) {
-      C.bat -= (P.moving ? 14 : 9) * dt;
+      if (P.moving) C.bat -= (P.sprinting ? 20 : 12) * dt;
+      else C.bat = Math.min(100, C.bat + 2.5 * this.D.camo * dt);
       if (C.bat <= 0) { C.bat = 0; C.on = false; this.hud.flash('CAMO DEPLETED', 'red'); this.audio.click(); }
       C.regenT = 2;
     } else {
