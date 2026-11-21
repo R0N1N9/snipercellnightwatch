@@ -513,7 +513,7 @@ export const Devices = {
     if (m.width !== W || m.height !== H) { m.width = W; m.height = H; }
     const mc = m.getContext('2d');
     mc.globalCompositeOperation = 'source-over';
-    mc.fillStyle = '#000'; mc.fillRect(0, 0, W, H);
+    mc.fillStyle = 'rgba(0,0,0,0.22)'; mc.fillRect(0, 0, W, H); // the world stays visible round the lenses, like NV
     mc.globalCompositeOperation = 'destination-out';
     mc.beginPath(); mc.arc(W / 2 - dx, H / 2, r, 0, Math.PI * 2); mc.arc(W / 2 + dx, H / 2, r, 0, Math.PI * 2); mc.fill();
     c.drawImage(m, 0, 0, W, H);

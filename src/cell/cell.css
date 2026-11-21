@@ -476,3 +476,19 @@ body.cell-compact #touch .cell-tbar .pill:not(.keep) { display: none !important;
 /* Touch: the TABLET button (with ISR inside) replaces the console / ISR preview squares. */
 body.touch #cell-hud .c-pip { display: none !important; }
 body.touch #cell-hud.has-pip .c-partner { top: 14px; }
+
+/* The KR-50 magazine strip (left): orange silhouettes with round counts; tap to load. */
+#cell-mags { position: fixed; left: 18px; top: 160px; z-index: 7; display: flex; gap: 5px; font-family: var(--mono); pointer-events: auto; }
+#cell-mags.col { flex-direction: column; }
+#cell-mags .cm { width: 40px; padding: 3px 0 2px; text-align: center; background: rgba(6, 10, 14, 0.55); border: 1px solid rgba(242, 179, 91, 0.3); border-radius: 6px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+#cell-mags svg { display: block; width: 20px; height: 29px; margin: 0 auto; }
+#cell-mags svg path { fill: #f2b35b; }
+#cell-mags svg path.rib { fill: none; stroke: rgba(40, 24, 8, 0.55); stroke-width: 1; }
+#cell-mags .cm b { display: block; font-size: 8px; letter-spacing: 0.08em; color: #f2b35b; }
+#cell-mags .cm em { display: block; font-style: normal; font-size: 9px; color: #fff; }
+#cell-mags .cm.on { border-color: #ffd040; background: rgba(255, 208, 64, 0.18); box-shadow: 0 0 10px rgba(255, 208, 64, 0.35); }
+#cell-mags .cm.on svg path:not(.rib) { fill: #ffd040; }
+#cell-mags .cm.out { opacity: 0.35; }
+#cell-mags .cm.busy { animation: magbusy 0.5s ease-in-out infinite alternate; }
+@keyframes magbusy { to { transform: translateY(-3px); } }
+#touch .cell-usebtn span { font-size: 12px; letter-spacing: 0.1em; font-weight: 700; }

@@ -24,7 +24,43 @@ export const XRounds = {
     Object.defineProperty(this.xr, 'rounds', { get: () => this.xr.pouch.xr, set: (v) => (this.xr.pouch.xr = v) });
     this.xcharges = [];
     this._xcId = 1;
-    if (own) this._ammoMenuBuild();
+    if (own) { this._ammoMenuBuild(); this._magStripBuild(); }
+  },
+
+  // The magazine strip on the left: an orange silhouette per round type with how many rounds you
+  // have; tap (or click) one to load it (the full mag-out / mag-in reload).
+  _magStripBuild() {
+    const el = (this.magEl = document.createElement('div'));
+    el.id = 'cell-mags';
+    el.className = 'col';
+    const tip = { std: '', xr: '#ff4a3a', pen: '#d8dde4', emp: '#3fe8ff' };
+    const short = { std: 'STD', xr: 'EXP', pen: 'PEN', emp: 'EMP' };
+    el.innerHTML = AMMO.map((a) => `<div class="cm" data-a="${a.k}"><svg viewBox="0 0 26 38"><path d="M7 2h12l1 4-1 3 2 23-1 4H6l-1-4 2-23-1-3z" /><path class="rib" d="M8 13h10M8 18h10M8 23h10M8 28h10" />${tip[a.k] ? `<rect x="9" y="0" width="8" height="4" rx="1" fill="${tip[a.k]}" />` : ''}</svg><b>${short[a.k]}</b><em></em></div>`).join('');
+    document.body.appendChild(el);
+    const pick = (e) => { const b = e.target.closest('[data-a]'); if (!b) return; e.preventDefault(); e.stopPropagation(); this._ammoSwap(b.dataset.a); this._magPaint(true); };
+    el.addEventListener('pointerdown', pick);
+    el.addEventListener('touchstart', pick, { passive: false });
+    this._magPaint(true);
+  },
+  _magPaint(force) {
+    const el = this.magEl;
+    if (!el) return;
+    const P = this.player, w = P.arms.find((q) => q.def.slot === 'rifle');
+    const show = !!w && P.w === w && !this.knifeEq && !(this.tablet && this.tablet.visible) && !(this.isr && this.isr.active) && !(this.quad && this.quad.active) && !this.downed && !this.kia && !(this.cine && this.cine.active);
+    el.style.display = show ? '' : 'none';
+    if (!show) return;
+    this._magT = (this._magT || 0) - 1 / 60;
+    if (!force && this._magT > 0) return;
+    this._magT = 0.25;
+    const cur = w.ammo || 'std', X = this.xr;
+    for (const b of el.children) {
+      const k = b.dataset.a;
+      const n = k === 'std' ? w.reserve + (cur === 'std' ? w.mag + w.chamber : 0) : X.pouch[k] + (cur === k ? w.mag + w.chamber : 0);
+      b.querySelector('em').textContent = '\u00D7' + n;
+      b.classList.toggle('on', cur === k);
+      b.classList.toggle('out', !n);
+      b.classList.toggle('busy', !!X.swap && X.swap.to === k);
+    }
   },
 
   // The rounds menu: a column on the left. Z toggles it; 1–4, a click or a tap loads one.
@@ -91,6 +127,7 @@ export const XRounds = {
   // Every frame (all clients): swap completion, charges ticking and blowing.
   _xrTick(dt) {
     const X = this.xr;
+    if (this.magEl) this._magPaint();
     if (X && X.swap && this.player.reloadT <= 0) {
       const w = this.player.arms.find((q) => q.def.slot === 'rifle');
       if (w && X.swap.to !== 'std') {
