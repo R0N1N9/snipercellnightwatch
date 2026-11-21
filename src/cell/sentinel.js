@@ -129,6 +129,20 @@ function rig(body, C, mk) {
   return legs;
 }
 
+// A carbine the troops carry at the low ready: receiver, barrel with a muzzle device, stock,
+// curved magazine, optic and a weapon light under the barrel.
+function carbine(gun, mk, short = false) {
+  const k = short ? 0.85 : 1;
+  mk(new THREE.BoxGeometry(0.07, 0.1, 0.4 * k), '#1d1f22', 0, 0, -0.05, gun);
+  mk(new THREE.CylinderGeometry(0.018, 0.018, 0.34 * k, 8).rotateX(Math.PI / 2), '#141517', 0, 0.015, -0.42 * k, gun);
+  mk(new THREE.BoxGeometry(0.035, 0.035, 0.06), '#141517', 0, 0.015, -0.6 * k, gun);
+  mk(new THREE.BoxGeometry(0.06, 0.12, 0.24), '#2a2c2f', 0, -0.02, 0.26 * k, gun);
+  mk(new THREE.BoxGeometry(0.05, 0.17, 0.08), '#17181a', 0, -0.12, -0.12 * k, gun).rotation.x = 0.25;
+  mk(new THREE.BoxGeometry(0.04, 0.1, 0.05), '#17181a', 0, -0.09, 0.08 * k, gun).rotation.x = 0.3;
+  mk(new THREE.BoxGeometry(0.045, 0.05, 0.12), '#141517', 0, 0.08, -0.04, gun);
+  mk(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8).rotateX(Math.PI / 2), '#2a2c2f', 0, -0.035, -0.36 * k, gun);
+}
+
 export function buildUnit(type = 'guard', chief = false) {
   const T = TYPES[type] || TYPES.guard;
   const root = new THREE.Group();
@@ -150,7 +164,7 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.SphereGeometry(0.15, 10, 7, 0, Math.PI * 2, 0, Math.PI / 1.8), chief ? '#4b3f63' : '#3b4046', 0, 1.66, 0.01);
     glow(new THREE.BoxGeometry(0.2, 0.05, 0.03), chief ? '#c070ff' : '#ff4050', 0, 1.62, -0.115);
     gun.position.set(0.05, 1.18, -0.28);
-    mk(new THREE.BoxGeometry(0.06, 0.09, 0.7), '#1b1c1f', 0, 0, -0.1, gun);
+    carbine(gun, mk);
     for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.11, 0.11, 0.42), C.suit, s * 0.22, 1.28, -0.16).rotation.y = -s * 0.35;
   } else if (type === 'scav') {
     // Hunched little conscript: coolant pack on its back, slit visor, twitchy.
@@ -169,8 +183,8 @@ export function buildUnit(type = 'guard', chief = false) {
     glow(new THREE.BoxGeometry(0.26, 0.05, 0.02), '#ffe040', 0, 1.53, -0.28);
     mk(new THREE.CylinderGeometry(0.06, 0.08, 0.12, 8).rotateX(Math.PI / 2), '#1a1918', 0, 1.42, -0.3);
     gun.position.set(0.18, 1.12, -0.32);
-    mk(new THREE.BoxGeometry(0.08, 0.1, 0.26), '#24262a', 0, 0, -0.05, gun);
-    glow(new THREE.SphereGeometry(0.045, 8, 6), '#60ff70', 0, 0.02, -0.2, gun, 2);
+    carbine(gun, mk, true);
+    glow(new THREE.SphereGeometry(0.03, 8, 6), '#60ff70', 0, 0.075, -0.05, gun, 2);
     for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.09, 0.09, 0.36), C.suit, s * 0.22, 1.22, -0.16).rotation.y = -s * 0.3;
   } else if (type === 'jugg' || type === 'overseer') {
     // Hulking enforcer: plated, neon seams, heavy cannon on the left, energy blade on the right.

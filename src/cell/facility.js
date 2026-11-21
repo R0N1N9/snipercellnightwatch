@@ -31,6 +31,7 @@ export const SPOTS = {
     { id: 'east', name: 'EAST KNOLL', x: 128, z: -72, yaw: Math.PI / 2 + 0.5 },
     { id: 'west', name: 'WEST KNOLL', x: -136, z: -28, yaw: -Math.PI / 2 },
     { id: 'roof', name: 'TOWER ROOF', x: 0, z: -1.6, yaw: Math.PI },
+    { id: 'north', name: 'NORTH RIDGE', x: 1, z: -117, yaw: Math.PI },
   ],
   relay: { x: 33.2, z: -6, y: 1.1 },
   server: { x: 30, z: -35.6, y: 1.1 },
@@ -45,8 +46,8 @@ export const SPOTS = {
 // to z1), where you and your partner start, and whether there's an approach to walk.
 export const DROPS = {
   draw: { name: 'TREE LINE', desc: 'The wooded draw south of the ridge. Walk in under the trees, clear the pickets, crest the hill.', van: [6, 336, 298], insert: [{ x: 6.9, z: 276 }, { x: 5.1, z: 276 }], approach: true },
-  ridge: { name: 'RIDGE', desc: 'Straight onto the plateau above the cliff. No approach: the compound is right below you.', van: [6, 196, 143], insert: [{ x: 6.9, z: 121 }, { x: 5.1, z: 121 }], approach: false },
   // HALO jumps from a transport onto the knolls either side of the valley (Ra lands on the perch).
+  north: { name: 'NORTH RIDGE', desc: 'HALO jump onto the ridge behind the tower. Looks straight down on the back of the building and the north towers.', air: true, from: [0.15, -1], insert: [{ x: 7, z: -122 }, { x: 4, z: -120 }], perch: 4, overlook: { x: -4, z: -121 }, approach: false },
   roof: { name: 'TOWER ROOF', desc: 'HALO straight onto the tower roof, then down the service hatch onto the data floor. Fast, high, nowhere to run.', air: true, roof: true, from: [0.25, 1], insert: [{ x: -2, z: -14 }, { x: 1.5, z: -12 }], perch: 3, overlook: { x: 10, z: -8 }, approach: false },
   west: { name: 'WEST KNOLL', desc: 'HALO jump from a transport, canopies onto the west knoll. Long view over the west fence.', air: true, from: [-1, 0.35], insert: [{ x: -133, z: -27 }, { x: -134.5, z: -23.5 }], perch: 2, overlook: { x: -131, z: -21 }, approach: false },
   east: { name: 'EAST KNOLL', desc: 'HALO jump from a transport, canopies onto the east knoll. Overlooks the dock and the exfil track.', air: true, from: [1, -0.25], insert: [{ x: 126, z: -70 }, { x: 127.5, z: -66.5 }], perch: 1, overlook: { x: 124, z: -64 }, approach: false },

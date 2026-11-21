@@ -421,3 +421,5 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 #panel-staging .stg-opts button { text-align: left; }
 #panel-staging .stg-prim { border: 1px solid rgba(232, 230, 240, 0.18); padding: 6px 8px; margin-bottom: 4px; font-family: var(--mono); }
 #panel-staging .stg-prim b { font-size: 12px; letter-spacing: 0.1em; }
+
+.tag.cell-tag { font-size: 0.82em; line-height: 1.35; }
