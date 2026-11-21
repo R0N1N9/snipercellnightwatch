@@ -318,7 +318,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 
 - P-9 pistol (2 magazines) with a removable suppressor (**B**: animated twist off / on).
 - **Eyes on:** anything in your field of view, in the clear and within about 40 m (60 m aimed), is marked for the team while you can see it, like the quad's neurolink. Your crosshair on an enemy tags it at once with a ping. Sight marks don't send an AI Ra after them; tag with F or ping ENEMY for that.
-- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon drone, medevac) at the spot you're aiming at, with the phone animation. **0** (or the SWEEP button) calls an **ISR sweep** on the ground under your crosshair.
+- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon drone, medevac) at the spot you're aiming at, with the phone animation. **0** (or ISR SWEEP on the press-and-hold wheel) calls an **ISR sweep** on the ground under your crosshair.
 - **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
 - **Recon drone:** G (desktop) tosses it up out of your left hand before the feed cuts in. Hold G to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
 - **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. G takes the sticks; hold G recalls it.
@@ -408,7 +408,7 @@ The lone operative carries both kits. Shift+E plants C4.
 
 **On an iPad or a phone:**
 
-- The action buttons sit in a strip along the bottom centre, like the desktop key hints, between the move stick and the fire buttons. They cover every action, including TABLET, HACK, ISR, SWEEP, QUAD, RECALL, SYNC, HELP, LIGHT, DROP, PING, TAG, USE, SUPP, NV and CHAT.
+- The action buttons sit in a strip along the bottom centre, like the desktop key hints, between the move stick and the fire buttons. They cover every action, including TABLET, HACK, ISR, QUAD, RECALL, SYNC, HELP, LIGHT, DROP, PING, TAG, USE, SUPP, NV and CHAT. Anything on the press-and-hold command wheel has no separate button (SWEEP appears only inside the ISR view, where the wheel doesn't open).
 - The Auto preset gives iPads Medium, with a capped render resolution.
 - For better radio voices, install enhanced male voices: Settings → Accessibility → Spoken Content → Voices → English, then Aaron, Arthur or Evan (Enhanced).
 
