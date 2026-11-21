@@ -206,7 +206,10 @@ export function buildP9() {
   box(0.026, 0.008, 0.06, frameM, 0, -0.022, -0.11); // accessory rail
   box(0.034, 0.112, 0.052, gripM, 0, -0.068, 0.012, -0.2); // grip, raked back
   for (let i = 0; i < 5; i++) box(0.035, 0.004, 0.046, frameM, 0, -0.035 - i * 0.02, 0.006 + i * 0.004, -0.2);
-  box(0.03, 0.008, 0.012, frameM, 0, -0.026, -0.045); // trigger guard front
+  // Trigger guard: front post, bottom bar curving back to the grip.
+  box(0.03, 0.03, 0.009, frameM, 0, -0.035, -0.05);
+  box(0.03, 0.008, 0.058, frameM, 0, -0.051, -0.023);
+  box(0.03, 0.012, 0.01, frameM, 0, -0.045, 0.004);
   box(0.006, 0.02, 0.006, dark, 0, -0.03, -0.022); // trigger
   box(0.03, 0.022, 0.012, frameM, 0, 0.0, 0.03); // beavertail
   const slide = new THREE.Group();

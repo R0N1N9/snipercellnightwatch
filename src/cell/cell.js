@@ -44,6 +44,7 @@ import { installSpatial } from './spatial.js';
 import { installPhone } from './phone.js';
 import { installXRounds, XR, AMMO_NAME } from './xrounds.js';
 import { installAbilities } from './abilities.js';
+import { installMelee } from './melee.js';
 import { installDevices } from './devices.js';
 import { wallBlock } from './sentinel.js';
 import { Cinema } from './cinema.js';
@@ -418,6 +419,7 @@ export class CellGame {
     this._xrInit();
     this._abInit();
     this._devInit();
+    this._wpnInit();
     this.laserOn = true;
     this._setupPartner();
     this.ops = this.role === 'spotter' ? new Ops(this) : this.solo ? new Ops(this) : null;
@@ -1221,8 +1223,10 @@ export class CellGame {
     this._kitKeys(dt, I, tab, quad, live, act);
     this._abInput(dt, I, act, live && !tab && !quad);
     // Spotter's binoculars: X (or BINO) to swap from the P-9; scope raises them.
-    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino') || (this.role === 'spotter' && I.pressed('swap'))) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
+    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino')) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
+    if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
+    this._wpnInput(dt, I, act, live && !tab && !quad && !isr && !this.mini.open);
     const seat = this._seat();
     if (!live || tab || quad) {
       act.fire = false; act.fireHeld = false; act.scope = false; act.reload = act.reload && live && !quad;
@@ -1308,7 +1312,8 @@ export class CellGame {
     this.camera.updateProjectionMatrix();
     // First-person weapon.
     const scopedRifle = P.def.scope && P.scopeT > 0.6;
-    this.viewmodel.visible = live && !scopedRifle && !quad && !tab && !seat && !isr && !(this.knifeT > 0) && !this.devAnim && !(this.bino && this.bino.on);
+    this.viewmodelVisible = live && !quad && !tab && !seat && !isr && !this.devAnim;
+    this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !(this.bino && this.bino.on) && !this.knifeEq;
     // Suppressor cans (mid-gesture the can shows while it's in your hand).
     const supU = this._supTick(dt), SA = this.supAnim;
     const canShow = (w) => (SA && SA.w === w ? (SA.to ? supU > 0.18 : supU < 0.82) : !!w.sup);
@@ -1316,6 +1321,7 @@ export class CellGame {
     for (const w of P.arms) { const c = canOf(w); if (c) c.visible = canShow(w); }
     this.carry.visible = this.obj.drive === this.role && live && !quad && !isr;
     this._knifeTick(dt);
+    this._wpnTick();
     // Deadeye: the M50 in the right hand, the KR-50 lowered in the left.
     const DE = this.deSeq;
     if (this.deRifle) this.deRifle.visible = !!DE && this.viewmodel.root.visible;
@@ -2882,7 +2888,7 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('3–8', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('9', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('0', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
     const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
@@ -3152,7 +3158,7 @@ class CellHud {
     // Touch swap button names what you'd swap to. The spotter's P-9 is primary, binoculars secondary.
     if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
     if (this.elSwap) {
-      const lbl = g.role === 'spotter' ? (g.bino && g.bino.on ? 'PRIMARY' : 'SECONDARY') : P.slot === 0 ? 'SECONDARY' : 'PRIMARY';
+      const lbl = ({ p: 'PRIMARY', s: 'SECONDARY', k: 'KNIFE' })[g._wpnNextK ? g._wpnNextK() : 's'];
       if (this.elSwap.textContent !== lbl) this.elSwap.textContent = lbl;
     }
     // Objective & alarm.
@@ -3552,4 +3558,5 @@ installSpatial(CellGame);
 installPhone(CellGame);
 installXRounds(CellGame);
 installAbilities(CellGame);
+installMelee(CellGame);
 installDevices(CellGame);

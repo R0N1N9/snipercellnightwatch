@@ -153,15 +153,18 @@ export function mergeBoxes(list, material) {
   let n = 0;
   const geos = list.map(({ geo, m }) => { const g = geo.index ? geo.toNonIndexed() : geo; g.applyMatrix4(m); n += g.attributes.position.count; return g; });
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+  const withUv = geos.every((g) => g.attributes.uv), uv = withUv ? new Float32Array(n * 2) : null;
   let o = 0;
   for (const g of geos) {
     pos.set(g.attributes.position.array, o * 3);
     nor.set(g.attributes.normal.array, o * 3);
+    if (uv) uv.set(g.attributes.uv.array, o * 2);
     o += g.attributes.position.count;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  if (uv) geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.computeBoundingSphere();
   return new THREE.Mesh(geo, material);
 }
