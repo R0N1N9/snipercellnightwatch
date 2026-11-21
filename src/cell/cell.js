@@ -1671,7 +1671,6 @@ export class CellGame {
 
   _onKillEvent(m) {
     if (m.by === this.role && m.dist) this.stats.longest = Math.max(this.stats.longest, m.dist);
-    if (m.by === this.role && m.what === 'TAKEDOWN' && this.role === 'shooter' && this.kit.execs < KIT.exec.max) { this.kit.execs++; this.hud.flash('EXECUTE CHARGED (T)', 'cyan'); }
     this.hud.feed(`${m.name} ▸ ${m.what}${m.dist > 30 ? ' · ' + m.dist + ' m' : ''}${m.chief ? (this.mission === 'nightwatch' ? ' · OVERSEER' : ' · SITE CHIEF') : ''}`, m.by === this.role ? ROLES[this.role].color : ROLES[this.partnerRole].color);
   }
 
@@ -2933,7 +2932,7 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('0', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('Z', 'rounds menu'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
     const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hack phone'), K('TAB', 'tablet · ISR (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
@@ -3000,26 +2999,34 @@ class CellHud {
     bar.className = 'cell-tbar';
     // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
-    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
+    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative && g.role === 'shooter'
       ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
+        ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ...common]
         : [['cell-tab', 'TABLET'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
-    const KEEP = new Set(['cell-use', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
+    const KEEP = new Set(['cell-tab', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
     // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
     const AB = g.operative && g.role === 'shooter'
-      ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
+      ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
-        ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
+        ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure']]
         : [['cell-ability', 'DRONE', 'drone'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm'], ['cell-lase', 'LASE', 'lase']]), ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
     ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
     t.appendChild(ab);
     this.abEl = ab;
+    // USE: a round button that pops up beside FIRE when there's something to interact with.
+    const use = document.createElement('div');
+    use.className = 'tb sm cell-usebtn';
+    use.dataset.act = 'cell-use';
+    use.innerHTML = '<i>\u261D</i><span>USE</span>';
+    use.style.display = 'none';
+    t.appendChild(use);
+    this.useBtn = use;
     this.abBtns = [...ab.children].map((el) => ({ el, k: el.dataset.k, bar: el.querySelector('b'), cnt: el.querySelector('em'), last: '' }));
     bar.querySelector('#cell-tpause').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.setPause(true); }, { passive: false });
     // PING: hold and drag your thumb to pick from the wheel.
@@ -3037,7 +3044,10 @@ class CellHud {
   // Ability buttons (touch): fill = how charged / ready it is; 'cd' greys it out, 'on' = active.
   _abilTick(dt) {
     const g = this.g, K = g.kit, A = g.ab, C = g.cloak;
+    const binoUp = !!(g.bino && g.bino.up);
     for (const b of this.abBtns) {
+      // The nano swarm and the laser only exist through the raised binoculars.
+      if (b.k === 'swarm' || b.k === 'lase') { const show = binoUp; if ((b.el.style.visibility !== 'hidden') !== show) b.el.style.visibility = show ? '' : 'hidden'; }
       let f = 1, st = '', n = '';
       if (b.k === 'camo') { f = C.bat / 100; st = C.on ? 'on' : C.bat < 10 || C.lockT > 0 ? 'cd' : ''; }
       else if (b.k === 'deadeye' && K) { if (K.deadeye > 0) { f = K.deadeye / KIT.deadeye.dur; st = 'on'; } else if (K.deadeyeCd > 0) { f = 1 - K.deadeyeCd / KIT.deadeye.cd; st = 'cd'; n = Math.ceil(K.deadeyeCd) + 's'; } }
@@ -3071,37 +3081,40 @@ class CellHud {
     }
   }
 
-  // Put the ability buttons on the left, below the objective board, without covering anything:
-  // try a few column counts and offsets, take the first that clears every other control.
+  // Scatter the ability buttons round the left thumb, like PRONE and CROUCH: candidate spots on
+  // arcs above and around the move stick (nearest first), each taken only if it clears every
+  // other control and the buttons already placed.
   _abilPlace() {
     const el = this.abEl;
     if (!el || !el.getClientRects().length) return;
-    const W = innerWidth, H = innerHeight, n = this.abBtns.length;
+    const VV = window.visualViewport, W = (VV && VV.width) || innerWidth, H = Math.min((VV && VV.height) || innerHeight, document.documentElement.clientHeight || innerHeight), small = Math.min(W, H) < 500, size = small ? 44 : 50;
     const avoid = [...document.querySelectorAll('#touch .tb, #touch .cell-tbar .pill, #touch .stick, #cell-hud .c-obj, #cell-hud .c-vis, #cell-hud .c-vitals, #cell-bodycams')]
-      .filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden')
+      .filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.classList.contains('cell-usebtn'))
       .map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
-    const hits = (x, y, w, h) => avoid.some((r) => x < r.right + 4 && x + w > r.left - 4 && y < r.bottom + 4 && y + h > r.top - 4);
+    const st = document.querySelector('#touch .stick'), sr = st && st.getBoundingClientRect();
+    const cx = sr && sr.width ? sr.left + sr.width / 2 : 120, cy = sr && sr.height ? sr.top + sr.height / 2 : H - 120;
+    const R = sr && sr.width ? sr.width / 2 : 70;
     const obj = document.querySelector('#cell-hud .c-obj');
-    const or = obj && obj.getClientRects().length ? obj.getBoundingClientRect() : null;
-    const top0 = or ? or.bottom + 8 : 70;
-    for (const size of [50, 44, 40]) {
-      const gap = 6;
-      for (const cols of [1, 2, 3, 4, n]) {
-        const rows = Math.ceil(n / cols), w = cols * size + (cols - 1) * gap, h = rows * size + (rows - 1) * gap;
-        for (let y = top0; y + h < H - 8; y += 12) {
-          for (let x = 12; x + w < W * 0.45; x += 12) {
-            if (!hits(x, y, w, h)) { this._abSet(x, y, cols, size); return; }
-          }
-        }
-      }
+    const top0 = obj && obj.getClientRects().length ? obj.getBoundingClientRect().bottom + 6 : 60;
+    const spots = [];
+    for (const rr of [R + size * 1.9, R + size * 3.1, R + size * 4.3, R + size * 5.5]) {
+      for (let a = -100; a >= -175; a -= 15) spots.push([cx + Math.cos((a * Math.PI) / 180) * rr, cy + Math.sin((a * Math.PI) / 180) * rr]);
+      for (let a = -85; a <= -20; a += 15) spots.push([cx + Math.cos((a * Math.PI) / 180) * rr, cy + Math.sin((a * Math.PI) / 180) * rr]);
     }
-    this._abSet(12, top0, 2, 40);
-  }
-  _abSet(x, y, cols, size) {
-    const s = this.abEl.style;
-    s.left = `${Math.round(x)}px`; s.top = `${Math.round(y)}px`;
-    s.gridTemplateColumns = `repeat(${cols}, ${size}px)`;
-    s.setProperty('--ab', `${size}px`);
+    spots.sort((p, q) => Math.hypot(p[0] - cx, p[1] - cy) - Math.hypot(q[0] - cx, q[1] - cy));
+    const placed = [];
+    const clear = (x, y) => x - size / 2 >= 6 && x + size / 2 <= W * 0.5 && y - size / 2 >= top0 && y + size / 2 <= H - 16
+      && !avoid.some((r) => x + size / 2 > r.left - 6 && x - size / 2 < r.right + 6 && y + size / 2 > r.top - 6 && y - size / 2 < r.bottom + 6)
+      && !placed.some(([px, py]) => Math.hypot(px - x, py - y) < size + 8);
+    el.style.setProperty('--ab', `${size}px`);
+    for (const b of this.abBtns) {
+      let spot = spots.find(([x, y]) => clear(x, y));
+      if (!spot) { for (let y = top0 + size / 2; y < H - size && !spot; y += 12) for (let x = 12 + size / 2; x < W * 0.45 && !spot; x += 12) if (clear(x, y)) spot = [x, y]; }
+      if (!spot) spot = [12 + size / 2 + (placed.length % 3) * (size + 6), top0 + size / 2 + Math.floor(placed.length / 3) * (size + 6)];
+      placed.push(spot);
+      b.el.style.left = `${Math.round(spot[0] - size / 2)}px`;
+      b.el.style.top = `${Math.round(spot[1] - size / 2)}px`;
+    }
   }
 
   intro(M, who) {
@@ -3199,6 +3212,28 @@ class CellHud {
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
     if (this.abBtns) this._abilTick(dt);
+    if (this.useBtn) {
+      const pr = g.prompts && g.prompts[g.role];
+      const on = !!(pr && pr.label && !/^DOWNED/.test(pr.label)) && !g.tablet.visible && !g.isr.active;
+      if ((this.useBtn.style.display !== 'none') !== on) {
+        this.useBtn.style.display = on ? '' : 'none';
+        const f = document.querySelector('#touch .fire-r');
+        if (on && f) {
+          // A free spot round FIRE (left, up-left, up...), clear of the other buttons.
+          const r = f.getBoundingClientRect(), fx = r.left + r.width / 2, fy = r.top + r.height / 2, R = r.width / 2 + 36, s = 50;
+          const others = [...document.querySelectorAll('#touch .tb, #touch .cell-tbar .pill')].filter((e) => e !== this.useBtn && e.getClientRects().length && getComputedStyle(e).display !== 'none').map((e) => e.getBoundingClientRect());
+          let best = [fx - R, fy];
+          for (const a of [180, 200, 160, 220, 140, 240, 120, 260, 100]) {
+            const x = fx + Math.cos((a * Math.PI) / 180) * R, y = fy - Math.sin(((a - 180) * Math.PI) / 180) * R * -1;
+            const yy = fy + Math.sin((a * Math.PI) / 180) * -R;
+            if (x - s / 2 < 4 || yy - s / 2 < 4 || yy + s / 2 > innerHeight - 4) continue;
+            if (!others.some((o) => x + s / 2 > o.left - 4 && x - s / 2 < o.right + 4 && yy + s / 2 > o.top - 4 && yy - s / 2 < o.bottom + 4)) { best = [x, yy]; void y; break; }
+          }
+          this.useBtn.style.left = `${Math.round(best[0] - s / 2)}px`;
+          this.useBtn.style.top = `${Math.round(best[1] - s / 2)}px`;
+        }
+      }
+    }
     // Context buttons only while they do something: DROP (carrying the drive), SEND / DENY (a
     // request waiting), RECALL (drone out).
     if (this.tbar) {
@@ -3299,7 +3334,7 @@ class CellHud {
     // Ability chips.
     if (g.role === 'shooter') {
       const K = g.kit;
-      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${K.execs ? 'on' : 'cd'}">T EXECUTE \u00D7${K.execs}</i><i class="${(P.arms.find((q) => q.ammo && q.ammo !== 'std') ? 'on' : '')}">Z ROUNDS \u00B7 ${AMMO_NAME[(P.arms.find((q) => q.def.slot === 'rifle') || {}).ammo || 'std']}</i>`;
+      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${(P.arms.find((q) => q.ammo && q.ammo !== 'std') ? 'on' : '')}">Z ROUNDS \u00B7 ${AMMO_NAME[(P.arms.find((q) => q.def.slot === 'rifle') || {}).ammo || 'std']}</i>`;
       if (kh !== this._kh) { this._kh = kh; this.el.kit.innerHTML = kh; }
     }
     // Incoming request / call card.
