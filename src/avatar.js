@@ -190,6 +190,35 @@ const WRAITH_MAP = {
 };
 // Operator theme: these parts take the theme colour, keeping their light/dark relationships.
 const THEMED = new Set([PAL.fatigue, PAL.fatigueDark, PAL.vest, PAL.pouch, PAL.rig, PAL.web, PAL.hat, PAL.can]);
+// Load-bearing kit that takes look.gear (e.g. flat dark earth over multicam black).
+const GEAR = new Set([PAL.vest, PAL.pouch, PAL.rig, PAL.web]);
+let _irMat = null;
+function irMarkMat() {
+  if (!_irMat) _irMat = withHaze(new THREE.MeshLambertMaterial({ color: '#6e2424', emissive: '#3a0c0c', emissiveIntensity: 0.6 }), { key: 'avatarIR' });
+  return _irMat;
+}
+// The KR-50 Nightjar for third person (matches the first-person model): slab receiver, boxy
+// shroud, a fat suppressor, scope, stock and magazine. Muzzle at z ≈ -1.31 like the valley rifle.
+function buildKR50TP() {
+  const g = new THREE.Group();
+  const M = (hex) => withHaze(new THREE.MeshLambertMaterial({ color: hex }), { key: 'avatar' });
+  const body = M('#2a2d31'), dark = M('#17181b'), hi = M('#3a3e44');
+  const box = (w, h, d, m, x, y, z, rx = 0) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.x = rx; g.add(o); return o; };
+  const cyl = (r, len, m, x, y, z) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 14).rotateX(Math.PI / 2), m); o.position.set(x, y, z); g.add(o); return o; };
+  box(0.075, 0.085, 0.42, body, 0, 0.01, -0.12);
+  box(0.08, 0.03, 0.42, hi, 0, 0.06, -0.12);
+  box(0.07, 0.075, 0.62, body, 0, 0.0, -0.62);
+  box(0.074, 0.02, 0.6, dark, 0, 0.045, -0.62);
+  cyl(0.042, 0.38, dark, 0, 0.0, -1.12);
+  cyl(0.03, 0.34, dark, 0, 0.115, -0.14);
+  cyl(0.038, 0.06, dark, 0, 0.115, -0.33);
+  box(0.03, 0.05, 0.04, dark, 0, 0.08, -0.06);
+  box(0.055, 0.13, 0.3, body, 0, -0.03, 0.22);
+  box(0.045, 0.06, 0.12, dark, 0, -0.065, 0.33);
+  box(0.035, 0.11, 0.05, dark, 0, -0.08, 0.04, 0.3);
+  box(0.05, 0.13, 0.09, dark, 0, -0.09, -0.13);
+  return g;
+}
 // Tactical colour schemes only. Patterned ones (multicam, digital) are drawn by a camo shader.
 export const THEMES = {
   ranger: { name: 'Ranger green', base: '#4b4e3a' },
@@ -541,6 +570,7 @@ function solveElbow(sh, hand, a, b, pole, out) {
 
 export class Avatar {
   constructor(accent = '#d89a3a', seed = 7) {
+    this.accent = accent;
     const rng = seeded(seed);
     const P = PAL;
     // Goggle / glasses lenses: tinted and faintly lit so the colour reads at dusk.
@@ -755,9 +785,10 @@ export class Avatar {
     const capCrown = mesh(new THREE.SphereGeometry(0.114, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.42).scale(0.95, 0.95, 1.03), P.hat);
     capCrown.position.y = 0.035;
     cap.add(capCrown);
-    const capBill = mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.008, 18, 1, false, Math.PI / 2, Math.PI).scale(0.95, 1, 1.05), P.hat);
-    capBill.position.set(0, 0.058, -0.075);
-    capBill.rotation.x = -0.12;
+    // A proper ball-cap brim: wide, curved a little, and sticking well out over the eyes.
+    const capBill = mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.009, 20, 1, false, Math.PI / 2, Math.PI).scale(0.98, 1, 1.45), P.hat);
+    capBill.position.set(0, 0.052, -0.088);
+    capBill.rotation.x = -0.1;
     cap.add(capBill);
     const capButton = mesh(new THREE.SphereGeometry(0.01, 6, 4), P.web);
     capButton.position.y = 0.143;
@@ -768,6 +799,38 @@ export class Avatar {
     cap.add(capPatch);
     head.add(cap);
     this.hats.cap = cap;
+    // Comms headset (flat dark earth) with a boom mic across to the mouth.
+    const hs = (this.headset = new THREE.Group());
+    const hsFde = '#6b5d45';
+    for (const sx of [-1, 1]) {
+      const hsCup = mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.034, 14).rotateZ(Math.PI / 2), hsFde);
+      hsCup.position.set(sx * 0.118, -0.005, 0.005);
+      hs.add(hsCup);
+    }
+    const hsBand = mesh(new THREE.TorusGeometry(0.122, 0.009, 6, 18, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI / 2), hsFde);
+    hsBand.rotation.set(0, 0, 0);
+    hsBand.position.set(0, 0.0, 0.03);
+    hsBand.rotation.z = Math.PI / 2;
+    hs.add(hsBand);
+    const hsBoom = mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.13, 6).rotateX(Math.PI / 2), '#222');
+    hsBoom.position.set(-0.1, -0.045, -0.06);
+    hsBoom.rotation.y = -0.55;
+    hs.add(hsBoom);
+    const hsMic = mesh(new THREE.SphereGeometry(0.013, 8, 6), '#1a1a1a');
+    hsMic.position.set(-0.045, -0.06, -0.115);
+    hs.add(hsMic);
+    hs.visible = false;
+    head.add(hs);
+    // Covert earpiece: a clear coiled tube from the right ear down into the collar.
+    const epPts = [];
+    for (let i = 0; i <= 40; i++) { const u = i / 40; epPts.push(new THREE.Vector3(0.112 + Math.cos(u * 40) * 0.006, -0.01 - u * 0.2, 0.02 + Math.sin(u * 40) * 0.006 + u * 0.03)); }
+    const coil = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(epPts), 60, 0.003, 5), new THREE.MeshLambertMaterial({ color: '#d8ecff', transparent: true, opacity: 0.5 }));
+    const epBud = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), new THREE.MeshLambertMaterial({ color: '#e8f4ff', transparent: true, opacity: 0.6 }));
+    epBud.position.set(0.112, -0.005, 0.015);
+    this.earpiece = new THREE.Group();
+    this.earpiece.add(coil, epBud);
+    this.earpiece.visible = false;
+    head.add(this.earpiece);
     const capBack = cap.clone();
     capBack.rotation.y = Math.PI;
     capBack.children.forEach((c) => { if (c.position.z < -0.09) c.visible = false; });
@@ -938,12 +1001,31 @@ export class Avatar {
     });
     this.root.add(this.aim);
     // Sidearm, shown instead of the rifle when drawn.
+    // A real-looking service pistol: slide, frame with a rail and trigger guard, a raked grip
+    // with the magazine base, and a suppressor on the muzzle.
     const pistol = new THREE.Group();
-    pistol.add(mesh(new THREE.BoxGeometry(0.03, 0.03, 0.18), P.steel));
-    const pg = mesh(new THREE.BoxGeometry(0.03, 0.1, 0.045), '#8a7758');
-    pg.position.set(0, -0.06, 0.06);
-    pg.rotation.x = 0.2;
+    const psSlide = mesh(new THREE.BoxGeometry(0.032, 0.036, 0.19), '#1e1f22');
+    psSlide.position.set(0, 0.018, 0);
+    pistol.add(psSlide);
+    for (let i = 0; i < 5; i++) { const psSr = mesh(new THREE.BoxGeometry(0.034, 0.024, 0.004), '#2c2e31'); psSr.position.set(0, 0.018, 0.07 + i * 0.007); pistol.add(psSr); }
+    const psFrame = mesh(new THREE.BoxGeometry(0.03, 0.022, 0.165), '#2a2c2f');
+    psFrame.position.set(0, -0.009, -0.01);
+    pistol.add(psFrame);
+    const psGuard = mesh(new THREE.TorusGeometry(0.019, 0.0035, 5, 10, Math.PI).rotateY(Math.PI / 2), '#2a2c2f');
+    psGuard.position.set(0, -0.02, 0.0);
+    psGuard.rotation.x = Math.PI;
+    pistol.add(psGuard);
+    const pg = mesh(new THREE.BoxGeometry(0.03, 0.105, 0.042), '#25272a');
+    pg.position.set(0, -0.065, 0.058);
+    pg.rotation.x = -0.28; // grip rakes back, bottom toward the shooter
     pistol.add(pg);
+    const psBase = mesh(new THREE.BoxGeometry(0.032, 0.012, 0.046), '#1a1b1d');
+    psBase.position.set(0, -0.116, 0.074);
+    psBase.rotation.x = -0.28;
+    pistol.add(psBase);
+    const psCan = mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.13, 12).rotateX(Math.PI / 2), '#1a1b1e');
+    psCan.position.set(0, 0.016, -0.16);
+    pistol.add(psCan);
     pistol.position.set(0.04, 0.0, -0.4);
     pistol.visible = false;
     this.pistol = pistol;
@@ -1027,7 +1109,7 @@ export class Avatar {
     const kit = look.kit || {};
     const hat = HATS[look.hat] ? look.hat : DEFAULT_GEAR[outfit].hat;
     const eyes = EYEWEAR[look.eyes] ? look.eyes : DEFAULT_GEAR[outfit].eyes;
-    const key = [outfit, thermal, pollo, lens, themeId, hat, eyes, look.vest, kit.scout, kit.stealth, kit.tactical, look.ponchoTheme].join('|');
+    const key = [outfit, thermal, pollo, lens, themeId, hat, eyes, look.vest, kit.scout, kit.stealth, kit.tactical, look.ponchoTheme, look.gear, look.headset, look.earpiece, look.rifle, look.irMark].join('|');
     if (this.look === key) return;
     this.look = key;
     const wraith = outfit === 'wraith';
@@ -1056,13 +1138,25 @@ export class Avatar {
       g.position.z = thermal ? 0.09 : 0; // strapped on over the poncho
     }
     this.smokeKit.visible = kit.tactical === 'smoke';
+    this.headset.visible = !!look.headset;
+    this.earpiece.visible = !!look.earpiece;
+    // NightWatch rifle: the KR-50 instead of the valley rifle (same one you see in first person).
+    if (look.rifle === 'kr50') {
+      if (!this._kr50) {
+        this._kr50 = buildKR50TP();
+        this._rifleParts = this.rifle.children.slice();
+        this.rifle.add(this._kr50);
+      }
+      for (const c of this._rifleParts) c.visible = false;
+      this._kr50.visible = true;
+    } else if (this._kr50) { this._kr50.visible = false; for (const c of this._rifleParts) c.visible = true; }
     const vest = look.vest === 'rig' ? 'rig' : 'plate';
     this.vests.plate.visible = vest === 'plate';
     this.vests.rig.visible = vest === 'rig';
     const sup = kit.stealth === 'suppressor';
-    this.rifle.userData.can.visible = sup;
-    this.rifle.userData.brake.visible = !sup;
-    this.rifle.userData.honey.visible = kit.stealth === 'killflash';
+    this.rifle.userData.can.visible = sup && look.rifle !== 'kr50';
+    this.rifle.userData.brake.visible = !sup && look.rifle !== 'kr50';
+    this.rifle.userData.honey.visible = kit.stealth === 'killflash' && look.rifle !== 'kr50';
     const setMat = (o, m) => {
       if (o.userData.coolMat) o.userData.coolMat = m;
       else o.material = m;
@@ -1070,6 +1164,10 @@ export class Avatar {
     this.root.traverse((o) => {
       if (!o.isMesh || !o.userData.hex) return;
       let hex = o.userData.hex;
+      // IR-reflective markers and armbands: a muted red that glints under IR.
+      if (look.irMark && hex === this.accent) return setMat(o, irMarkMat());
+      // Load-bearing kit (carrier, rig, pouches, webbing) in its own colour over the uniform.
+      if (look.gear && GEAR.has(hex)) return setMat(o, mat(retint(hex, look.gear, PAL.vest), o.userData.flat));
       if (T.colors && PRINTED.has(hex)) return setMat(o, camoMaterial(themeId, PRINTED.get(hex)));
       if (THEMED.has(hex)) hex = retint(hex, theme);
       else if (wraith && WRAITH_MAP[hex]) hex = WRAITH_MAP[hex];

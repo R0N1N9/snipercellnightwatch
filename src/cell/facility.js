@@ -30,6 +30,7 @@ export const SPOTS = {
     { id: 'cliff', name: 'SOUTH CLIFF', x: 2, z: 110.5, yaw: 0 },
     { id: 'east', name: 'EAST KNOLL', x: 128, z: -72, yaw: Math.PI / 2 + 0.5 },
     { id: 'west', name: 'WEST KNOLL', x: -136, z: -28, yaw: -Math.PI / 2 },
+    { id: 'roof', name: 'TOWER ROOF', x: 0, z: -1.6, yaw: Math.PI },
   ],
   relay: { x: 33.2, z: -6, y: 1.1 },
   server: { x: 30, z: -35.6, y: 1.1 },
@@ -46,6 +47,7 @@ export const DROPS = {
   draw: { name: 'TREE LINE', desc: 'The wooded draw south of the ridge. Walk in under the trees, clear the pickets, crest the hill.', van: [6, 336, 298], insert: [{ x: 6.9, z: 276 }, { x: 5.1, z: 276 }], approach: true },
   ridge: { name: 'RIDGE', desc: 'Straight onto the plateau above the cliff. No approach: the compound is right below you.', van: [6, 196, 143], insert: [{ x: 6.9, z: 121 }, { x: 5.1, z: 121 }], approach: false },
   // HALO jumps from a transport onto the knolls either side of the valley (Ra lands on the perch).
+  roof: { name: 'TOWER ROOF', desc: 'HALO straight onto the tower roof, then down the service hatch onto the data floor. Fast, high, nowhere to run.', air: true, roof: true, from: [0.25, 1], insert: [{ x: -2, z: -14 }, { x: 1.5, z: -12 }], perch: 3, overlook: { x: 10, z: -8 }, approach: false },
   west: { name: 'WEST KNOLL', desc: 'HALO jump from a transport, canopies onto the west knoll. Long view over the west fence.', air: true, from: [-1, 0.35], insert: [{ x: -133, z: -27 }, { x: -134.5, z: -23.5 }], perch: 2, overlook: { x: -131, z: -21 }, approach: false },
   east: { name: 'EAST KNOLL', desc: 'HALO jump from a transport, canopies onto the east knoll. Overlooks the dock and the exfil track.', air: true, from: [1, -0.25], insert: [{ x: 126, z: -70 }, { x: 127.5, z: -66.5 }], perch: 1, overlook: { x: 124, z: -64 }, approach: false },
 };
@@ -543,6 +545,27 @@ export class Facility {
       // Car roof (the car is a cage you can't climb out of mid-ride).
       this.lift.roof = this.box(S.x0 + 0.05, 2.7, S.z0 + 0.05, S.x1 - 0.05, 2.85, S.z1 - 0.05, '#4a4e55', { mesh: true });
       this.setLift(0);
+    }
+    // ---- The roof: a parapet round the edge and a service hatch with a ladder down into the
+    // data floor's storage room. ----
+    {
+      const rh = h + 0.5, hx = 24.5, hz = -16.2;
+      for (const [a0, b0, a1, b1] of [[x0 - 0.4, z0 - 0.4, x1 + 0.4, z0 - 0.1], [x0 - 0.4, z1 + 0.1, x1 + 0.4, z1 + 0.4], [x0 - 0.4, z0 - 0.4, x0 - 0.1, z1 + 0.4], [x1 + 0.1, z0 - 0.4, x1 + 0.4, z1 + 0.4]]) this.box(a0, rh, b0, a1, rh + 1.0, b1, '#3b3f45', { sight: false, shot: false });
+      this.box(hx - 0.8, rh, hz - 0.8, hx + 0.8, rh + 0.25, hz + 0.8, '#4a4f56', { solid: false });
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 1.4), lam('#565b62'));
+      lid.position.set(hx, rh + 0.6, hz - 1.1);
+      lid.rotation.x = -1.1;
+      this.root.add(lid);
+      const hole = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#050607' }));
+      hole.position.set(hx, rh + 0.26, hz);
+      this.root.add(hole);
+      // The ladder in the storage room below.
+      for (const sx of [-0.25, 0.25]) this.deco(new THREE.BoxGeometry(0.05, h - f1, 0.05), hx + sx, (f1 + h) / 2, hz - 0.6, '#6b7078');
+      for (let y = f1 + 0.3; y < h; y += 0.35) this.deco(new THREE.BoxGeometry(0.5, 0.03, 0.03), hx, y, hz - 0.6, '#6b7078');
+      this.hatch = { x: hx, z: hz, roofY: rh };
+      const rl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: '#ff3040' }));
+      rl.position.set(x1 - 1, rh + 1.2, z0 + 1);
+      this.root.add(rl);
     }
     // ---- The lobby checkpoint: a walk-through metal detector with rope barriers either side
     // (step round the ends of the barriers to skip it). ----

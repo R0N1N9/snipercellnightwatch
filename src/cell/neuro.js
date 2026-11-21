@@ -5,7 +5,7 @@
 // and a pulse out from the quad. Rotor noise carries: guards within ~10 m hear it.
 import * as THREE from 'three';
 
-export const NEURO = { range: 45, every: 0.25, hold: 1.2, noise: 10 };
+export const NEURO = { range: 45, every: 0.25, hold: 1.2, noise: 10, cone: 0.62 };
 // The spotter's own eyes: range (×1.6 scoped) and how often the crosshair re-tags one enemy.
 export const EYES = { range: 40, retag: 10 };
 
@@ -23,7 +23,7 @@ export const Neuro = {
     for (const f of this.neuroFx) f.t += dt;
     this.neuroFx = this.neuroFx.filter((f) => f.t < 1.1);
     if (this.neuroPulse) { this.neuroPulse.t += dt; if (this.neuroPulse.t > 0.9) this.neuroPulse = null; }
-    if (!this._quadOut()) { this.neuroSet.clear(); this.neuroCount = 0; this.quadNoisy = false; return; }
+    if (!this._quadOut() || this.quad.launching || this.quad.recall) { this.neuroSet.clear(); this.neuroCount = 0; this.quadNoisy = false; return; }
     this._neuroT -= dt;
     if (this._neuroT > 0) return;
     this._neuroT = NEURO.every;
@@ -35,6 +35,10 @@ export const Neuro = {
       const d = Math.hypot(e.x - q.x, e.z - q.z, (e.y || 0) - q.y);
       if (e.kind === 'g' && d < NEURO.noise) noisy = true;
       if (d > NEURO.range) continue;
+      // Only what's inside its (red) view cone.
+      const fx = -Math.sin(q.yaw) * Math.cos(q.pitch ?? -0.35), fy = Math.sin(q.pitch ?? -0.35), fz = -Math.cos(q.yaw) * Math.cos(q.pitch ?? -0.35);
+      const vx = e.x - q.x, vy = (e.y || 0) + (e.kind === 'd' ? 0 : 1.3) - q.y, vz = e.z - q.z, vl = Math.hypot(vx, vy, vz) || 1;
+      if ((fx * vx + fy * vy + fz * vz) / vl < Math.cos(NEURO.cone)) continue;
       if (!this.fac.los(eye, { x: e.x, y: (e.y || 0) + (e.kind === 'd' ? 0 : 1.3), z: e.z })) continue;
       seen.push(e.id);
     }

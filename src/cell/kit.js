@@ -76,7 +76,8 @@ export const KitMethods = {
       if (I.pressed('KeyH') || I.pressed('cell-deadeye')) this._deadeye();
       if (I.pressed('KeyX') || I.pressed('cell-lure')) this._throwLure();
       if (I.pressed('KeyT') || I.pressed('cell-exec')) this._execute();
-      if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._xrSwap();
+      if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._ammoMenu();
+      if (this.xr && this.xr.menu) for (let i = 1; i <= 4; i++) if (I.pressed('Digit' + i)) { this._ammoPick(['std', 'xr', 'pen', 'emp'][i - 1]); act.slot1 = act.slot2 = false; }
     }
     // Downed: V / PING / HELP calls for a pickup on your position.
     this._helpCd = Math.max(0, (this._helpCd || 0) - dt);
@@ -129,6 +130,7 @@ export const KitMethods = {
   // ---- DEADEYE: weak points glow through the dark for a few seconds -------------------
   _deadeye() {
     const K = this.kit;
+    this._hint && this._hint('deadeye');
     if (K.deadeyeCd > 0) { this.hud.flash(`DEADEYE ${Math.ceil(K.deadeyeCd)} s`, 'red'); return; }
     K.deadeye = KIT.deadeye.dur;
     K.deadeyeCd = KIT.deadeye.cd;
@@ -138,6 +140,7 @@ export const KitMethods = {
 
   // ---- LURE: a thrown noise-maker that pulls patrols off their route ------------------
   _throwLure() {
+    this._hint && this._hint('lure');
     const K = this.kit;
     if (K.lures <= 0) { this.hud.flash('NO LURES — resupply', 'red'); return; }
     K.lures--;
@@ -199,6 +202,7 @@ export const KitMethods = {
   },
   _execute() {
     const K = this.kit;
+    this._hint && this._hint('execute');
     if (K.execQ.length) return;
     if (K.execs <= 0) { this.hud.flash('EXECUTE: earn a charge with a silent takedown', 'red'); return; }
     const list = this._execTargets();
@@ -376,7 +380,7 @@ export const KitMethods = {
       }
       // Human: the quad flies itself to the spot and holds there, marking.
       const why = this._quadTo(at);
-      if (!why) this._addPin({ x: at.x, z: at.z, label: 'QUAD →', by: this.role });
+      if (!why) this._addPin({ x: at.x, z: at.z, label: 'DRONE →', by: this.role });
       return why;
     }
     if (k === 'sweep') return this._isrSweep(at);
@@ -515,6 +519,7 @@ export const KitMethods = {
     const S = this.sentinel;
     const e = S.byId(ev.id);
     const pos = e ? new THREE.Vector3(e.x, (e.y || 0) + 1.4, e.z) : null;
+    if (ev.t === 'fx' && ev.k === 'crash') { this._boom({ x: ev.x, y: ev.y, z: ev.z }); this.hud.flash('SPOTLIGHT DRONE DOWN', 'amber', 1); return; }
     if (ev.t === 'bark' && pos) this.sfx.bark(ev.k === 'flee' ? 'flee' : ev.k, pos);
     if (ev.t === 'fx' && pos) {
       if (ev.k === 'pop') { this.sfx.shieldPop(pos); this.effects.puff(pos, 'metal', 1.4, 0.4); }

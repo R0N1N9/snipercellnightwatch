@@ -336,6 +336,8 @@ details[open] { display: flex; flex-direction: column; gap: 10px; }
 .tb.big i { font-size: 28px; }
 .tb.big span { font-size: 10px; }
 .tb.mid { width: 64px; height: 64px; }
+.tb.mid.scope { width: 80px; height: 80px; }
+.tb.mid.scope i { font-size: 28px; }
 .tb.mid i { font-size: 22px; }
 .tb.sm { width: 50px; height: 50px; }
 .tb.fire { border-color: rgba(242, 179, 91, 0.85); color: var(--amber); background: rgba(40, 26, 8, 0.45); }

@@ -86,7 +86,7 @@ It also has **[NightWatch](#nightwatch-co-op)**, a co-op (or solo) night stealth
 
 - Controls sit in arcs around where each thumb rests, inset from the corners and clear of notches. A fixed joystick sits bottom-left; push it fully forward to sprint. Zero −/+, Range and the weapon swap sit in an outer ring around the right-hand FIRE button. The left thumb also has a second **FIRE** and a **BREATH** toggle, so either thumb can aim while the other fires.
 - Drag anywhere that isn't a button to aim. Left and right thumbs each have their own sensitivity in Settings.
-- **SCOPE** and **BREATH** are toggles. Breath releases itself when you unscope or run out of air.
+- **SCOPE** (the larger button just above FIRE) and **BREATH** are toggles. Breath releases itself when you unscope or run out of air. **RELOAD** sits to FIRE's left.
 - **Gyro aiming** (Settings): Off, When scoped (default on phones) or Always, with its own sensitivity and invert. It needs HTTPS, so it works from the hosted page, not an opened file. iPhones ask for motion permission the first time.
 - Pills along the top hold your tools (with charges), kit, the Predator feed and the menu.
 
@@ -211,6 +211,7 @@ The data center has **two storeys** with two stairwells. Guards, cameras and pat
 
 - **Tree line** (the default, described below): the van drops you in the woods south of the ridge.
 - **Ridge**: the van takes you straight onto the plateau above the cliff, with no approach.
+- **Tower roof**: a HALO jump straight onto the roof, then down the service hatch (hold E) onto the data floor. The same hatch takes you back up.
 - **West knoll** / **East knoll**: a HALO jump. The intro shows a transport droning in with the ramp down, the jump light going green, freefall (with a point-of-view shot and an altimeter), canopies opening, a point-of-view shot under canopy, and the landing on the knoll. You hear the engines, the wind in freefall, the canopy snap and flutter, and the landing.
 
 **Layout:** **Standard layout** is the map as built. **Random layout** scatters the yard's cover (containers, trucks, HVAC, generators, sandbags, crates), the light poles and the west fence cut from the game's seed, so both players get the same compound. Roads, doors, guard routes, the towers, the barracks and the drone bay stay clear.
@@ -269,6 +270,15 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
 
 The **Staging area · Loadout** screen shows each operator in full kit on a turntable (drag to turn; tabs switch between shooter and spotter).
 
+### Shared kit
+
+- **Tablet / map / ISR:** your weapon drops away, your left hand brings the tablet up until it fills the view, and the screen flickers on. On the tablet, the ISR button flips to the Predator feed (both roles), and TAB flips back.
+- **Laser sights (K or LASER):** a visible red laser from your weapon, on by default. Your partner sees yours; guards can catch it too.
+- **Body drag (hold E on a body):** drag it out of sight, then let go. You move at half speed while dragging.
+- **Bodycams:** both operators' head cams show as small squares in the ISR view. Turn on **Partner bodycam** in the pause menu to keep your partner's in a corner of your screen.
+- **Spotlight drones:** a helicopter drone circles high over each way in (west, east and south), sweeping a spotlight across the ground. Stand in the light too long and it locks on: an alarm, and every guard near you comes. Stay out of the light, or shoot it down. The wreck makes a crash the guards nearby hear.
+- **Look:** both operators wear multicam black with flat dark earth load-bearing kit (carrier, rig, belts, straps) and IR-reflective red markers. The shooter has a clear coiled earpiece under the hood; the spotter has a ball cap and an FDE headset with a boom mic.
+
 ### Roles
 
 **Shooter** (default callsign **Ra**):
@@ -276,7 +286,21 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - KR-50 Nightjar: bolt-action, integrally suppressed, with Halo-style hitscan and a night-vision scope.
   - Dead-on through the scope, wide from the hip (the crosshair opens to show it), with a real kick.
   - **Standard bolt** (default): tap fire and you come off the glass to work the bolt; keep fire held to stay scoped. The **straight-pull bolt** (Staging area) cycles while you stay on target.
-  - **Z: explosive rounds.** Swap in a marked magazine (a full reload animation). Each round sticks where it hits, blinks for a second and blows: it kills a juggernaut or titan it's stuck to and catches anything within about 5 m. It's loud. Z again swaps back to standard, and supply crates restock a magazine.
+  - **Collateral:** a KR-50 round carries on through bodies and through thin interior walls and doors (losing some punch each time).
+  - **Z: rounds menu** (left of the screen; 1–4, click or tap). Each swap is a full reload animation, and supply crates restock the special rounds.
+    - **Standard:** the default round, with collateral.
+    - **Explosive:** sticks where it hits, blinks for a second and blows. It kills a juggernaut or titan it's stuck to and catches anything within about 5 m. Loud.
+    - **Penetrator:** punches through exterior walls and bulwark shields.
+    - **EMP:** kills drones, cameras, lights, shields and radios around the hit (non-lethal to people).
+  - **Breath and wind:** hold **SHIFT** on the scope to steady it (a few seconds, then a cooldown). The scope shows the crosswind and a hold-off dot for the range; the round drifts with the wind.
+  - **Recoil and noise:** the rifle kicks. Its suppressed crack and the M50's still carry a short way, fading with distance (startling anyone very close); beyond that they're silent.
+- **Ghillie freeze:** prone and dead still for two seconds and you all but vanish past ~15 m. Move or fire and it breaks.
+- **Marked for death:** three kills on tagged enemies, each within 10 s of the last, give you Deadeye back and a full camo battery.
+- **Overwatch lock:** hold the scope steady on an area for 1.5 s and everything around your point of aim is marked for the team while you hold it. Your partner sees the ring.
+- **Counter-sniper read:** the tower snipers' sightlines show to you as red lasers.
+- **Spotter relay:** tagged enemies off your screen get an arrow at the edge with their range.
+- **M: camera darts** (three): fire a tiny camera into a wall or the ground. It marks enemies in front of it and appears on the tablet map; click it to watch its feed.
+- **First-use hints:** the first time you use an ability, a short card explains it.
 - Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi) or the **M50 Magnum** (7 rounds, slow and heavy: a deep boom, a big kick and a wide hip spread, so aim down sights or get close). Its suppressor is fitted by default and removable: your support hand comes up to the muzzle and twists the can off and pockets it (or threads it back on). You can't fire mid-gesture.
 - **Stealth kit:**
   - **G** active camo. **Firing breaks it.**
@@ -284,7 +308,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
   - **X** lures.
   - **T** Mark & Execute.
   - **E** knife takedown.
-- **Requests at the crosshair:** keys **3–8** request supply, scan, EMP, decoy, lights or the quad on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
+- **Requests at the crosshair:** keys **3–8** request supply, scan, EMP, decoy, lights or the recon drone on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
 - **Pings:** V (or PING) on open ground drops a plain PING marker. F (or TAG) on open ground calls "look here".
   - The shooter can't unlock doors, only walk through ones that are already open.
 
@@ -292,9 +316,11 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 
 - P-9 pistol (2 magazines) with a removable suppressor (**B**: animated twist off / on).
 - **Eyes on:** anything in your field of view, in the clear and within about 40 m (60 m aimed), is marked for the team while you can see it, like the quad's neurolink. Your crosshair on an enemy tags it at once with a ping. Sight marks don't send an AI Ra after them; tag with F or ping ENEMY for that.
-- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon quad, medevac) at the spot you're aiming at, with the phone animation. **0** (or the SWEEP button) calls an **ISR sweep** on the ground under your crosshair.
+- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon drone, medevac) at the spot you're aiming at, with the phone animation. **0** (or the SWEEP button) calls an **ISR sweep** on the ground under your crosshair.
 - **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
-- **Recon quad to a spot:** drag RECON QUAD from the tablet onto the map (or fire the quad command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. Q takes the sticks; hold Q recalls it.
+- **Recon drone:** Q tosses it up out of your left hand before the feed cuts in. Hold Q to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
+- **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. Q takes the sticks; hold Q recalls it.
+- **Thermal binoculars (X or BINO):** swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.

@@ -368,6 +368,16 @@ export class Audio {
   }
 
   // Night vision: the reach (cloth rustle), the mount click, and the tubes whining up (or down).
+  // EMP discharge: a crackling electric snap and a falling whine.
+  zap(pos) {
+    if (!this.ctx) return;
+    const t = this.now, p = this._panner(pos, 18);
+    this._noiseBurst(p, t, 0.35, 'highpass', 3000, 0.8, 0.5, 0.25);
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(1800, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.5);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(g).connect(p); o.start(t); o.stop(t + 0.6);
+  }
   // Elevator arrival: a two-note chime at the car.
   chime(pos) {
     if (!this.ctx) return;
