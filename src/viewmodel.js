@@ -551,6 +551,9 @@ export class ViewModel {
     if (U.slide && rack > 0) handR = handR; // right hand stays; left racks the slide
     let handL = toRoot(U.gripL);
     if (leftReach > 0) handL.lerp(new THREE.Vector3(-0.05, -0.45, -0.2), leftReach);
+    // The support hand leaves the gun (e.g. to hold a phone): it drops away low left, out of view.
+    const leftOff = Math.max(0, Math.min(1, st.leftOff || 0));
+    if (leftOff > 0) handL.lerp(new THREE.Vector3(-0.24, -0.66, -0.1), smoothstep(0, 1, leftOff));
     // Bipod: the support hand slides forward to the legs, flicks them, and comes back.
     if (U.bipod && (st.bipodState === 'deploying' || st.bipodState === 'stowing')) {
       const u = st.bipodU || 0;
@@ -561,6 +564,8 @@ export class ViewModel {
       handL.lerp(legs, reach);
     }
     if (supReach > 0) handL.lerp(toRoot(can).add(new THREE.Vector3(-0.012, -0.022, 0.01)), supReach);
+    // A caller can take the support hand elsewhere (Deadeye: it holds the lowered rifle).
+    if (st.leftHand) handL = st.leftHand.clone();
     if (rack > 0 && !U.bolt) handL.lerp(toRoot(U.slide || U.gripL).add(new THREE.Vector3(0, 0.02, 0.06)), rack);
     const fR = fwd.clone().add(new THREE.Vector3(0, -0.25, 0)).normalize();
     const fL = pistol ? fwd.clone().add(new THREE.Vector3(0.4, -0.15, 0)).normalize() : fwd.clone().add(new THREE.Vector3(0.15, 0.25, 0)).normalize();

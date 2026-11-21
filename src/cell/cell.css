@@ -9,7 +9,7 @@
 .cell-btn em { font-style: normal; color: #ffffff; font-size: 0.8em; margin-left: 6px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
 /* Main-menu button: the mode's name, with a small caption underneath. */
 #btn-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-#btn-cell em { margin-left: 0; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(0, 255, 224, 0.75); }
+#btn-cell em { margin-left: 0; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #ffffff; text-shadow: none; }
 #panel-cell .cell-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 8px; }
 #panel-cell .cell-role { text-transform: none; letter-spacing: normal; font-weight: 500; line-height: 1.2; text-align: left; padding: 10px; border: 1px solid var(--line); background: rgba(8, 9, 15, 0.55); color: var(--ink); cursor: pointer; border-radius: 3px; min-height: 96px; }
 #panel-cell .cell-role b { display: block; font-size: 17px; letter-spacing: 0.1em; }
@@ -30,7 +30,6 @@
 /* Valley HUD and touch bits that don't belong in this mode */
 body.cell-mode #hud, body.cell-mode #touch .tbar, body.cell-mode #touch .breath, body.cell-mode #touch .bipodb,
 body.cell-mode #touch .zdn, body.cell-mode #touch .zup, body.cell-mode #touch .rng { display: none !important; }
-body.cell-spotter #touch .swp { display: none !important; }
 
 #cell-hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: var(--sans); color: var(--ink); }
 #cell-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -257,7 +256,7 @@ body.cell-cine #cell-hud .c-debrief { background: rgba(0, 0, 0, 0.25); }
 #cell-hud .c-sync.go b { color: #30ff90; animation: cellblink 0.3s infinite alternate; }
 /* Top right: CYBER OPS and ISR side by side at the very top, the partner chip under them,
    then the radio subtitles. */
-#cell-hud .c-pip { position: absolute; right: 18px; top: 14px; display: flex; flex-direction: row; gap: 6px; pointer-events: auto; }
+#cell-hud .c-pip { position: absolute; right: 18px; top: 14px; display: flex; flex-direction: row; align-items: flex-start; gap: 6px; pointer-events: auto; }
 #cell-hud.has-pip .c-partner { top: 140px; }
 #cell-hud .c-sq { width: 168px; cursor: pointer; border: 1px solid rgba(0, 255, 224, 0.45); background: rgba(0, 10, 14, 0.7); }
 #cell-hud .c-sq span { display: block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: var(--cell); padding: 2px 5px; }
@@ -411,9 +410,15 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 
 /* Bodycams: small squares on the right (stacked in the ISR view). */
 #cell-bodycams { position: fixed; right: max(12px, env(safe-area-inset-right)); top: 150px; z-index: 7; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-#cell-bodycams .bc { position: relative; width: min(220px, 26vw); aspect-ratio: 16 / 10; border: 1px solid rgba(64, 216, 232, 0.5); background: #05080a; }
-#cell-bodycams .bc canvas { width: 100%; height: 100%; display: block; filter: contrast(1.15) saturate(0.7); }
-#cell-bodycams .bc b { position: absolute; left: 6px; top: 4px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: #9ff8ff; text-shadow: 0 1px 2px #000; }
+#cell-bodycams .bc { position: relative; width: min(220px, 26vw); aspect-ratio: 16 / 10; border: 1px solid rgba(64, 216, 232, 0.5); background: #05080a; overflow: hidden; }
+#cell-bodycams[style*="width"] .bc { width: 100%; }
+/* Low-light bodycam: boosted, slightly washed, a fisheye-ish vignette and scanlines. */
+#cell-bodycams .bc canvas { width: 100%; height: 100%; display: block; filter: brightness(1.35) contrast(1.15) saturate(0.55); }
+#cell-bodycams .bc::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%), repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px); }
+#cell-bodycams .bc .rec { position: absolute; left: 6px; top: 18px; font: normal 9px var(--mono); letter-spacing: 0.1em; color: #ff4a4a; text-shadow: 0 1px 2px #000; z-index: 1; animation: bcrec 1.2s steps(2) infinite; }
+#cell-bodycams .bc s { position: absolute; right: 6px; bottom: 4px; text-decoration: none; font: 9px var(--mono); color: #e8f6f8; text-shadow: 0 1px 2px #000; z-index: 1; }
+@keyframes bcrec { 50% { opacity: 0.25; } }
+#cell-bodycams .bc b { position: absolute; z-index: 1; left: 6px; top: 4px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: #9ff8ff; text-shadow: 0 1px 2px #000; }
 #cell-bodycams.isr { top: 90px; }
 
 /* Staging: descriptions under each choice, and the fixed primaries. */
@@ -421,3 +426,45 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 #panel-staging .stg-opts button { text-align: left; }
 #panel-staging .stg-prim { border: 1px solid rgba(232, 230, 240, 0.18); padding: 6px 8px; margin-bottom: 4px; font-family: var(--mono); }
 #panel-staging .stg-prim b { font-size: 12px; letter-spacing: 0.1em; }
+
+.tag.cell-tag { font-size: 0.82em; line-height: 1.35; }
+
+/* Touch ability buttons: a small grid on the left with a recharge bar along each one's bottom. */
+#touch .cell-abil { position: fixed; display: grid; gap: 6px; z-index: 6; --ab: 50px; }
+#touch .cell-abil .ab { position: relative; width: var(--ab); height: var(--ab); border-radius: 50%; border: 1.5px solid rgba(0, 255, 224, 0.55); background: rgba(2, 10, 14, 0.62); display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+#touch .cell-abil .ab span { font: 600 8px var(--mono, monospace); letter-spacing: 0.06em; color: var(--cell, #00ffe0); margin-top: -6px; }
+#touch .cell-abil .ab em { position: absolute; top: 5px; font: normal 8px var(--mono, monospace); color: #e8f6f8; }
+#touch .cell-abil .ab i { position: absolute; left: 18%; right: 18%; bottom: 9px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+#touch .cell-abil .ab i b { display: block; height: 100%; width: 100%; background: var(--cell, #00ffe0); border-radius: 2px; transition: width 0.15s linear; }
+#touch .cell-abil .ab.full i b { box-shadow: 0 0 6px var(--cell, #00ffe0); }
+#touch .cell-abil .ab.cd { border-color: rgba(140, 150, 155, 0.45); }
+#touch .cell-abil .ab.cd span { color: #8a9296; }
+#touch .cell-abil .ab.cd i b { background: #8a9296; box-shadow: none; }
+#touch .cell-abil .ab.on { background: rgba(0, 255, 224, 0.2); border-color: #00ffe0; box-shadow: 0 0 10px rgba(0, 255, 224, 0.45); }
+#touch .cell-abil .ab.on span { color: #fff; }
+#touch .cell-abil .ab.on i b { background: #fff; }
+#touch .cell-abil .ab:active { transform: scale(0.94); }
+
+/* Collapsed views (tap to toggle): just a title strip. */
+#cell-hud .c-obj.min .c-obj-n, #cell-hud .c-obj.min .c-obj-a, #cell-hud .c-obj.min .c-obj-h { display: none !important; }
+#cell-hud .c-obj.min { padding: 4px 10px; }
+#cell-hud .c-obj.min .c-obj-t { font-size: 13px; }
+#cell-hud .c-obj.min .c-obj-t::after { content: '  \25B8'; color: var(--cell-dim); }
+#cell-hud .c-obj, #cell-hud .c-pip .c-sq, #cell-bodycams .bc { cursor: pointer; }
+#cell-hud .c-pip .c-sq.min canvas { display: none; }
+#cell-hud .c-pip .c-sq.min { height: auto !important; aspect-ratio: auto !important; }
+#cell-bodycams .bc.min { aspect-ratio: auto; height: 20px; }
+#cell-bodycams .bc.min canvas, #cell-bodycams .bc.min .rec, #cell-bodycams .bc.min s, #cell-bodycams .bc.min::after { display: none; }
+
+/* The grouped touch wheel: commands right, operator toggles left, pings top and bottom. */
+.cell-wheel.laid .cw-ring { background: radial-gradient(ellipse, rgba(0, 10, 14, 0.7) 0 60%, transparent 72%); border: none; transform: scale(1.35, 1.05); }
+.cell-wheel.laid .cw-item { width: 58px; padding: 3px 1px; }
+.cell-wheel.laid .cw-item i { font-size: 13px; }
+.cell-wheel.laid .cw-item b { font-size: 8px; letter-spacing: 0.04em; }
+.cell-wheel .cw-item.cw-tog { color: #cfe6ff; border-color: rgba(160, 200, 255, 0.35); }
+.cell-wheel .cw-item.cw-tog.sel { background: rgba(160, 200, 255, 0.25); border-color: #cfe6ff; }
+.cell-wheel .cw-item.cw-comms { color: #00ffe0; }
+.cell-wheel.laid .cw-centre { top: -14px; }
+/* Phones: the middle strip folds into the wheel; only USE, pause and the context buttons stay. */
+body.cell-compact #touch .cell-tbar .pill:not(.keep) { display: none !important; }
+.stg-note { font-size: 11px; opacity: 0.7; margin: 6px 0 0; }

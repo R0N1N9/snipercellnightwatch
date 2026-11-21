@@ -21,7 +21,46 @@
 // Headshots kill anything, whatever the weapon. Infiltration keeps its plain security guards.
 // Reinforcements always come from OUTSIDE the building: the barracks door and the south gate.
 import * as THREE from 'three';
-import { lam, glowMat, SPOTS, ROOMS, drawX, BUILDING } from './facility.js';
+import { lam, glowMat, SPOTS, ROOMS, drawX, BUILDING, mergeBoxes } from './facility.js';
+import { withHaze } from '../atmosphere.js';
+
+// A shared fabric texture for enemy kit: a fine weave, faint camo blotches, grain and a few
+// stitched seams, in greys so each part's colour still shows through.
+let _fab = null;
+function fabricTex() {
+  if (_fab) return _fab;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#d6d6d6';
+  x.fillRect(0, 0, 128, 128);
+  let s = 11;
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 30; i++) {
+    const v = Math.floor(120 + r() * 100);
+    x.fillStyle = `rgba(${v},${v},${v},0.45)`;
+    x.beginPath(); x.ellipse(r() * 128, r() * 128, 6 + r() * 16, 4 + r() * 10, r() * 3, 0, Math.PI * 2); x.fill();
+  }
+  x.fillStyle = 'rgba(0,0,0,0.07)';
+  for (let y = 0; y < 128; y += 2) x.fillRect(0, y, 128, 1);
+  x.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let k = 0; k < 128; k += 3) x.fillRect(k, 0, 1, 128);
+  const d = x.getImageData(0, 0, 128, 128);
+  for (let i = 0; i < d.data.length; i += 4) { const n = (r() - 0.5) * 26; d.data[i] += n; d.data[i + 1] += n; d.data[i + 2] += n; }
+  x.putImageData(d, 0, 0);
+  x.strokeStyle = 'rgba(0,0,0,0.25)';
+  x.setLineDash([2, 2]);
+  for (const y of [18, 70, 110]) { x.beginPath(); x.moveTo(0, y); x.lineTo(128, y); x.stroke(); }
+  _fab = new THREE.CanvasTexture(c);
+  _fab.wrapS = _fab.wrapT = THREE.RepeatWrapping;
+  _fab.colorSpace = THREE.SRGBColorSpace;
+  return _fab;
+}
+const _texMats = new Map();
+function texLam(hex) {
+  if (!_texMats.has(hex)) _texMats.set(hex, withHaze(new THREE.MeshLambertMaterial({ color: hex, map: fabricTex() }), { key: 'cellTex' }));
+  return _texMats.get(hex);
+}
 import { clamp, mulberry32 } from '../util.js';
 
 export const DIFFS = {
@@ -46,7 +85,8 @@ const HELI_HP = 140; // spotlight helicopter drone: one KR-50 round, or a long S
 const HELI_R = 6.5; // the light's pool on the ground
 const EYE = 1.62;
 // The bulwark's hard-light wall, in its local frame (feet at origin, facing -Z, before scale).
-export const WALL = { z: -0.55, w: 0.95, y0: 0.3, y1: 1.85, port: { x0: 0.04, x1: 0.32, y0: 1.38, y1: 1.76 } };
+// The sight-port is a notch cut down from the top edge (a Halo-style dip), so it's easy to read.
+export const WALL = { z: -0.55, w: 0.95, y0: 0.3, y1: 1.85, port: { x0: -0.14, x1: 0.16, y0: 1.42, y1: 1.85 }, hp: 120 };
 
 // ---------------------------------------------------------------------------
 // Models
@@ -95,12 +135,16 @@ function shellMat(color) {
 }
 function wallMat() {
   return new THREE.ShaderMaterial({
-    uniforms: { uT: { value: 0 }, uA: { value: 1 } },
+    uniforms: { uT: { value: 0 }, uA: { value: 1 }, uHp: { value: 1 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform float uT, uA; varying vec2 vUv;
+    fragmentShader: `uniform float uT, uA, uHp; varying vec2 vUv;
       void main(){
         vec2 p = vUv;
-        // The sight-port: a notch near the top on the weapon side.
+        // The sight-port: a notch cut down from the top edge on the weapon side, with a bright
+        // amber rim so it reads at a glance.
+        float px0 = ${(0.5 + WALL.port.x0 / WALL.w).toFixed(3)}, px1 = ${(0.5 + WALL.port.x1 / WALL.w).toFixed(3)}, py0 = ${((WALL.port.y0 - WALL.y0) / (WALL.y1 - WALL.y0)).toFixed(3)};
+        float pd = max(max(px0 - p.x, p.x - px1), py0 - p.y);
+        float rim = (1.0 - smoothstep(0.0, 0.05, pd)) * step(0.0, pd);
         float port = step(${(0.5 + WALL.port.x0 / WALL.w).toFixed(3)}, p.x) * step(p.x, ${(0.5 + WALL.port.x1 / WALL.w).toFixed(3)}) * step(${((WALL.port.y0 - WALL.y0) / (WALL.y1 - WALL.y0)).toFixed(3)}, p.y) * step(p.y, ${((WALL.port.y1 - WALL.y0) / (WALL.y1 - WALL.y0)).toFixed(3)});
         if (port > 0.5) discard;
         float edge = 1.0 - smoothstep(0.0, 0.06, min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y)));
@@ -108,6 +152,11 @@ function wallMat() {
         float grid = smoothstep(0.42, 0.5, hx);
         float scan = 0.5 + 0.5 * sin(p.y * 60.0 - uT * 6.0);
         vec3 c = vec3(0.2, 0.85, 1.0) * (0.12 + edge * 0.9 + grid * 0.25 + scan * 0.05);
+        c += vec3(1.0, 0.75, 0.3) * rim * (1.1 + 0.25 * sin(uT * 5.0));
+        // Weakening: cyan bleeds to red, pulsing faster as it nears breaking.
+        float low = 1.0 - smoothstep(0.15, 0.85, uHp);
+        vec3 red = vec3(1.0, 0.18, 0.15) * (0.16 + edge * 0.9 + grid * 0.3 + scan * 0.06) * (1.0 + 0.35 * low * sin(uT * (6.0 + 14.0 * low)));
+        c = mix(c, red + vec3(1.0, 0.75, 0.3) * rim * 0.8, low);
         gl_FragColor = vec4(c * uA, 1.0);
       }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
@@ -129,6 +178,36 @@ function rig(body, C, mk) {
   return legs;
 }
 
+// A carbine the troops carry at the low ready: receiver, barrel with a muzzle device, stock,
+// curved magazine, optic and a weapon light under the barrel.
+function carbine(gun, mk, short = false) {
+  const k = short ? 0.85 : 1;
+  mk(new THREE.BoxGeometry(0.07, 0.1, 0.4 * k), '#1d1f22', 0, 0, -0.05, gun);
+  mk(new THREE.CylinderGeometry(0.018, 0.018, 0.34 * k, 8).rotateX(Math.PI / 2), '#141517', 0, 0.015, -0.42 * k, gun);
+  mk(new THREE.BoxGeometry(0.035, 0.035, 0.06), '#141517', 0, 0.015, -0.6 * k, gun);
+  mk(new THREE.BoxGeometry(0.06, 0.12, 0.24), '#2a2c2f', 0, -0.02, 0.26 * k, gun);
+  mk(new THREE.BoxGeometry(0.05, 0.17, 0.08), '#17181a', 0, -0.12, -0.12 * k, gun).rotation.x = 0.25;
+  mk(new THREE.BoxGeometry(0.04, 0.1, 0.05), '#17181a', 0, -0.09, 0.08 * k, gun).rotation.x = 0.3;
+  mk(new THREE.BoxGeometry(0.045, 0.05, 0.12), '#141517', 0, 0.08, -0.04, gun);
+  mk(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8).rotateX(Math.PI / 2), '#2a2c2f', 0, -0.035, -0.36 * k, gun);
+  // Refinements: slotted handguard, top rail, angled foregrip, buttpad, sling.
+  mk(new THREE.BoxGeometry(0.075, 0.08, 0.22 * k), '#25272b', 0, 0.0, -0.33 * k, gun);
+  for (let i = 0; i < 4; i++) for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.004, 0.02, 0.03), '#0f1012', s * 0.039, 0.0, -0.25 * k - i * 0.05 * k, gun);
+  for (let i = 0; i < 9; i++) mk(new THREE.BoxGeometry(0.05, 0.008, 0.014), '#101113', 0, 0.054, 0.1 - i * 0.05 * k, gun);
+  mk(new THREE.BoxGeometry(0.035, 0.07, 0.04), '#17181a', 0, -0.07, -0.3 * k, gun).rotation.x = -0.5;
+  mk(new THREE.BoxGeometry(0.065, 0.14, 0.025), '#0f1012', 0, -0.025, 0.39 * k, gun);
+  mk(new THREE.BoxGeometry(0.01, 0.01, 0.6 * k), '#2b2620', 0.04, -0.06, 0.0, gun);
+}
+
+// Shared kit detail: knee pads (on each hip pivot's lower leg) and a belt with pouches.
+function kneePads(legs, mk, col) {
+  for (const L of legs) mk(new THREE.BoxGeometry(0.16, 0.12, 0.05), col, 0, -0.47, -0.105, L);
+}
+function belt(mk, col, y = 0.94, w = 0.44) {
+  mk(new THREE.BoxGeometry(w, 0.06, 0.28), col, 0, y, 0);
+  for (const [x, z] of [[-0.14, -0.15], [0.14, -0.15], [-0.23, 0], [0.23, 0.02]]) mk(new THREE.BoxGeometry(0.08, 0.09, 0.06), col, x, y - 0.03, z);
+}
+
 export function buildUnit(type = 'guard', chief = false) {
   const T = TYPES[type] || TYPES.guard;
   const root = new THREE.Group();
@@ -137,6 +216,9 @@ export function buildUnit(type = 'guard', chief = false) {
   root.add(body);
   const mk = (geo, col, x, y, z, parent = body, opts) => { const m = new THREE.Mesh(geo, lam(col, opts)); m.position.set(x, y, z); parent.add(m); return m; };
   const glow = (geo, col, x, y, z, parent = body, k = 1.8) => mk(geo, col, x, y, z, parent, { emissive: col, emissiveIntensity: k });
+  // Rounded parts: a scaled sphere (or a dome when `dome`), and a capsule between two heights.
+  const ball = (r, sx, sy, sz, col, x, y, z, parent = body, dome = false) => { const m = mk(dome ? new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2) : new THREE.SphereGeometry(r, 14, 10), col, x, y, z, parent); m.scale.set(sx, sy, sz); return m; };
+  const cap = (r, len, col, x, y, z, rx = 0, rz = 0, parent = body) => { const m = mk(new THREE.CapsuleGeometry(r, len, 5, 10), col, x, y, z, parent); m.rotation.set(rx, 0, rz); return m; };
   const gun = new THREE.Group();
   body.add(gun);
   let legs, shell = null, wall = null, blade = null, helmet = null;
@@ -150,8 +232,44 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.SphereGeometry(0.15, 10, 7, 0, Math.PI * 2, 0, Math.PI / 1.8), chief ? '#4b3f63' : '#3b4046', 0, 1.66, 0.01);
     glow(new THREE.BoxGeometry(0.2, 0.05, 0.03), chief ? '#c070ff' : '#ff4050', 0, 1.62, -0.115);
     gun.position.set(0.05, 1.18, -0.28);
-    mk(new THREE.BoxGeometry(0.06, 0.09, 0.7), '#1b1c1f', 0, 0, -0.1, gun);
+    carbine(gun, mk);
     for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.11, 0.11, 0.42), C.suit, s * 0.22, 1.28, -0.16).rotation.y = -s * 0.35;
+    // Kit: helmet shell with ear covers, NVG mount and side rails; plate carrier with a mag
+    // shingle, radio and shoulder pads; belt; hydration pack; knee and elbow pads; gloves.
+    const kitC = chief ? '#2d2838' : '#25282c', padC = '#1b1d20';
+    for (const s of [-1, 1]) {
+      mk(new THREE.BoxGeometry(0.05, 0.1, 0.12), kitC, s * 0.15, 1.6, 0.0);
+      mk(new THREE.BoxGeometry(0.02, 0.03, 0.16), '#14151a', s * 0.155, 1.69, 0.0);
+      mk(new THREE.BoxGeometry(0.14, 0.06, 0.2), kitC, s * 0.27, 1.45, -0.0).rotation.z = s * 0.35;
+      mk(new THREE.BoxGeometry(0.08, 0.08, 0.08), padC, s * 0.27, 1.22, -0.27);
+      mk(new THREE.BoxGeometry(0.07, 0.07, 0.08), '#111214', s * 0.2, 1.24, -0.38);
+    }
+    mk(new THREE.BoxGeometry(0.07, 0.05, 0.05), '#14151a', 0, 1.74, -0.12);
+    mk(new THREE.BoxGeometry(0.05, 0.04, 0.06), '#14151a', 0, 1.7, -0.16);
+    for (let i = -1; i <= 1; i++) { mk(new THREE.BoxGeometry(0.1, 0.13, 0.06), kitC, i * 0.11, 1.12, -0.19); mk(new THREE.BoxGeometry(0.06, 0.03, 0.03), '#101113', i * 0.11, 1.2, -0.2); }
+    mk(new THREE.BoxGeometry(0.16, 0.08, 0.05), kitC, 0, 1.33, -0.19);
+    mk(new THREE.BoxGeometry(0.06, 0.14, 0.05), padC, -0.2, 1.28, 0.1);
+    mk(new THREE.CylinderGeometry(0.006, 0.006, 0.22, 4), '#111', -0.21, 1.46, 0.1);
+    mk(new THREE.BoxGeometry(0.3, 0.36, 0.08), kitC, 0, 1.25, 0.19);
+    belt(mk, padC);
+    kneePads(legs, mk, padC);
+    // MOLLE webbing front and back, a thigh holster, a dump pouch, boot soles and toe caps, and
+    // a small IR patch on the shoulder.
+    for (const y of [1.05, 1.27]) for (const z of [-0.223, 0.235]) mk(new THREE.BoxGeometry(0.34, 0.012, 0.006), '#111214', 0, y, z);
+    mk(new THREE.BoxGeometry(0.08, 0.17, 0.1), padC, 0.1, -0.24, 0.0, legs[1]);
+    mk(new THREE.BoxGeometry(0.04, 0.05, 0.06), '#111214', 0.1, -0.13, -0.02, legs[1]);
+    mk(new THREE.BoxGeometry(0.14, 0.12, 0.1), kitC, -0.12, 0.88, 0.17);
+    for (const L of legs) { mk(new THREE.BoxGeometry(0.17, 0.03, 0.3), '#0b0c0d', 0, -0.94, -0.04, L); mk(new THREE.BoxGeometry(0.16, 0.05, 0.06), '#202226', 0, -0.88, -0.17, L); }
+    glow(new THREE.BoxGeometry(0.05, 0.03, 0.005), chief ? '#c070ff' : '#ff4050', -0.28, 1.47, -0.08, body, 0.9);
+    // Rounded against the angular kit: domed shoulder pads, capsule forearms, knee domes, a
+    // rounded pack top and a chin strap.
+    for (const sd of [-1, 1]) {
+      const d = ball(0.11, 1.1, 0.8, 1.2, kitC, sd * 0.27, 1.47, 0.0, body, true); d.rotation.z = -sd * 0.4;
+      cap(0.045, 0.2, C.suit, sd * 0.2, 1.24, -0.3, 1.45, 0);
+    }
+    for (const L of legs) ball(0.07, 1.1, 0.9, 0.6, padC, 0, -0.47, -0.12, L);
+    mk(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 14, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), kitC, 0, 1.44, 0.19);
+    mk(new THREE.TorusGeometry(0.11, 0.008, 6, 14, Math.PI), '#111214', 0, 1.58, -0.02).rotation.set(0, 0, Math.PI);
   } else if (type === 'scav') {
     // Hunched little conscript: coolant pack on its back, slit visor, twitchy.
     const C = { suit: '#2b2a2f', boot: '#121214' };
@@ -165,63 +283,186 @@ export function buildUnit(type = 'guard', chief = false) {
     glow(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 10), neon, 0, 1.46, 0.47, body, 1.6);
     glow(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), neon, 0.18, 1.55, 0.2, body, 1.2).rotation.x = 1.0;
     // Head: rebreather mask with a wide slit visor.
-    mk(new THREE.BoxGeometry(0.3, 0.26, 0.3), '#2a2826', 0, 1.5, -0.12);
     glow(new THREE.BoxGeometry(0.26, 0.05, 0.02), '#ffe040', 0, 1.53, -0.28);
     mk(new THREE.CylinderGeometry(0.06, 0.08, 0.12, 8).rotateX(Math.PI / 2), '#1a1918', 0, 1.42, -0.3);
     gun.position.set(0.18, 1.12, -0.32);
-    mk(new THREE.BoxGeometry(0.08, 0.1, 0.26), '#24262a', 0, 0, -0.05, gun);
-    glow(new THREE.SphereGeometry(0.045, 8, 6), '#60ff70', 0, 0.02, -0.2, gun, 2);
+    carbine(gun, mk, true);
+    glow(new THREE.SphereGeometry(0.03, 8, 6), '#60ff70', 0, 0.075, -0.05, gun, 2);
     for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.09, 0.09, 0.36), C.suit, s * 0.22, 1.22, -0.16).rotation.y = -s * 0.3;
+    // Straps over the chest, shoulder pads, belt, knee pads.
+    for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.05, 0.5, 0.02), '#1d1c1a', s * 0.12, 1.2, -0.21).rotation.x = 0.35; mk(new THREE.BoxGeometry(0.16, 0.07, 0.24), '#4a3f30', s * 0.3, 1.42, -0.02).rotation.z = s * 0.4; }
+    belt(mk, '#1d1c1a', 0.94, 0.46);
+    kneePads(legs, mk, '#1d1c1a');
+    for (const y of [1.28, 1.46, 1.64]) mk(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10), '#1d1c1a', 0, y, 0.47);
+    // Rounded: a capsule methane tank with domed caps, a rounded mask with a rebreather snout, and
+    // rounded shoulders over the boxy harness.
+    cap(0.13, 0.36, '#4a4238', 0, 1.46, 0.36);
+    for (const y of [1.18, 1.74]) mk(new THREE.TorusGeometry(0.13, 0.015, 6, 16).rotateX(Math.PI / 2), '#1d1c1a', 0, y, 0.36);
+    ball(0.17, 1.0, 0.85, 0.95, '#2e2b28', 0, 1.5, -0.14);
+    ball(0.07, 1.0, 1.0, 1.3, '#1a1918', 0, 1.41, -0.3);
+    for (const sd of [-1, 1]) ball(0.12, 1.1, 0.8, 1.1, '#4a3f30', sd * 0.3, 1.38, 0.0, body, true);
+    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.3, 0.015, 0.01), '#1a1918', 0, 1.3 + i * 0.06, 0.155);
   } else if (type === 'jugg' || type === 'overseer') {
-    // Hulking enforcer: plated, neon seams, heavy cannon on the left, energy blade on the right.
+    // Brute (Halo-style): hunched and broad, a barrel chest under layered curved plates, stacked
+    // dome pauldrons, thick capsule arms with gauntlets, armoured thighs and greaves, a low
+    // heavy head; neon trim along the plate edges. Heavy cannon on the left, blade on the right.
     const boss = type === 'overseer';
-    const C = { suit: boss ? '#2a2236' : '#2c2628', boot: '#121214' };
+    const C = { suit: boss ? '#2a2236' : '#2a2622', boot: '#121214' };
+    const A1 = boss ? '#4a3e66' : '#3d4a6a', A2 = boss ? '#5a4c7a' : '#4e5c80', TRIM = boss ? '#8a7040' : '#262c3a', FUR = '#2e2520';
     legs = rig(body, C, mk);
-    mk(new THREE.BoxGeometry(0.62, 0.66, 0.42), boss ? '#3a3050' : '#3e3434', 0, 1.22, 0);
-    mk(new THREE.BoxGeometry(0.7, 0.36, 0.48), boss ? '#4a3e66' : '#4e4040', 0, 1.36, -0.02);
-    for (const s of [-1, 1]) {
-      mk(new THREE.BoxGeometry(0.3, 0.2, 0.42), boss ? '#4a3e66' : '#4e4040', s * 0.46, 1.52, 0).rotation.z = s * 0.25;
-      glow(new THREE.BoxGeometry(0.02, 0.5, 0.02), neon, s * 0.32, 1.2, -0.22);
+    const sph = (r, sx, sy, sz, col, x, y, z, rx = 0, parent = body, seg) => { const m = mk(seg || new THREE.SphereGeometry(r, 16, 12), col, x, y, z, parent); m.scale.set(sx, sy, sz); m.rotation.x = rx; return m; };
+    const plate = (r, t0, t1, col, y, z, sx = 1, sy = 1, sz = 1) => sph(r, sx, sy, sz, col, 0, y, z, 0.18, body, new THREE.SphereGeometry(r, 18, 8, Math.PI * 1.08, Math.PI * 0.84, Math.PI * t0, Math.PI * (t1 - t0)));
+    // Body mass: barrel chest and gut, hunched forward.
+    sph(0.36, 1.02, 0.95, 0.8, FUR, 0, 1.26, 0.02, 0.22);
+    sph(0.3, 1.0, 0.8, 0.85, FUR, 0, 1.0, 0.0);
+    // Layered chest plates (upper overlaps lower), a belly guard, neon trim on the edges.
+    plate(0.39, 0.22, 0.5, A2, 1.27, 0.0, 1.06, 1.0, 0.86);
+    plate(0.37, 0.44, 0.66, A1, 1.22, 0.01, 1.05, 1.0, 0.86);
+    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.34 - i * 0.04, 0.07, 0.06), A1, 0, 1.02 - i * 0.075, -0.25 + i * 0.01).rotation.x = 0.15;
+    glow(new THREE.BoxGeometry(0.5, 0.012, 0.012), neon, 0, 1.33, -0.33, body, 1.2);
+    glow(new THREE.BoxGeometry(0.44, 0.012, 0.012), neon, 0, 1.15, -0.31, body, 1.2);
+    // Back: spine plates.
+    for (let i = 0; i < 4; i++) sph(0.1, 1.4, 0.5, 0.7, A1, 0, 1.48 - i * 0.14, 0.3 - i * 0.01);
+    // Stacked dome pauldrons and thick arms with gauntlets.
+    for (const sd of [-1, 1]) {
+      for (let i = 0; i < 3; i++) { const d = sph(0.2 - i * 0.025, 1.1, 0.75, 1.0, i ? A1 : A2, sd * (0.42 + i * 0.03), 1.56 - i * 0.075, 0.0, 0, body, new THREE.SphereGeometry(0.2 - i * 0.025, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2)); d.rotation.z = -sd * (0.35 + i * 0.1); }
+      glow(new THREE.BoxGeometry(0.02, 0.02, 0.3), neon, sd * 0.56, 1.5, 0.0, body, 1.0);
+      const up = mk(new THREE.CapsuleGeometry(0.1, 0.24, 6, 10), FUR, sd * 0.46, 1.3, -0.04);
+      up.rotation.z = sd * 0.25;
+      const fa = mk(new THREE.CylinderGeometry(0.11, 0.09, 0.26, 12), A1, sd * 0.5, 1.12, -0.16);
+      fa.rotation.x = 1.2;
+      mk(new THREE.BoxGeometry(0.03, 0.03, 0.2), TRIM, sd * 0.5, 1.2, -0.2).rotation.x = 1.2;
     }
-    mk(new THREE.BoxGeometry(0.3, 0.3, 0.32), '#2a2426', 0, 1.7, -0.02);
-    glow(new THREE.BoxGeometry(0.24, 0.04, 0.02), neon, 0, 1.72, -0.19);
-    if (boss) { glow(new THREE.BoxGeometry(0.06, 0.2, 0.06), neon, 0, 1.92, 0.02); helmet = new THREE.Group(); mk(new THREE.BoxGeometry(0.36, 0.3, 0.38), '#4a3e66', 0, 1.74, -0.02, helmet); glow(new THREE.BoxGeometry(0.28, 0.04, 0.02), neon, 0, 1.74, -0.22, helmet); body.add(helmet); }
+    // Low, heavy head pushed forward, tusks and a glowing visor; overseer wears a crested
+    // helmet that can be shot off.
+    sph(0.15, 1.15, 1.0, 1.15, '#2a2220', 0, 1.62, -0.12);
+    sph(0.12, 1.25, 0.6, 1.1, FUR, 0, 1.53, -0.16);
+    for (const sd of [-1, 1]) mk(new THREE.ConeGeometry(0.02, 0.08, 6), '#c8bca0', sd * 0.07, 1.5, -0.27).rotation.x = -2.6;
+    glow(new THREE.BoxGeometry(0.2, 0.035, 0.02), neon, 0, 1.65, -0.29);
+    if (boss) {
+      helmet = new THREE.Group();
+      sph(0.19, 1.1, 0.85, 1.15, A2, 0, 1.7, -0.1, 0, helmet, new THREE.SphereGeometry(0.19, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.6));
+      mk(new THREE.BoxGeometry(0.04, 0.12, 0.34), '#8a7040', 0, 1.86, -0.08, helmet);
+      glow(new THREE.BoxGeometry(0.22, 0.03, 0.02), neon, 0, 1.68, -0.32, helmet);
+      body.add(helmet);
+      glow(new THREE.BoxGeometry(0.05, 0.16, 0.05), neon, 0, 1.94, 0.02);
+    }
     gun.position.set(-0.32, 1.2, -0.3);
-    mk(new THREE.BoxGeometry(0.16, 0.18, 0.66), '#26232a', 0, 0, -0.1, gun);
+    // Heavy cannon: a fat rounded barrel housing, a blade-like bayonet under it.
+    mk(new THREE.CylinderGeometry(0.1, 0.12, 0.66, 12).rotateX(Math.PI / 2), '#26232a', 0, 0, -0.1, gun);
+    mk(new THREE.BoxGeometry(0.06, 0.1, 0.4), '#3a3440', 0, -0.1, -0.3, gun);
     glow(new THREE.BoxGeometry(0.17, 0.04, 0.4), '#b050ff', 0, 0.1, -0.15, gun);
-    mk(new THREE.BoxGeometry(0.14, 0.14, 0.4), C.suit, 0.32, 1.25, -0.18);
-    blade = glow(new THREE.BoxGeometry(0.03, 0.08, 0.95), '#ff3aa0', 0.36, 1.1, -0.72, body, 3);
+    // Armoured legs: rounded thigh plates, knee caps with a glow line, shin greaves.
+    for (const L of legs) {
+      sph(0.13, 1.0, 1.5, 0.95, A1, 0, -0.24, -0.02, 0, L);
+      sph(0.09, 1.2, 1.0, 0.8, A2, 0, -0.47, -0.1, 0, L);
+      glow(new THREE.BoxGeometry(0.12, 0.015, 0.015), neon, 0, -0.43, -0.175, L, 1.2);
+      mk(new THREE.CylinderGeometry(0.1, 0.085, 0.3, 12), A1, 0, -0.68, -0.02, L);
+    }
+    belt(mk, '#1a1618', 0.86, 0.62);
+    // Energy sword: a dark hilt with two curved plasma prongs and a soft halo.
+    blade = new THREE.Group();
+    blade.position.set(0.4, 1.1, -0.4);
+    mk(new THREE.CylinderGeometry(0.03, 0.035, 0.22, 10).rotateX(Math.PI / 2), '#1a1c22', 0, 0, 0.1, blade);
+    mk(new THREE.BoxGeometry(0.16, 0.05, 0.06), '#2a2e38', 0, 0, -0.02, blade);
+    for (const sd of [-1, 1]) {
+      const pr = glow(new THREE.BoxGeometry(0.022, 0.06, 0.62), '#7fe0ff', sd * 0.05, 0, -0.34, blade, 3);
+      pr.rotation.y = -sd * 0.07;
+      const tip = glow(new THREE.ConeGeometry(0.03, 0.14, 6).rotateX(-Math.PI / 2), '#cfffff', sd * 0.028, 0, -0.71, blade, 3);
+      tip.rotation.y = -sd * 0.05;
+    }
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.9), new THREE.MeshBasicMaterial({ color: '#4fc8ff', transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    halo.rotation.x = -Math.PI / 2; halo.position.z = -0.38; blade.add(halo);
+    body.add(blade);
     blade.visible = false;
     shell = new THREE.Mesh(new THREE.SphereGeometry(0.62, 18, 12).scale(0.95, 1.55, 0.8), shellMat(neon));
     shell.position.y = 1.05;
     root.add(shell);
   } else if (type === 'titan') {
-    // Walking armour: slab plates, a heavy cannon on each arm, a full helmet that can be shot off.
+    // Titan (walking armour), built to brute detail: a rounded armoured mass under layered
+    // gunmetal plates with orange seams, stacked shoulder domes with angular rims, a back power
+    // pack with vents and glowing coils, armoured capsule arms (an arm cannon and a forearm
+    // shield), thigh plates, knee domes and greaves, and a domed helmet with an angular faceplate
+    // that a headshot knocks off.
     const C = { suit: '#25272b', boot: '#101112' };
+    const G1 = '#3a3d42', G2 = '#55595f', G3 = '#2a2c30', HOT = '#ff8030';
     legs = rig(body, C, mk);
-    for (const L of legs) mk(new THREE.BoxGeometry(0.24, 0.3, 0.26), '#3a3d42', 0, -0.45, -0.04, L);
-    mk(new THREE.BoxGeometry(0.72, 0.72, 0.5), '#3a3d42', 0, 1.22, 0);
-    mk(new THREE.BoxGeometry(0.8, 0.3, 0.56), '#4a4e55', 0, 1.42, -0.02);
-    for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.34, 0.3, 0.5), '#4a4e55', s * 0.52, 1.5, 0); glow(new THREE.BoxGeometry(0.02, 0.4, 0.02), neon, s * 0.36, 1.18, -0.26); }
-    mk(new THREE.BoxGeometry(0.24, 0.24, 0.26), '#1c1d20', 0, 1.7, -0.02);
-    glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), '#ffd040', 0, 1.71, -0.16);
+    const plate = (r, t0, t1, col, y, z, sx = 1, sy = 1, sz = 1) => { const m = mk(new THREE.SphereGeometry(r, 18, 8, Math.PI * 1.08, Math.PI * 0.84, Math.PI * t0, Math.PI * (t1 - t0)), col, 0, y, z); m.scale.set(sx, sy, sz); m.rotation.x = 0.12; return m; };
+    // Body mass and layered chest plates.
+    ball(0.42, 1.0, 0.92, 0.75, C.suit, 0, 1.24, 0.02);
+    ball(0.32, 1.05, 0.75, 0.8, C.suit, 0, 0.98, 0.0);
+    plate(0.45, 0.2, 0.42, G2, 1.3, 0.0, 1.05, 1.0, 0.82);
+    plate(0.44, 0.36, 0.56, G1, 1.24, 0.01, 1.04, 1.0, 0.82);
+    plate(0.42, 0.5, 0.68, G2, 1.18, 0.02, 1.03, 1.0, 0.82);
+    glow(new THREE.BoxGeometry(0.56, 0.014, 0.014), HOT, 0, 1.38, -0.36, body, 1.4);
+    glow(new THREE.BoxGeometry(0.5, 0.014, 0.014), HOT, 0, 1.22, -0.36, body, 1.2);
+    // Segmented abdomen bands and an angular belly plate.
+    for (let i = 0; i < 3; i++) mk(new THREE.TorusGeometry(0.3 - i * 0.015, 0.03, 6, 18), G3, 0, 1.02 - i * 0.065, 0.0).rotation.x = Math.PI / 2;
+    mk(new THREE.BoxGeometry(0.26, 0.16, 0.06), G1, 0, 0.98, -0.3).rotation.x = 0.1;
+    // Back: a capsule power pack, vents, glowing coils, rounded back plates and spines.
+    cap(0.14, 0.42, G3, 0, 1.36, 0.33, 0, Math.PI / 2);
+    for (let i = 0; i < 4; i++) mk(new THREE.BoxGeometry(0.06, 0.12, 0.02), '#0f1012', -0.16 + i * 0.105, 1.36, 0.47);
+    for (const sd of [-1, 1]) glow(new THREE.TorusGeometry(0.07, 0.012, 6, 14).rotateY(Math.PI / 2), HOT, sd * 0.3, 1.36, 0.33, body, 1.5);
+    for (let i = 0; i < 3; i++) ball(0.12, 1.5, 0.55, 0.7, G1, 0, 1.12 - i * 0.12, 0.27);
+    for (let i = 0; i < 5; i++) mk(new THREE.ConeGeometry(0.035, 0.16, 6), '#1c1d20', 0, 1.66 - i * 0.12, 0.3).rotation.x = 0.9;
+    // Shoulders: three stacked domes with an angular rim plate; armoured arms.
+    for (const sd of [-1, 1]) {
+      for (let i = 0; i < 3; i++) { const d = ball(0.25 - i * 0.03, 1.1, 0.75, 1.0, i % 2 ? G1 : G2, sd * (0.52 + i * 0.035), 1.62 - i * 0.075, 0, body, true); d.rotation.z = -sd * (0.3 + i * 0.12); }
+      mk(new THREE.BoxGeometry(0.3, 0.04, 0.46), G3, sd * 0.56, 1.52, 0).rotation.z = -sd * 0.45;
+      glow(new THREE.BoxGeometry(0.02, 0.02, 0.36), HOT, sd * 0.64, 1.47, 0, body, 1.1);
+      cap(0.11, 0.24, C.suit, sd * 0.5, 1.3, -0.05, 0, sd * 0.25);
+      const fa = mk(new THREE.CylinderGeometry(0.12, 0.1, 0.3, 12), G1, sd * 0.52, 1.14, -0.18); fa.rotation.x = 1.25;
+      ball(0.1, 1.0, 0.9, 1.1, G2, sd * 0.52, 1.08, -0.34);
+      mk(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 10).rotateZ(Math.PI / 2), G3, sd * 0.38, 1.52, -0.18);
+    }
+    // Forearm shield on the right arm.
+    mk(new THREE.BoxGeometry(0.05, 0.3, 0.34), G2, 0.64, 1.14, -0.22).rotation.z = 0.15;
+    glow(new THREE.BoxGeometry(0.012, 0.22, 0.012), HOT, 0.67, 1.14, -0.36, body, 1.2);
+    // Head under the helmet: dark, rounded, one hot eye.
+    ball(0.14, 1.0, 1.0, 1.1, '#1c1d20', 0, 1.7, -0.04);
+    glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), '#ffd040', 0, 1.71, -0.18);
+    // Helmet: a dome with an angular faceplate, visor and crest.
     helmet = new THREE.Group();
-    mk(new THREE.BoxGeometry(0.36, 0.34, 0.38), '#55595f', 0, 1.74, -0.02, helmet);
-    glow(new THREE.BoxGeometry(0.3, 0.04, 0.02), neon, 0, 1.74, -0.22, helmet);
+    ball(0.2, 1.05, 0.95, 1.15, G2, 0, 1.74, -0.03, helmet, true);
+    mk(new THREE.BoxGeometry(0.3, 0.18, 0.06), G1, 0, 1.69, -0.24, helmet).rotation.x = -0.15;
+    for (const sd of [-1, 1]) mk(new THREE.BoxGeometry(0.06, 0.16, 0.2), G1, sd * 0.19, 1.7, -0.1, helmet);
+    mk(new THREE.BoxGeometry(0.04, 0.08, 0.36), G3, 0, 1.94, -0.02, helmet);
+    glow(new THREE.BoxGeometry(0.24, 0.035, 0.02), neon, 0, 1.73, -0.275, helmet);
     body.add(helmet);
+    // Arm cannon: a ribbed rounded barrel with a glowing core and a muzzle collar.
     gun.position.set(-0.36, 1.2, -0.32);
-    mk(new THREE.BoxGeometry(0.18, 0.2, 0.7), '#26282c', 0, 0, -0.1, gun);
-    glow(new THREE.BoxGeometry(0.19, 0.04, 0.44), '#ff8030', 0, 0.11, -0.15, gun);
-    mk(new THREE.BoxGeometry(0.16, 0.16, 0.5), C.suit, 0.36, 1.25, -0.2);
+    mk(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 14).rotateX(Math.PI / 2), '#26282c', 0, 0, -0.1, gun);
+    for (let i = 0; i < 4; i++) mk(new THREE.TorusGeometry(0.115, 0.014, 6, 14), G3, 0, 0, 0.12 - i * 0.12, gun);
+    mk(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 14).rotateX(Math.PI / 2), G2, 0, 0, -0.46, gun);
+    glow(new THREE.BoxGeometry(0.19, 0.04, 0.44), HOT, 0, 0.11, -0.15, gun);
+    // Legs: thigh plates, knee domes with a glow line, greaves.
+    for (const L of legs) {
+      ball(0.14, 1.0, 1.4, 0.95, G1, 0, -0.24, -0.02, L);
+      ball(0.1, 1.2, 1.0, 0.8, G2, 0, -0.46, -0.1, L);
+      glow(new THREE.BoxGeometry(0.12, 0.015, 0.015), HOT, 0, -0.42, -0.175, L, 1.2);
+      mk(new THREE.CylinderGeometry(0.11, 0.09, 0.32, 12), G1, 0, -0.68, -0.02, L);
+    }
+    belt(mk, '#1c1d20', 0.9, 0.66);
   } else if (type === 'bulwark') {
     // Lean, long-necked lookout behind a hard-light wall with a sight-port.
     const C = { suit: '#22282c', boot: '#101214' };
     legs = rig(body, C, mk);
     mk(new THREE.BoxGeometry(0.36, 0.5, 0.26), '#2c3438', 0, 1.18, 0.04);
-    mk(new THREE.BoxGeometry(0.1, 0.24, 0.1), '#22282c', 0, 1.5, -0.04).rotation.x = -0.4;
-    mk(new THREE.BoxGeometry(0.2, 0.18, 0.34), '#2c3438', 0, 1.62, -0.12);
     glow(new THREE.BoxGeometry(0.03, 0.06, 0.36), neon, 0, 1.74, -0.1, body, 2);
     glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), neon, 0, 1.62, -0.3);
+    for (let i = -1; i <= 1; i++) mk(new THREE.BoxGeometry(0.09, 0.12, 0.05), '#1b2024', i * 0.1, 1.1, -0.12);
+    mk(new THREE.BoxGeometry(0.14, 0.06, 0.2), '#2c3438', 0.22, 1.4, 0.02).rotation.z = 0.4;
+    belt(mk, '#1b2024', 0.94, 0.38);
+    kneePads(legs, mk, '#1b2024');
+    mk(new THREE.BoxGeometry(0.1, 0.08, 0.34), '#2c3438', -0.2, 1.2, -0.2);
+    // Bird-like head: an elongated rounded skull, a hooked beak, eyes, quills sweeping back; a
+    // capsule neck and slim capsule arms.
+    ball(0.11, 0.9, 0.85, 1.5, '#3a4448', 0, 1.62, -0.12);
+    mk(new THREE.ConeGeometry(0.045, 0.16, 8).rotateX(-Math.PI / 2), '#8a8070', 0, 1.58, -0.33);
+    for (const sd of [-1, 1]) glow(new THREE.SphereGeometry(0.018, 8, 6), neon, sd * 0.06, 1.66, -0.24, body, 2);
+    for (let i = 0; i < 4; i++) mk(new THREE.ConeGeometry(0.018, 0.2, 5), '#5a2a2a', (i - 1.5) * 0.04, 1.72, 0.02).rotation.x = 1.9;
+    cap(0.045, 0.16, '#2c3438', 0, 1.47, -0.06, -0.4);
+    for (const sd of [-1, 1]) cap(0.04, 0.26, '#2c3438', sd * 0.21, 1.2, -0.1, 0.4, sd * 0.2);
     gun.position.set(0.22, 1.2, -0.3);
     mk(new THREE.BoxGeometry(0.06, 0.08, 0.6), '#1b1e22', 0, 0, -0.15, gun);
     glow(new THREE.BoxGeometry(0.02, 0.02, 0.5), '#30e0ff', 0, 0.05, -0.15, gun, 1.4);
@@ -243,6 +484,29 @@ export function buildUnit(type = 'guard', chief = false) {
   tag.position.set(0, 2.15, 0);
   tag.visible = false;
   root.add(tag);
+  // All that kit is a lot of little meshes: merge the static ones on the body (one mesh per
+  // material) so a compound full of troops stays cheap to draw.
+  const mergeIn = (grp) => {
+    const byMat = new Map();
+    for (const o of [...grp.children]) {
+      if (!o.isMesh || o === blade || o === beam) continue;
+      o.updateMatrix();
+      if (!byMat.has(o.material)) byMat.set(o.material, []);
+      byMat.get(o.material).push(o);
+    }
+    for (const [m, list] of byMat) {
+      if (list.length < 2) continue;
+      const merged = mergeBoxes(list.map((o) => ({ geo: o.geometry, m: o.matrix })), m);
+      for (const o of list) grp.remove(o);
+      grp.add(merged);
+    }
+  };
+  // Fabric texture on every plain (non-glowing) part.
+  for (const grp of [body, gun, ...(legs || [])]) for (const o of grp.children) {
+    const m = o.isMesh && o !== beam && o !== blade ? o.material : null;
+    if (m && m.isMeshLambertMaterial && !m.map && !(m.emissive && m.emissive.getHex() !== 0)) o.material = texLam('#' + m.color.getHexString());
+  }
+  for (const grp of [body, gun, ...(legs || [])]) mergeIn(grp);
   body.scale.setScalar(T.scale);
   root.userData = { body, legs, gun, beam, tag, shell, wall, blade, helmet, phase: Math.random() * 6, scale: T.scale };
   return root;
@@ -624,7 +888,9 @@ export class Sentinel {
       route, ri: 0, wait: 0, post, path: null, pathT: 0, aw: 0, target: null, lkp: null,
       reactT: 0, fireT: 0, radioT: 0, searchT: 0, jamT: 0, empT: 0, seenT: 0, tagT: 0, scanT: 0, body: false, found: false, fallT: 0, moving: false,
       badge: chief, quadAw: 0, fleeT: 0, meleeT: 0, burst: 0, lower: 0, aimT: 0, aiming: null, enraged: false, helmet: !!T.helmet, stagger: 0, sync: false,
+      wallHp: T.wall ? WALL.hp : 0, wallPct: T.wall ? 100 : 0,
     };
+    if (type === 'jugg') g.sword = g.id % 2 === 0; // sword brutes: charge the moment they see you
     if (!post || !post.y) g.y = this.fac.groundAt(g.x, g.z, g.y + 0.5, 0.6);
     if (hunt) { g.state = 'search'; g.lkp = { ...hunt }; g.searchT = 18; }
     g.obj = withXray(buildUnit(type, chief));
@@ -681,7 +947,7 @@ export class Sentinel {
       break;
     }
     if (best) {
-      d.aw = Math.min(1.3, d.aw + 0.1 * (best.cloak && !best.cloakFlicker ? 0.5 : best.ghillie ? 0.4 : 1.6));
+      d.aw = Math.min(1.3, d.aw + 0.1 * (best.cloak && !best.cloakFlicker ? 0 : best.ghillie ? 0.4 : 1.6));
       if (d.aw >= 1) {
         if (!d.lock) {
           d.lock = best.role;
@@ -796,6 +1062,16 @@ export class Sentinel {
   // ---- damage --------------------------------------------------------------------
   // `part` is the hit location; a headshot kills anything outright, with any weapon.
   // Returns { killed, absorbed, popped }.
+  // A shot into a bulwark's hard-light shield (host). It holds about two rifle rounds; at zero it
+  // shatters for good.
+  wallDamage(id, dmg) {
+    const g = this.byId(id);
+    if (!g || g.type !== 'bulwark' || g.wallHp <= 0) return;
+    g.wallHp = Math.max(0, g.wallHp - dmg);
+    g.wallPct = (g.wallHp / WALL.hp) * 100;
+    if (g.wallHp <= 0) { g.wallBroke = true; this.emit({ t: 'toast', m: 'Bulwark shield down.', c: 'cyan' }); }
+  }
+
   damage(id, dmg, how, from, part) {
     const e = this.byId(id);
     const out = { killed: false, absorbed: 0, popped: false };
@@ -1066,7 +1342,7 @@ export class Sentinel {
     const range = base * (vis < 0.5 ? 0.55 : 1);
     if (d > range) return 0;
     if (d > 2.5 && ang > cone) return 0;
-    if (a.cloak && !a.cloakFlicker && d > 4 && this.rng() < 0.6) return 0;
+    if (a.cloak && !a.cloakFlicker && d > 2.5) return 0; // a steady cloak breaks line of sight outright
     if (a.ghillie && d > 15) return 0; // ghillie freeze: prone and still, invisible past ~15 m
     if (!this.fac.los(ep, tp)) return 0;
     return vis * (1 - (d / range) * 0.5) * T.rate;
@@ -1218,7 +1494,8 @@ export class Sentinel {
 
   _guardSpeed(g) {
     const s = TYPES[g.type].speed;
-    if (g.state === 'berserk') return 6.8;
+    if (g.lungeT > 0) return 12;
+    if (g.state === 'berserk') return g.sword ? 7.6 : 6.8;
     if (g.state === 'flee') return s[3] * 1.3;
     return g.state === 'alert' ? s[3] : g.state === 'search' ? s[2] : g.state === 'sus' ? s[1] : s[0];
   }
@@ -1271,7 +1548,7 @@ export class Sentinel {
     if (kind === 'beam') p = 0.55 + this.D.guardAcc * 0.4;
     if (tgt.stance === 2) p *= 0.6; else if (tgt.stance === 1) p *= 0.8;
     if (tgt.moving) p *= kind === 'beam' ? 0.7 : 0.8;
-    if (tgt.cloak) p *= 0.35;
+    if (tgt.cloak) p *= tgt.cloakFlicker ? 0.35 : 0.12; // firing at a shimmer
     const base = { bullet: [9, 6], plasma: [7, 4], heavy: [11, 5], beam: [42, 10] }[kind];
     const dmg = Math.round((base[0] + this.rng() * base[1]) * this.D.guardDmg);
     const sc = TYPES[g.type].scale;
@@ -1371,7 +1648,7 @@ export class Sentinel {
     if (T.berserk && g.state === 'alert') {
       const tgt = g.target && agents.find((a) => a.role === g.target);
       const close = tgt && Math.hypot(tgt.pos.x - g.x, tgt.pos.z - g.z) < 11 && g.seenT > 0;
-      if (g.enraged || close || (g.shield <= 0 && g.hp < g.maxHp * 0.7)) {
+      if (g.enraged || close || (g.shield <= 0 && g.hp < g.maxHp * 0.7) || (g.sword && g.seenT > 0)) {
         g.state = 'berserk';
         g.berserkT = 6;
         g.path = null;
@@ -1457,11 +1734,14 @@ export class Sentinel {
         const seen = g.seenT > 0 || d < 6;
         if (seen) { g.lkp = { x: tgt.pos.x, z: tgt.pos.z, y: tgt.pos.y }; g.berserkT = 6; g.target = tgt.role; }
         else g.berserkT -= dt;
+        // Sword brutes close the last few metres with a lunge.
+        g.lungeT = Math.max(0, (g.lungeT || 0) - dt);
+        if (g.sword && d < 5.5 && d > 2.2 && g.lungeT <= 0 && g.meleeT <= 0 && seen) { g.lungeT = 0.4; this.emit({ t: 'bark', k: 'jugg', id: g.id }); }
         if (d > 2.0) this._moveTo(g, g.lkp ? g.lkp.x : tgt.pos.x, g.lkp ? g.lkp.z : tgt.pos.z, dt, this._guardSpeed(g), g.lkp ? g.lkp.y : tgt.pos.y);
         else g.yaw += angDiff(Math.atan2(-(tgt.pos.x - g.x), -(tgt.pos.z - g.z)), g.yaw) * Math.min(1, dt * 10);
-        if (d < 2.5 && g.meleeT <= 0 && Math.abs(tgt.pos.y - g.y) < 1.5 && g.jamT <= 0) {
+        if (d < 2.5 && g.meleeT <= 0 && Math.abs(tgt.pos.y - g.y) < 1.5 && (g.jamT <= 0 || g.sword)) {
           g.meleeT = 1.3;
-          this.emit({ t: 'emelee', id: g.id, role: tgt.role, dmg: Math.round(70 * this.D.guardDmg), a: [g.x, g.y + 1.2, g.z] });
+          this.emit({ t: 'emelee', id: g.id, role: tgt.role, dmg: Math.round((g.sword ? 120 : 70) * this.D.guardDmg), a: [g.x, g.y + 1.2, g.z], sword: g.sword ? 1 : 0 });
         }
         if (g.berserkT <= 0) { g.state = 'search'; g.searchT = 10; g.enraged = false; }
       } else { g.state = 'search'; g.searchT = 8; g.enraged = false; }
@@ -1564,7 +1844,7 @@ export class Sentinel {
       const range = d.state === 'hunt' ? 30 : 22;
       for (const a of agents) {
         const tp = { x: a.pos.x, y: a.pos.y + 1, z: a.pos.z };
-        const r = range * (a.cloak && !a.cloakFlicker ? 0.35 : 1);
+        const r = range * (a.cloak && !a.cloakFlicker ? 0.1 : 1);
         const dd = Math.hypot(tp.x - d.x, tp.y - d.y, tp.z - d.z);
         if (dd > r || !this.fac.los(d, tp)) continue;
         const v = 1 - dd / r;
@@ -1607,7 +1887,8 @@ export class Sentinel {
       if (!a.alive || a.downed) continue;
       const tp = { x: a.pos.x, y: a.pos.y + 1, z: a.pos.z };
       const dx = tp.x - c.x, dz = tp.z - c.z, d = Math.hypot(dx, dz);
-      let r = c.range * (a.cloak && !a.cloakFlicker ? 0.3 : 1);
+      if (a.cloak && !a.cloakFlicker) continue;
+      let r = c.range;
       if (this.fac.lightAt(tp.x, tp.y, tp.z) < 0.35) r *= 0.5;
       if (d > r) continue;
       if (Math.abs(angDiff(Math.atan2(-dx, -dz), c.yaw)) > 0.5) continue;
@@ -1649,8 +1930,8 @@ export class Sentinel {
     const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
     return {
       g: this.guards.map((g) => [g.id, r1(g.x), r1(g.y), r1(g.z), r2(g.yaw + g.look), STATES.indexOf(g.state), r2(clamp(g.aw, 0, 1)),
-        (g.chief ? 1 : 0) | (g.badge ? 2 : 0) | (g.found ? 4 : 0) | (g.moving ? 8 : 0) | (g.tower ? 16 : 0) | (g.lower > 0 ? 32 : 0) | (g.empT > 0 ? 64 : 0) | (g.helmet ? 128 : 0) | (g.radioT > 0 ? 256 : 0) | (g.sync ? 512 : 0) | (g.stagger > 0 ? 1024 : 0) | (g.incap ? 2048 : 0),
-        Math.ceil(g.tagT), Math.ceil(g.scanT), g.rev ? 1 : 0, TYPE_KEYS.indexOf(g.type), g.maxShield ? Math.round((g.shield / g.maxShield) * 100) : 0, g.aiming ? (g.aiming === 'shooter' ? 1 : 2) : 0]),
+        (g.chief ? 1 : 0) | (g.badge ? 2 : 0) | (g.found ? 4 : 0) | (g.moving ? 8 : 0) | (g.tower ? 16 : 0) | (g.lower > 0 ? 32 : 0) | (g.empT > 0 ? 64 : 0) | (g.helmet ? 128 : 0) | (g.radioT > 0 ? 256 : 0) | (g.sync ? 512 : 0) | (g.stagger > 0 ? 1024 : 0) | (g.incap ? 2048 : 0) | (g.sword ? 4096 : 0),
+        Math.ceil(g.tagT), Math.ceil(g.scanT), g.rev ? 1 : 0, TYPE_KEYS.indexOf(g.type), g.maxShield ? Math.round((g.shield / g.maxShield) * 100) : 0, g.aiming ? (g.aiming === 'shooter' ? 1 : 2) : 0, g.type === 'bulwark' ? Math.round(g.wallPct) : 0]),
       d: this.drones.map((d) => [d.id, r1(d.x), r1(d.y), r1(d.z), r2(d.yaw), d.state === 'dead' ? 2 : d.state === 'hunt' ? 1 : 0, r2(clamp(d.aw, 0, 1)), d.empT > 0 ? 1 : 0, Math.ceil(d.tagT), d.rev ? 1 : 0, d.heli ? r1(d.sx) : 0, d.heli ? r1(d.sz) : 0, d.lock ? 1 : 0]),
       c: this.cams.map((c) => [c.id, r2(c.yaw), (c.hacked ? 1 : 0) | (c.loopT > 0 ? 2 : 0) | (c.empT > 0 ? 4 : 0), r2(clamp(c.aw, 0, 1))]),
       al: r2(this.alarm), pk: r2(this.alarmPeak), ld: this.lockdown ? 1 : 0, lkp: this.lkpT > 0 && this.lkp ? [r1(this.lkp.x), r1(this.lkp.z)] : null, sp: Math.ceil(this.spoofT), sc: Math.ceil(this.scanT),
@@ -1662,7 +1943,7 @@ export class Sentinel {
   applySnap(s) {
     const seenG = new Set();
     for (const a of s.g) {
-      const [id, x, y, z, yaw, st, aw, fl, tag, scan, rev, ti, sh, aim] = a;
+      const [id, x, y, z, yaw, st, aw, fl, tag, scan, rev, ti, sh, aim, wp] = a;
       seenG.add(id);
       let g = this.guards.find((q) => q.id === id);
       const type = TYPE_KEYS[ti] || 'guard';
@@ -1676,9 +1957,10 @@ export class Sentinel {
       if (ns === 'dead' && g.state !== 'dead') g.fallT = 0;
       if (g.maxShield && sh < (g.shieldPct ?? 100) - 1) g.hitFx = 1;
       g.shieldPct = sh;
+      if (g.type === 'bulwark' && wp !== undefined) { if ((g.wallPct ?? 100) > 0 && wp <= 0) g.wallBroke = true; g.wallPct = wp; }
       g.shield = (sh / 100) * g.maxShield;
       g.state = ns; g.aw = aw; g.chief = !!(fl & 1); g.badge = !!(fl & 2); g.found = !!(fl & 4); g.moving = !!(fl & 8); g.tower = !!(fl & 16);
-      g.lower = fl & 32 ? 0.5 : 0; g.empT = fl & 64 ? 1 : 0; g.helmet = !!(fl & 128); g.radioT = fl & 256 ? 1 : 0; g.sync = !!(fl & 512); g.stagger = fl & 1024 ? 1 : 0; g.incap = !!(fl & 2048);
+      g.lower = fl & 32 ? 0.5 : 0; g.empT = fl & 64 ? 1 : 0; g.helmet = !!(fl & 128); g.radioT = fl & 256 ? 1 : 0; g.sync = !!(fl & 512); g.stagger = fl & 1024 ? 1 : 0; g.incap = !!(fl & 2048); g.sword = !!(fl & 4096);
       g.tagT = tag; g.scanT = scan; g.rev = !!rev; g.hp = ns === 'dead' ? 0 : 1;
       g.aiming = aim === 1 ? 'shooter' : aim === 2 ? 'spotter' : null;
     }
@@ -1701,8 +1983,48 @@ export class Sentinel {
     this.huntSnap = s.hn || {};
   }
 
+  // A shield breaking: a white flash, then glowing shards that burst outward, tumble and fall.
+  _shatter(wall) {
+    const plane = wall.userData.plane;
+    plane.updateWorldMatrix(true, false);
+    this.shards = this.shards || [];
+    const mat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const flash = new THREE.Mesh(new THREE.PlaneGeometry(WALL.w * 1.2, (WALL.y1 - WALL.y0) * 1.1), mat('#e8fbff', 0.9));
+    flash.applyMatrix4(plane.matrixWorld);
+    this.scene.add(flash);
+    this.shards.push({ m: flash, t: 0, life: 0.25, flash: true });
+    const n = new THREE.Vector3(0, 0, -1).transformDirection(plane.matrixWorld);
+    for (let i = 0; i < 18; i++) {
+      const w = 0.08 + Math.random() * 0.16, h = 0.06 + Math.random() * 0.14;
+      const sh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat(Math.random() < 0.6 ? '#ff5a5a' : '#7fe8ff', 0.85));
+      const lx = (Math.random() - 0.5) * WALL.w, ly = (Math.random() - 0.5) * (WALL.y1 - WALL.y0);
+      sh.position.set(lx, ly, 0).applyMatrix4(plane.matrixWorld);
+      sh.quaternion.setFromRotationMatrix(plane.matrixWorld);
+      const v = n.clone().multiplyScalar(1.5 + Math.random() * 2.5).add(new THREE.Vector3((Math.random() - 0.5) * 3, 1 + Math.random() * 2.5, (Math.random() - 0.5) * 3));
+      this.scene.add(sh);
+      this.shards.push({ m: sh, t: 0, life: 0.9 + Math.random() * 0.5, v, spin: new THREE.Vector3(Math.random() * 12 - 6, Math.random() * 12 - 6, Math.random() * 12 - 6) });
+    }
+  }
+  _shardTick(dt) {
+    if (!this.shards || !this.shards.length) return;
+    for (const s of this.shards) {
+      s.t += dt;
+      const k = s.t / s.life;
+      if (s.flash) { s.m.material.opacity = 0.9 * (1 - k); s.m.scale.setScalar(1 + k * 0.4); }
+      else {
+        s.v.y -= 9 * dt;
+        s.m.position.addScaledVector(s.v, dt);
+        s.m.rotation.x += s.spin.x * dt; s.m.rotation.y += s.spin.y * dt; s.m.rotation.z += s.spin.z * dt;
+        s.m.material.opacity = 0.85 * (1 - k * k);
+      }
+      if (k >= 1) { this.scene.remove(s.m); s.m.geometry.dispose(); s.m.material.dispose(); }
+    }
+    this.shards = this.shards.filter((s) => s.t < s.life);
+  }
+
   // ---- visuals (both sides) ------------------------------------------------------
   draw(dt, camPos) {
+    this._shardTick(dt);
     const k = Math.min(1, dt * 12);
     for (const g of this.guards) {
       if (!this.sim && g.tx !== undefined) {
@@ -1725,11 +2047,14 @@ export class Sentinel {
       }
       if (U.wall) {
         const down = g.lower > 0 || g.empT > 0;
-        U.wall.visible = !dead && !(g.empT > 0 && Math.random() < 0.7);
+        const hpK = (g.wallPct ?? 100) / 100;
+        if (g.wallBroke) { g.wallBroke = false; this._shatter(U.wall); }
+        U.wall.userData.plane.material.uniforms.uHp.value = hpK;
+        U.wall.visible = !dead && hpK > 0 && !(g.empT > 0 && Math.random() < 0.7) && !(hpK < 0.35 && Math.random() < 0.12);
         U.wall.rotation.y += ((down ? 1.2 : 0) - U.wall.rotation.y) * Math.min(1, dt * 10);
         U.wall.userData.plane.material.uniforms.uT.value = this.t;
       }
-      if (U.blade) U.blade.visible = g.state === 'berserk';
+      if (U.blade) U.blade.visible = !dead && (g.state === 'berserk' || !!g.sword);
       if (U.helmet) U.helmet.visible = !!g.helmet;
       if (dead) {
         g.fallT = Math.min(1, (g.fallT || 0) + dt * 2.2);
@@ -1844,7 +2169,7 @@ export function guardCapsules(g) {
 // Where the segment a→b meets a bulwark's raised wall (outside its sight-port), as a fraction
 // along the segment, or null when the shot gets past (port, flank, lowered wall, EMP).
 export function wallBlock(g, a, b) {
-  if (g.type !== 'bulwark' || g.state === 'dead' || g.lower > 0 || g.empT > 0) return null;
+  if (g.type !== 'bulwark' || g.state === 'dead' || g.lower > 0 || g.empT > 0 || (g.wallPct ?? 100) <= 0) return null;
   const s = TYPES.bulwark.scale;
   const yaw = g.yaw + (g.look || 0);
   const cs = Math.cos(yaw), sn = Math.sin(yaw);

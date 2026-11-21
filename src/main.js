@@ -239,7 +239,22 @@ $('in-sens').oninput = (e) => {
 $('in-invert').onchange = (e) => store.set('invert', (settings.invertY = e.target.checked));
 $('in-toggle').onchange = (e) => store.set('toggle', (settings.scopeToggle = e.target.checked));
 
+// NightWatch screens (and loading into it) say INFILTRATION and carry the op's own line;
+// everything else is the TACTICAL DUEL.
+let loadingCell = false;
+const CELL_PANELS = new Set(['panel-cell', 'panel-staging']);
+function setModeHeader(cell) {
+  $('kicker-mode').textContent = cell ? '// INFILTRATION' : '// TACTICAL DUEL';
+  // NightWatch selected: SNIPER CELL: NIGHTWATCH (night cyan, watch red).
+  if (cell && !polloOn()) { $('title').innerHTML = 'SNIPER<br />CELL:<span class="nw-title"><span class="t-c">NIGHT</span><span class="t-r">WATCH</span></span>'; document.title = 'Sniper Cell: NightWatch'; }
+  else updateTitle();
+  const tl = $('tagline');
+  if (cell) { if (!tl.dataset.duel) tl.dataset.duel = tl.textContent; tl.textContent = 'Night op at the Kestrel Ridge data center: break in, upload the malware, pull the archive drive, and get it out.'; tl.classList.add('cell-tag'); }
+  else if (tl.dataset.duel) { tl.textContent = tl.dataset.duel; delete tl.dataset.duel; tl.classList.remove('cell-tag'); }
+}
 function showPanel(id) {
+  if (id !== 'panel-loading') loadingCell = false;
+  setModeHeader(CELL_PANELS.has(id) || (id === 'panel-loading' && loadingCell) || (id === 'panel-host' && $('panel-cell').classList.contains('hosting')));
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
   document.querySelector('.menu-card').classList.toggle('cell-open', id === 'panel-cell');
   document.querySelector('.menu-card').classList.toggle('stage-open', id === 'panel-staging');
@@ -252,6 +267,7 @@ let cellMapMod = null, cellMapRaf = 0, cellMapHit = null;
 async function cellBrief() {
   cellMapMod = cellMapMod || (await import('./cell/menumap.js'));
   const { DROPS } = await import('./cell/facility.js');
+  if (!DROPS[cellSet.insert]) { cellSet.insert = 'draw'; store.set('cellInsert', 'draw'); }
   const box = $('cell-drops');
   const paint = () => {
     box.innerHTML = Object.entries(DROPS).map(([k, D]) => `<button data-drop="${k}" class="${cellSet.insert === k ? 'on' : ''}"><b>${D.name}${k === 'draw' ? ' \u00B7 DEFAULT' : ''}</b><span>${D.desc}</span></button>`).join('') + '<p class="note">Tap a drop point on the map or here. Hosting: your pick applies to both of you.</p>';
@@ -278,14 +294,9 @@ let stageRole = null;
 async function stagePreview(role) {
   const { cellLook } = await import('./cell/arms.js');
   stageRole = role || stageRole || cellSet.role;
-  const DESC = {
-    shooter: 'SHOOTER \u00B7 KR-50 Nightjar, active camo, FDE chest rig, urban-digital poncho, covert earpiece, NVGs.',
-    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier and headset, ball cap, NVGs, recon drone on the pack.',
-  };
   document.querySelectorAll('#stage-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.r === stageRole));
   $('stage-who').textContent = `${stageRole.toUpperCase()} \u00B7 ${cellName(stageRole)}`;
-  $('stage-desc').textContent = DESC[stageRole];
-  showPreview($('stage-prev'), cellLook(stageRole), stageRole === 'spotter');
+  showPreview($('stage-prev'), cellLook(stageRole), stageRole === 'spotter', true);
 }
 document.querySelectorAll('#stage-tabs button').forEach((b) => (b.onclick = () => stagePreview(b.dataset.r)));
 document.querySelectorAll('.back').forEach((b) => (b.onclick = () => {
@@ -677,6 +688,9 @@ function primeTalk() { try { const u = new SpeechSynthesisUtterance(' '); u.volu
 const CELL_CALL = { shooter: 'Ra', spotter: 'R\u014dnin' };
 // Staging-area loadouts (both roles), applied at mission start.
 let cellLoadout = store.get('cellLoadout', null);
+// Fast camo became the sniper's default perk: move the old default (lures) over once.
+if (cellLoadout && cellLoadout.shooter && cellLoadout.shooter.perk === 'lures' && !store.get('cellPerkCamo', false)) { cellLoadout.shooter.perk = 'camo'; store.set('cellLoadout', cellLoadout); }
+store.set('cellPerkCamo', true);
 async function renderStaging() {
   const { normLoadout, PERKS } = await import('./cell/arms.js');
   const L = (cellLoadout = normLoadout(cellLoadout));
@@ -684,16 +698,15 @@ async function renderStaging() {
   const perks = (r) => Object.entries(PERKS[r]).map(([v, p]) => opt(r + '.perk', v, p.name, L[r].perk === v, p.desc)).join('');
   const prim = (name, desc) => `<div class="stg-prim"><b>${name}</b><small>${desc}</small></div>`;
   $('panel-staging').querySelector('.stg').innerHTML = `
-    <div class="stg-col" data-r="shooter"><h3>SHOOTER \u00B7 ${CELL_CALL.shooter}</h3><p>Multicam black, FDE chest rig, urban-digital poncho, covert earpiece. Active camo, lock-pick set, weapon light, laser.</p>
+    <div class="stg-col" data-r="shooter"><h3>SHOOTER \u00B7 ${CELL_CALL.shooter}</h3>
       <div class="stg-k">PRIMARY</div>${prim('KR-50 NIGHTJAR', '.50 subsonic bolt gun, integral suppressor, 2\u00D7/8\u00D7 night scope. Through bodies and thin walls; special magazines (Z): explosive, penetrator, EMP. Kicks hard; wide from the hip.')}
       <div class="stg-k">KR-50 BOLT</div><div class="stg-opts">${opt('shooter.bolt', 'standard', 'STANDARD', L.shooter.bolt !== 'straight', 'Tap fire: off the glass to work the bolt. Hold fire to stay scoped.')}${opt('shooter.bolt', 'straight', 'STRAIGHT-PULL', L.shooter.bolt === 'straight', 'Cycles while you stay on target. A little more climb.')}</div>
       <div class="stg-k">SECONDARY</div><div class="stg-opts">${opt('shooter.secondary', 'smg', 'K9 HUSH SMG', L.shooter.secondary === 'smg', '40 rounds, full / burst / semi (B). Quiet, light kick.')}${opt('shooter.secondary', 'mag50', 'M50 MAGNUM', L.shooter.secondary === 'mag50', '7 rounds, slow and heavy. Big kick, wide from the hip: aim down sights.')}</div>
-      <div class="stg-k">SECONDARY SUPPRESSOR</div><div class="stg-opts">${opt('shooter.secSup', '1', 'FITTED', L.shooter.secSup, 'Quiet. Hold B in game to twist it off.')}${opt('shooter.secSup', '0', 'OFF', !L.shooter.secSup, 'Loud: every shot carries 70 m.')}</div>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('shooter')}</div></div>
-    <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3><p>Multicam black, FDE plate carrier, ball cap, FDE headset. CYBER OPS tablet, recon drone, ISR, keycard duty.</p>
-      <div class="stg-k">PRIMARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, two magazines. Suppressor fitted by default.')}
-      <div class="stg-k">SECOND</div>${prim('THERMAL BINOCULARS', 'X to swap from the P-9; raise them to mark every enemy in the viewfinder at any range.')}
-      <div class="stg-k">P-9 SUPPRESSOR</div><div class="stg-opts">${opt('spotter.pistolSup', '1', 'FITTED', L.spotter.pistolSup, 'Quiet up close.')}${opt('spotter.pistolSup', '0', 'OFF', !L.spotter.pistolSup, 'Loud: every shot carries 70 m.')}</div>
+    <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3>
+      <div class="stg-k">PRIMARY</div><div class="stg-opts">${opt('spotter.primary', 'bino', 'THERMAL BINOCULARS', L.spotter.primary !== 'smg', 'Raise them to mark every enemy in the viewfinder at any range.')}${opt('spotter.primary', 'smg', 'K9 HUSH SMG', L.spotter.primary === 'smg', '40 rounds, full / burst / semi. Binoculars stay on X.')}</div>
+      <div class="stg-k">SECONDARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, three magazines.')}
+      <p class="stg-note">Every weapon starts suppressed; take the suppressor off in game (B).</p>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('spotter')}</div></div>`;
 }
 $('panel-staging').addEventListener('click', (e) => {
@@ -705,7 +718,7 @@ $('panel-staging').addEventListener('click', (e) => {
   renderStaging();
 });
 const cellSet = { role: store.get('cellRole', 'shooter'), diff: store.get('cellDiff', 'operative'), names: store.get('cellNames', {}), mission: store.get('cellMission', 'nightwatch'), insert: store.get('cellInsert', 'draw'), layout: store.get('cellLayout', 'standard') };
-const MISSION_DESC = { nightwatch: 'Sentinel: SENTINEL\u2019s augmented night garrison \u2014 cowardly officers, shielded juggernauts with energy blades, bulwarks behind hard-light walls, beam-rifle snipers on the towers.', infiltration: 'Infiltration: the original op against a crew of human security guards.' };
+const MISSION_DESC = { nightwatch: 'Sentinel: SENTINEL\u2019s augmented night garrison \u2014 cowardly officers, shielded juggernauts with energy blades, bulwarks behind hard-light walls, beam-rifle snipers on the towers.', infiltration: 'Spec Ops: the original op against a crew of human security guards.' };
 const cellName = (role) => ((cellSet.names[role] || '').trim() || CELL_CALL[role]).replace(/[<>&"]/g, '').slice(0, 16);
 function syncCell() {
   document.querySelectorAll('#panel-cell .cell-role').forEach((b) => b.classList.toggle('on', b.dataset.role === cellSet.role));
@@ -738,6 +751,7 @@ $('btn-cell').onclick = () => { $('panel-cell').classList.remove('hosting'); syn
 syncCell();
 
 async function startCell(mode, opts = {}) {
+  loadingCell = true;
   if (game || director) return;
   showPanel('panel-loading');
   $('loading-text').textContent = 'Inserting at Kestrel Ridge\u2026';
@@ -747,7 +761,7 @@ async function startCell(mode, opts = {}) {
   const c = opts.cell || { role: cellSet.role, diff: cellSet.diff, mission: cellSet.mission, insert: cellSet.insert, layout: cellSet.layout, seed: (Math.random() * 1e6) | 0 };
   // The guest plays whichever role the host didn't take.
   const role = mode === 'operative' ? 'shooter' : mode === 'guest' ? (c.role === 'shooter' ? 'spotter' : 'shooter') : c.role;
-  game = new CellGame({ mode, net: opts.net || null, role, diff: c.diff, seed: c.seed, mission: c.mission || 'nightwatch', insert: ['ridge', 'west', 'east', 'roof'].includes(c.insert) ? c.insert : 'draw', layout: c.layout === 'random' ? 'random' : 'standard', look: c.look === 'og' || c.look === 'inked' ? c.look : settings.rules.look, quality, settings: { ...settings, cellLoadout }, audio, name: cellName(role), partnerName: opts.partnerName || CELL_CALL[role === 'shooter' ? 'spotter' : 'shooter'] });
+  game = new CellGame({ mode, net: opts.net || null, role, diff: c.diff, seed: c.seed, mission: c.mission || 'nightwatch', insert: ['north', 'west', 'east', 'roof'].includes(c.insert) ? c.insert : 'draw', layout: c.layout === 'random' ? 'random' : 'standard', look: c.look === 'og' || c.look === 'inked' ? c.look : settings.rules.look, quality, settings: { ...settings, cellLoadout }, audio, name: cellName(role), partnerName: opts.partnerName || CELL_CALL[role === 'shooter' ? 'spotter' : 'shooter'] });
   if (opts.hello) game.hello = opts.hello;
   window.__game = game;
   document.body.classList.toggle('touch', game.input.touch);

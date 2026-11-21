@@ -9,9 +9,9 @@ import * as THREE from 'three';
 export const XR = { mag: 4, start: 4, max: 8, fuse: 1.0, radius: 5.5, direct: 950, splash: 420, noise: 48, swap: 2.6 };
 // Magazine types for the KR-50 (Z opens the rounds menu on the left of the screen).
 export const AMMO = [
-  { k: 'std', name: 'STANDARD', desc: 'Subsonic .50. Goes through bodies and thin interior walls.' },
+  { k: 'std', name: 'STANDARD', desc: 'Subsonic .50. Goes straight through bodies: line them up.' },
   { k: 'xr', name: 'EXPLOSIVE', desc: 'Sticks where it hits, blows a second later. Kills heavies. Loud.' },
-  { k: 'pen', name: 'PENETRATOR', desc: 'Tungsten core: through exterior walls and bulwark shields.' },
+  { k: 'pen', name: 'PENETRATOR', desc: 'Tungsten core: through walls and doors, exterior walls and bulwark shields too.' },
   { k: 'emp', name: 'EMP', desc: 'Kills drones, cameras, lights, shields and radios around the hit.' },
 ];
 export const AMMO_NAME = Object.fromEntries(AMMO.map((a) => [a.k, a.name]));

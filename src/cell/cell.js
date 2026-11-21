@@ -44,12 +44,13 @@ import { installSpatial } from './spatial.js';
 import { installPhone } from './phone.js';
 import { installXRounds, XR, AMMO_NAME } from './xrounds.js';
 import { installAbilities } from './abilities.js';
+import { installMelee } from './melee.js';
 import { installDevices } from './devices.js';
 import { wallBlock } from './sentinel.js';
 import { Cinema } from './cinema.js';
 import { Radio, setVoiceSetting } from './voice.js';
 import { Minigame } from './minigame.js';
-import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildKnife, normLoadout, cellLook } from './arms.js';
+import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildP9, buildKnife, normLoadout, cellLook } from './arms.js';
 import { ISR, ISR_FOV } from './isr.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
 import { AtmosFX } from '../atmofx.js';
@@ -204,7 +205,7 @@ function cloakMaterial() {
 
 // The beefy suppressed bolt gun for the first-person view. Same anchor contract as the
 // valley's rifles (gripR / gripL / muzzle / bolt / boltKnob / mag / sight).
-function buildKR50() {
+export function buildKR50() {
   const g = new THREE.Group();
   const mat = (hex) => new THREE.MeshLambertMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.14 });
   const M = { body: mat('#2a2d31'), dark: mat('#17181b'), hi: mat('#3a3e44'), olive: mat('#3b3f36'), glow: new THREE.MeshBasicMaterial({ color: '#40ffb0' }) };
@@ -221,8 +222,8 @@ function buildKR50() {
   cyl(0.044, 0.044, 0.02, M.hi, 0, 0.0, -0.94, 16);
   cyl(0.044, 0.044, 0.02, M.hi, 0, 0.0, -1.3, 16);
   // Grip, trigger guard, mag well, thumbhole stock.
-  const grip = box(0.04, 0.12, 0.055, M.olive, 0, -0.08, 0.02);
-  grip.rotation.x = 0.3;
+  const grip = box(0.04, 0.12, 0.055, M.olive, 0, -0.08, 0.035);
+  grip.rotation.x = -0.3; // raked back like a real pistol grip
   box(0.01, 0.01, 0.08, M.dark, 0, -0.045, -0.04);
   const magG = new THREE.Group();
   const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.11, 0.1), M.dark);
@@ -255,6 +256,24 @@ function buildKR50() {
   const lens = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), new THREE.MeshBasicMaterial({ color: '#07160e' }));
   lens.position.set(0, sy, 0.062);
   g.add(lens);
+  // Refinements: a toothed top rail, scope rings and turrets, an adjustable cheek riser, a
+  // rubber recoil pad, a textured grip and magazine, a folded bipod and sling points.
+  for (let i = 0; i < 16; i++) box(0.05, 0.007, 0.012, M.dark, 0, 0.079, 0.06 - i * 0.026);
+  for (const z of [-0.08, -0.28]) { const r = cyl(0.03, 0.03, 0.022, M.hi, 0, sy, z, 14); void r; }
+  const tur = (x, y, z, rot) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.03, 14), M.hi); t.position.set(x, y, z); if (rot) t.rotation.z = Math.PI / 2; g.add(t); const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.006, 14), M.dark); cap.position.copy(t.position); if (rot) { cap.rotation.z = Math.PI / 2; cap.position.x += 0.016; } else cap.position.y += 0.016; g.add(cap); };
+  tur(0, sy + 0.035, -0.19, false);
+  tur(0.035, sy, -0.19, true);
+  box(0.054, 0.018, 0.1, M.dark, 0, 0.095, 0.17);
+  const ck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 10).rotateZ(Math.PI / 2), M.hi); ck.position.set(0.034, 0.07, 0.17); g.add(ck);
+  box(0.064, 0.16, 0.02, mat('#101113'), 0, -0.03, 0.39);
+  for (let i = 0; i < 4; i++) box(0.066, 0.004, 0.022, M.dark, 0, -0.09 + i * 0.04, 0.39);
+  for (let i = 0; i < 4; i++) { const t = box(0.042, 0.005, 0.05, M.dark, 0, -0.055 - i * 0.022, 0.035 + i * 0.0066); t.rotation.x = -0.3; }
+  const magPart = (w, h, d, y) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M.hi); o.position.y = y; magG.add(o); };
+  for (let i = 0; i < 3; i++) magPart(0.052, 0.005, 0.102, -0.02 - i * 0.03);
+  magPart(0.056, 0.014, 0.108, -0.108);
+  for (const sx of [-1, 1]) { const leg = box(0.014, 0.014, 0.22, M.dark, sx * 0.02, -0.05, -0.62); void leg; }
+  box(0.05, 0.02, 0.03, M.hi, 0, -0.04, -0.5);
+  for (const z of [-0.78, 0.3]) { const sw = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), M.hi); sw.position.set(0, -0.045, z); sw.rotation.y = Math.PI / 2; g.add(sw); }
   const anchor = (x, y, z) => { const a = new THREE.Object3D(); a.position.set(x, y, z); g.add(a); return a; };
   g.userData = {
     gripR: anchor(0, -0.09, 0.03), gripL: anchor(-0.005, -0.04, -0.5), muzzle: anchor(0, 0, -1.33),
@@ -400,6 +419,7 @@ export class CellGame {
     this._xrInit();
     this._abInit();
     this._devInit();
+    this._wpnInit();
     this.laserOn = true;
     this._setupPartner();
     this.ops = this.role === 'spotter' ? new Ops(this) : this.solo ? new Ops(this) : null;
@@ -433,7 +453,7 @@ export class CellGame {
     addEventListener('resize', () => this._resize());
     this.clock = new THREE.Clock();
     this.comms(this.operative ? 'Lone operative: rifle, camo and the CYBER OPS tablet are all yours (TAB).' : this.role === 'shooter' ? 'Ra in position. Kestrel Ridge below \u2014 lights in the yard, towers manned.' : 'R\u014dnin on the wire. CYBER OPS console synced (TAB).', ROLES[this.role].color, this.name);
-    this.comms(this.operative ? 'Hold V for the ping wheel; payloads run straight from your tablet.' : this.aiPartner ? (this.role === 'shooter' ? 'R\u014dnin (AI) runs the console. Hold V for pings and requests.' : 'Ra (AI) holds the cliff. Tag targets (F) or ping TAKE SHOT and Ra fires.') : `${this.partnerName} is the ${ROLES[this.partnerRole].name.toLowerCase()}. Hold V for pings and requests.`, 'dim');
+    this.comms(this.operative ? 'Q to ping and mark (hold for the wheel); payloads run straight from your tablet.' : this.aiPartner ? (this.role === 'shooter' ? 'R\u014dnin (AI) runs the console. Q to ping and mark; hold Q for pings and requests.' : 'Ra (AI) holds a perch. Mark targets (Q) and Ra fires.') : `${this.partnerName} is the ${ROLES[this.partnerRole].name.toLowerCase()}. Q to ping and mark; hold Q for pings and requests.`, 'dim');
     if (this.mission === 'nightwatch') this.comms('Officers spook when they\u2019re alone. Juggernauts\u2019 shells break \u2014 then they charge. Bulwarks: shoot the port in the wall.', 'dim');
     // The night soundscape (wind, insects, distant sounds; air handling indoors). No hum.
     this.ambient = new Ambience(this.audio);
@@ -523,6 +543,7 @@ export class CellGame {
     // you stay on target.
     P.autoCycle = true;
     P.straightPull = this.loadout.shooter.bolt === 'straight';
+    P.keepReload = true; // running doesn't break a reload (firing breaks a sprint instead)
     P.hp = this.D.hp;
     this.hp = this.D.hp;
     this.maxHp = this.D.hp;
@@ -531,12 +552,23 @@ export class CellGame {
     this.bleed = BLEED;
     this.cloak = { on: false, bat: 100, flick: 0, regenT: 0 };
     this.nv = false;
+    this.scopeNV = true;
     this.viewmodel = new ViewModel(this.camera);
-    for (const [key, model] of [['kr50', buildKR50()], ['smg', buildSMG()], ['mag50', buildMagnum()]]) {
+    // The P-9 replaces the valley's sidearm model (same key, so everything else follows it).
+    this.viewmodel.holder.remove(this.viewmodel.models.m18);
+    for (const [key, model] of [['kr50', buildKR50()], ['smg', buildSMG()], ['mag50', buildMagnum()], ['m18', buildP9()]]) {
       model.visible = false;
       this.viewmodel.models[key] = model;
       this.viewmodel.holder.add(model);
     }
+    // Deadeye: a second KR-50, held low across the body in the left hand while the M50 works.
+    this.deRifle = buildKR50();
+    this.deRifle.scale.setScalar(0.82);
+    this.deRifle.position.set(-0.13, -0.2, -0.38);
+    this.deRifle.rotation.set(-0.48, 0.32, 0.25);
+    this.deRifle.visible = false;
+    this.deRifle.traverse((o) => { o.renderOrder = 10; o.frustumCulled = false; });
+    this.camera.add(this.deRifle);
     // Knife for takedowns (camera space).
     this.knife = buildKnife();
     this.knife.visible = false;
@@ -552,7 +584,7 @@ export class CellGame {
     // Suppressor on the P-9 (toggle with B).
     const can = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.13, 12).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#1a1b1e', emissive: '#1a1b1e', emissiveIntensity: 0.14 }));
     const pm = this.viewmodel.models.m18;
-    can.position.set(0, 0.022, -0.225);
+    can.position.set(0, 0.026, -0.235);
     pm.add(can);
     this.pistolCan = can;
     // A knurled ring and a witness mark on each can so you can see it turn.
@@ -577,8 +609,12 @@ export class CellGame {
     const extra = this.role === 'shooter' && L.shooter.perk === 'mags' ? 2 : 0;
     P._spare = (d) => P._baseSpare(d) + extra;
     const mk = (d, sup) => ({ def: d, mag: d.mag, chamber: 1, reserve: d.mag * P._spare(d), zoomIdx: 0, zero: d.fixedZero || 100, sup, mode: d.modes ? d.modes[0] : null });
-    P.arms = this.role === 'shooter' ? [mk(KR50, true), mk(L.shooter.secondary === 'mag50' ? MAGNUM : SMG, L.shooter.secSup)] : [mk(P9, L.spotter.pistolSup)];
+    // Everything starts suppressed (B takes it off in game). The spotter's primary is the
+    // binoculars (default) or the K9 SMG; the P-9 is their secondary.
+    const spotSmg = this.role === 'spotter' && L.spotter.primary === 'smg';
+    P.arms = this.role === 'shooter' ? [mk(KR50, true), mk(L.shooter.secondary === 'mag50' ? MAGNUM : SMG, true)] : spotSmg ? [mk(SMG, true), mk(P9, true)] : [mk(P9, true)];
     P.slot = 0;
+    if (this.role === 'spotter' && !spotSmg && this.bino) this.bino.on = true; // binoculars in hand to start
   }
 
   _look(role) {
@@ -738,7 +774,7 @@ export class CellGame {
       case 'radio': this._voice(m.who, m.text); break;
       case 'emelee': this._onMelee(m.ev); break;
       case 'nearmiss': if (this.isHost) this.sentinel.nearMiss(m.at, m.from); break;
-      case 'block': if (this.isHost) { const g = this.sentinel.byId(m.id); if (g) { this.sentinel._alert(g, null, m.from); this.sentinel.emit({ t: 'fx', k: 'shield', id: m.id }); } } break;
+      case 'block': if (this.isHost) { const g = this.sentinel.byId(m.id); if (g) { this.sentinel._alert(g, null, m.from); this.sentinel.emit({ t: 'fx', k: 'shield', id: m.id }); if (m.dmg) this.sentinel.wallDamage(m.id, m.dmg); } } break;
     }
   }
 
@@ -818,6 +854,12 @@ export class CellGame {
       // ISR ping sweep: a circle on the ground; everything inside, flesh or machine, gets marked.
       case 'qmark': this._neuroMark(target.ids || [], !!target.auto); break;
       case 'pdrone': { const d = S.byId(target.id); if (d && d.state !== 'dead') { d.empT = 8; this._toast('Drone shorted out for 8 s.', 'cyan'); } break; }
+      case 'pcrash': {
+        // Hacked out of the sky: rotors cut, it drops (a spotlight heli's wreck makes a crash).
+        const d = S.byId(target.id);
+        if (d && d.state !== 'dead') { d.state = 'dead'; d.hp = 0; d.fallV = 0; d.lock = null; S.emit({ t: 'kill', id: d.id, how: 'hack', drone: true }); this._toast(d.heli ? 'Spotlight drone hacked: it\u2019s coming down.' : 'Drone hacked out of the sky.', 'cyan'); }
+        break;
+      }
       case 'blind': { const e = S.byId(target.id); if (e && e.state !== 'dead') { e.blindT = 6; e.aw = 0; if (e.state === 'alert' || e.state === 'berserk') { e.state = 'search'; e.searchT = 6; e.target = null; } this._toast('Optics rebooted: he\u2019s blind for 6 s.', 'cyan'); } break; }
       case 'plight': this.fac.lightsOff((L) => L.id === target.id, 20); this._toast('Light cut for 20 s.', 'dim'); break;
       case 'isrsweep': {
@@ -830,6 +872,7 @@ export class CellGame {
         break;
       }
       case 'jam': S.jams.push({ x: target.x, z: target.z, r: PAYLOAD.jam.r, t: 5 }); this._toast('Earpieces jammed for 5 s.', 'cyan'); break;
+      case 'melee': this._meleeHit(target, by); break;
       case 'emp':
         {
           const room = this._roomFor(target);
@@ -1082,7 +1125,7 @@ export class CellGame {
         this._tabT = 0;
         if (I.pressed('cell-tab')) cycle();
       }
-      if (I.pressed('cell-hack')) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
+      if (I.pressed('cell-hack') || (I.pressed('KeyH') && !this.operative)) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
     } else if (I.pressed('Tab') || I.pressed('cell-tab')) {
       // Shooter: TAB raises the map tablet; in the ISR view it flips back to the tablet.
       if (this.isr.active) { this.isr.exit(); this.tablet.open(); }
@@ -1090,7 +1133,12 @@ export class CellGame {
       else this._raise('tablet', () => this.tablet.open());
     }
     if ((I.pressed('KeyL') || I.pressed('cell-light')) && !tab) this._wlToggle();
-    if (I.pressed('KeyN') || I.pressed('cell-nv')) this._nvgToggle();
+    // N: on the KR-50's scope it flips the optic between night vision and plain glass;
+    // otherwise it's the goggles.
+    if (I.pressed('KeyN') || I.pressed('cell-nv')) {
+      if (P.def.scope && P.scopeT > 0.6) { this.scopeNV = !this.scopeNV; this.audio.click(); this.hud.flash(this.scopeNV ? 'SCOPE: NIGHT VISION' : 'SCOPE: PLAIN', 'dim', 0.7); }
+      else this._nvgToggle();
+    }
     // Objective board: O shows / hides it, P expands / compacts it (P is the sweep in the ISR view).
     if (I.pressed('KeyO')) this.hud.objToggle();
     if (I.pressed('KeyP') && !this.isr.active) this.hud.objExpand();
@@ -1110,7 +1158,8 @@ export class CellGame {
     {
       const canQ = this.role === 'spotter' || this.operative;
       const qa = this.operative ? 'cell-quad' : 'cell-ability';
-      const qHeld = canQ && (I.held('KeyQ') || I.held('T:' + qa)) && !tab;
+      // Desktop: G (a lone operative: Y) — Q is ping and marking.
+      const qHeld = canQ && (I.held(this.operative ? 'KeyY' : 'KeyG') || I.held('T:' + qa)) && !tab;
       if (qHeld) {
         this._qT = (this._qT || 0) + dt;
         if (this._qT > 0.45 && !this._qDone && this._quadOut()) { this._qDone = true; this._recallQuad(); }
@@ -1129,7 +1178,8 @@ export class CellGame {
     // F: tap = tag what's under the crosshair; hold on an enemy (or SYNC) = mark it as your
     // teammate's sync target.
     {
-      const fHeld = (I.held('KeyF') || I.held('T:cell-tag')) && !tab && !this.downed;
+      // (Tagging lives on Q / PING now: F is just the sync mark, tap or hold.)
+      const fHeld = I.held('KeyF') && !tab && !this.downed;
       const mark = () => { const e = this._crosshairEnemy(); if (e && e.kind === 'g') this._syncMark(e); else this.hud.flash('SYNC: look at an enemy', 'red'); };
       if (I.pressed('cell-sync') && !quad && !tab && !this.downed) mark();
       if (fHeld) {
@@ -1139,7 +1189,8 @@ export class CellGame {
           mark();
         }
       } else {
-        if (this._fT > 0 && !this._fDone) this._tagAtCrosshair();
+        if (this._fT > 0 && !this._fDone && !quad) mark();
+        else if (this._fT > 0 && !this._fDone && quad) this._tagAtCrosshair();
         this._fT = 0; this._fDone = false;
       }
     }
@@ -1153,12 +1204,14 @@ export class CellGame {
     if (this.quad && this.quad.parked && this.quad.auto && !this.quad.recall) this._quadAuto(dt);
     if (this.quad && this.quad.parked) { this.quad.bat -= dt * 0.25; if (this.quad.bat <= 0) { this.comms('Drone battery dead \u2014 it\u2019s coming home.', 'cyan', this.name); this._endQuad(); } }
 
-    // Cloak battery (Cold Archive: drain 14/s, regen 7 × camo/s).
+    // Cloak battery (PlanetSide-style): moving drains it (sprinting faster); holding still
+    // while cloaked trickles it back in; switched off it recharges at the full rate.
     const C = this.cloak;
     C.flick = Math.max(0, C.flick - dt);
     C.lockT = Math.max(0, (C.lockT || 0) - dt);
     if (C.on) {
-      C.bat -= (P.moving ? 14 : 9) * dt;
+      if (P.moving) C.bat -= (P.sprinting ? 20 : 12) * dt;
+      else C.bat = Math.min(100, C.bat + 2.5 * this.D.camo * dt);
       if (C.bat <= 0) { C.bat = 0; C.on = false; this.hud.flash('CAMO DEPLETED', 'red'); this.audio.click(); }
       C.regenT = 2;
     } else {
@@ -1182,6 +1235,8 @@ export class CellGame {
     // Spotter's binoculars: X (or BINO) to swap from the P-9; scope raises them.
     if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino')) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
+    if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
+    this._wpnInput(dt, I, act, live && !tab && !quad && !isr && !this.mini.open);
     const seat = this._seat();
     if (!live || tab || quad) {
       act.fire = false; act.fireHeld = false; act.scope = false; act.reload = act.reload && live && !quad;
@@ -1207,6 +1262,9 @@ export class CellGame {
     P.noSprint = !!this.obj.drive && this.obj.drive === this.role;
     P.speedMul = (tab ? 0.55 : 1) * (this.obj.drag && this.obj.drag[this.role] ? 0.5 : 1);
     if (this.downed) { P.stance = 2; }
+    // Pulling the trigger while running drops you out of the sprint (and the shot goes).
+    if ((act.fire || act.fireHeld) && live && !quad && !tab && (P.sprinting || act.sprint)) this._noSprintT = 0.4;
+    if (this._noSprintT > 0) { this._noSprintT -= dt; act.sprint = false; }
     P.update(dt, act, this.fac, { canMove: live && !quad && !seat });
     if (seat) { const w = this._seatWorld(seat); P.pos.set(w.x, w.y - P.eye + 0.62, w.z); P.vel.set(0, 0, 0); P.stance = 0; this._wasSeated = seat; }
     else if (this._wasSeated) { const d = this._doorWorld(this._wasSeated); P.pos.set(d.x, this.fac.groundAt(d.x, d.z, 5, 0.5), d.z); this._wasSeated = null; }
@@ -1217,6 +1275,7 @@ export class CellGame {
     // Fire. (A green sync pulls the trigger for you.)
     if (this._autoFire) { this._autoFire = false; if (live && !quad && !seat) { act.fire = true; this._syncShotId = this.syncAim; } }
     if (this.supAnim) { act.fire = false; act.fireHeld = false; }
+    if (this._deadeyeStep(dt, act, live && !quad && !tab)) { act.fire = false; act.fireHeld = false; }
     const mode = P.w.mode;
     if (act.fire && live && P.w.chamber === 0 && P.w.mag === 0) { this.audio.click(); if (P.w.reserve > 0) P.startReload(); }
     else if (live && mode === 'full') { if (act.fireHeld || act.fire) { if (P.canFire()) this._fire(); } }
@@ -1263,7 +1322,8 @@ export class CellGame {
     this.camera.updateProjectionMatrix();
     // First-person weapon.
     const scopedRifle = P.def.scope && P.scopeT > 0.6;
-    this.viewmodel.visible = live && !scopedRifle && !quad && !tab && !seat && !isr && !(this.knifeT > 0) && !this.devAnim && !(this.bino && this.bino.on);
+    this.viewmodelVisible = live && !quad && !tab && !seat && !isr && !this.devAnim;
+    this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !(this.bino && this.bino.on) && !this.knifeEq;
     // Suppressor cans (mid-gesture the can shows while it's in your hand).
     const supU = this._supTick(dt), SA = this.supAnim;
     const canShow = (w) => (SA && SA.w === w ? (SA.to ? supU > 0.18 : supU < 0.82) : !!w.sup);
@@ -1271,11 +1331,16 @@ export class CellGame {
     for (const w of P.arms) { const c = canOf(w); if (c) c.visible = canShow(w); }
     this.carry.visible = this.obj.drive === this.role && live && !quad && !isr;
     this._knifeTick(dt);
+    this._wpnTick();
+    // Deadeye: the M50 in the right hand, the KR-50 lowered in the left.
+    const DE = this.deSeq;
+    if (this.deRifle) this.deRifle.visible = !!DE && this.viewmodel.root.visible;
     this.viewmodel.update(dt, {
-      def: P.def, scopeT: P.scopeT, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
-      reloadT: P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
-      empty: P.w.chamber === 0 && P.def.kind === 'semi', boltPending: false,
+      def: DE ? MAGNUM : P.def, scopeT: DE ? 0.35 : P.scopeT, leftHand: DE ? new THREE.Vector3(-0.13, -0.24, -0.42) : null, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
+      reloadT: DE ? 0 : P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: DE ? DE.switchT : P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
+      empty: !DE && P.w.chamber === 0 && P.def.kind === 'semi', boltPending: false,
       supU: SA ? supU : 0, supTo: SA ? SA.to : false, supCan: SA ? canOf(SA.w) : null,
+      leftOff: this.qh ? Math.min(1, (this.qh.vis || 0) * 1.6) : 0,
     });
     this._cloakViewmodel(C.on);
     this.input.isScoped = P.scoped;
@@ -1374,8 +1439,8 @@ export class CellGame {
     else if (sup && def.heavy) this._noise(P.pos, 14, false, true);
     else this._noise(P.pos, sup ? 8 : 70, !sup);
     if (!sup) this.sentinel.stats.loudShots = (this.sentinel.stats.loudShots || 0) + 1, this._loud = true;
-    // The .50 carries on: through bodies (collateral) and thin interior walls and doors; the
-    // penetrator round through exterior walls and bulwark shields too. Each pass costs damage.
+    // The .50 carries on through bodies (collateral, every round); the penetrator round also
+    // goes through walls and bulwark shields. Each pass costs damage.
     let start = o, mul = 1, first = null, lastP = end;
     const passes = rifle ? (ammo === 'pen' ? 5 : 3) : 1;
     for (let k = 0; k < passes; k++) {
@@ -1389,18 +1454,19 @@ export class CellGame {
       if (res.enemy) { skip = 0.6; mul *= 0.7; }
       else if (res.blocked) { if (ammo !== 'pen') break; skip = 1.2; mul *= 0.8; }
       else if (res.box && !res.terrain) {
+        // Walls: only the penetrator goes through (standard rounds just carry on through bodies).
+        if (ammo !== 'pen' && res.box.kind !== 'fence') break;
         const th = this._boxDepth(hitP, dir, res.box);
-        const lim = ammo === 'pen' ? 1.3 : 0.4;
-        if (th > lim || res.box.kind === 'fence') { if (res.box.kind !== 'fence') break; }
-        skip = th + 0.05; mul *= ammo === 'pen' ? 0.85 : 0.6;
+        if (th > 1.3 && res.box.kind !== 'fence') break;
+        skip = th + 0.05; mul *= 0.85;
         this.effects.puff(hitP.clone().addScaledVector(dir, th), 'concrete', 0.5, 0.4);
       } else break;
       start = hitP.clone().addScaledVector(dir, skip);
       if (start.distanceTo(o) > 880) break;
     }
-    if (rifle) this._trail(from, lastP, true);
+    if (rifle) this._trail(from, lastP, true, ammo);
     else this._tracer(from, lastP, '#ffe0a0', 0.05);
-    this.send({ t: 'shot', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: lastP.toArray().map((v) => Math.round(v * 100) / 100), r: rifle ? 1 : 0, s: sup ? 1 : 0 });
+    this.send({ t: 'shot', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: lastP.toArray().map((v) => Math.round(v * 100) / 100), r: rifle ? 1 : 0, s: sup ? 1 : 0, am: rifle ? ammo : undefined });
     // Rounds snapping past make officers bolt.
     for (const g of this.sentinel.guards) {
       if (g.state === 'dead' || (first && first.enemy === g)) continue;
@@ -1437,9 +1503,12 @@ export class CellGame {
       const g = res.blocked;
       this.effects.puff(hitP, 'metal', 0.8, 0.3);
       this.sfx.shieldHit(hitP);
-      if (ammo !== 'pen') this.hud.flash('BLOCKED \u2014 HIT THE PORT', 'red', 0.9);
-      if (this.isHost) { this.sentinel._alert(g, null, { x: P.pos.x, z: P.pos.z }); }
-      else this._broadcast({ k: 'block', id: g.id, from: { x: P.pos.x, z: P.pos.z } });
+      // The shield soaks it and weakens: ~2 rifle rounds, 4 magnum, a dozen pistol, 15 SMG; an
+      // explosive round breaks it outright.
+      const wd = ammo === 'xr' ? 999 : ({ kr50: 60, mag50: 35, smg: 8, m18: 10 })[def.key] ?? 20;
+      if (ammo !== 'pen') this.hud.flash((g.wallPct ?? 100) * 1.2 - wd <= 0 ? 'SHIELD BROKEN' : 'BLOCKED \u2014 HIT THE NOTCH OR BREAK IT', 'red', 0.9);
+      if (this.isHost) { this.sentinel._alert(g, null, { x: P.pos.x, z: P.pos.z }); this.sentinel.wallDamage(g.id, wd); }
+      else this._broadcast({ k: 'block', id: g.id, from: { x: P.pos.x, z: P.pos.z }, dmg: wd });
     } else if (res && res.enemy && res.enemy.state === 'dead') {
       // A downed enemy: a headshot finishes it; a body shot just thumps the body.
       const e = res.enemy;
@@ -1577,7 +1646,7 @@ export class CellGame {
 
   _onRemoteShot(m) {
     const a = new THREE.Vector3(...m.a), b = new THREE.Vector3(...m.b);
-    if (m.r) this._trail(a, b, false); else this._tracer(a, b, '#ffe0a0', 0.05);
+    if (m.r) this._trail(a, b, false, m.am); else this._tracer(a, b, '#ffe0a0', 0.05);
     const d = this.camera.position.distanceTo(a);
     this.audio.shotDistant(a, d / 343, !!m.s);
     if (this.isHost) this._noise(a, m.r ? 10 : m.s ? 8 : 70, !m.s);
@@ -1589,15 +1658,18 @@ export class CellGame {
   }
 
   // The shooter's signature: a long white vapor trail that hangs in the night air.
-  _trail(a, b, mine) {
+  // Each round type has its own colour: standard white-blue, explosive orange, penetrator
+  // violet, EMP electric cyan.
+  _trail(a, b, mine, ammo) {
+    const TC = { std: ['#cfe6ff', '#7aa6ff'], xr: ['#ffb070', '#ff5a20'], pen: ['#e0b0ff', '#a050ff'], emp: ['#b0fff8', '#20e8ff'] }[ammo] || ['#cfe6ff', '#7aa6ff'];
     const len = a.distanceTo(b);
     const geo = new THREE.CylinderGeometry(0.018, 0.018, len, 6, 1, true).translate(0, len / 2, 0).rotateX(Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({ color: '#cfe6ff', transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+    const mat = new THREE.MeshBasicMaterial({ color: TC[0], transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
     const m = new THREE.Mesh(geo, mat);
     m.position.copy(a);
     m.lookAt(b);
     this.scene.add(m);
-    const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 6, 1, true).translate(0, len / 2, 0).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#7aa6ff', transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 6, 1, true).translate(0, len / 2, 0).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: TC[1], transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.add(glow);
     this.trails.push({ mesh: m, t: 0, life: mine ? 2.2 : 2.6, grow: true });
   }
@@ -1765,8 +1837,8 @@ export class CellGame {
     if (auto) this.audio.startLoop('quad', new THREE.Vector3(this.quad.x, this.quad.y, this.quad.z), 'rotor', 0.22);
     // By hand: tossed up out of the left hand, then the feed cuts in.
     else this._raise('drone', () => { const q = this.quad; if (!q || !q.launching) return; q.launching = false; q.active = true; this.post.uniforms.uStatic.value = 1; this.audio.startLoop('quad', new THREE.Vector3(q.x, q.y, q.z), 'rotor', 0.22); });
-    if (auto) this.comms('Recon drone en route to the mark. Q to take it, hold Q to recall.', 'cyan', this.name);
-    else this.comms('Recon drone up. Look at enemies to neurolink them. Q park \u00B7 hold Q recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+    if (auto) this.comms('Recon drone en route to the mark. G to take it, hold G to recall.', 'cyan', this.name);
+    else this.comms('Recon drone up. Look at enemies to neurolink them. G park \u00B7 hold G recall \u00B7 SPACE/C climb.', 'cyan', this.name);
   }
   // Send the quad to a spot: launch it there, or redirect it if it's already up.
   _quadTo(at) {
@@ -1802,7 +1874,7 @@ export class CellGame {
       q.yaw = Math.atan2(-dx, -dz);
     } else {
       q.auto = null;
-      this.comms('Recon drone on station. It keeps marking. Q to take it.', 'cyan', this.name);
+      this.comms('Recon drone on station. It keeps marking. G to take it.', 'cyan', this.name);
       this.sfx.ui(true);
     }
     this.audio.updateLoop('quad', new THREE.Vector3(q.x, q.y, q.z));
@@ -1817,7 +1889,7 @@ export class CellGame {
     q.active = false;
     q.parked = true;
     this.sfx.ui(false);
-    this.comms('Recon drone parked. It keeps marking. Q to fly it, hold Q to recall.', 'cyan', this.name);
+    this.comms('Recon drone parked. It keeps marking. G to fly it, hold G to recall.', 'cyan', this.name);
   }
   _resumeQuad() {
     const q = this.quad;
@@ -2540,7 +2612,7 @@ export class CellGame {
     const av = Q.avatar;
     av.setVisible(Q.seen && !Q.avatarHidden && !Q.kia);
     if (!Q.seen) return;
-    av.update(dt, { p: Q.pos, yaw: Q.yaw, pitch: Q.pitch || 0, st: Q.downed ? 2 : Q.st, moving: Q.moving, w: Q.w });
+    av.update(dt, { p: Q.pos, yaw: Q.yaw, pitch: Q.pitch || 0, st: Q.downed ? 2 : Q.st, moving: Q.moving, w: Q.w, sprint: !!Q.sprinting && Q.moving });
     // Cloaked shooter: shimmer instead of the kit.
     const ck = Q.cloak;
     if (ck !== Q._ck) {
@@ -2714,7 +2786,7 @@ export class CellGame {
     const P = this.player;
     const quad = this.quad && this.quad.active;
     const isr = this.isr.active;
-    const scopeNV = !isr && P.def.scope && P.scopeT > 0.6;
+    const scopeNV = !isr && P.def.scope && P.scopeT > 0.6 && this.scopeNV !== false;
     const nv = isr || quad || scopeNV || this.nv;
     u.uNV.value += ((nv ? 1 : 0) - u.uNV.value) * Math.min(1, dt * 10);
     u.uMode.value = isr ? (this.isr.mode === 'IR' ? 3 : 2) : quad ? 2 : scopeNV ? 1 : 0;
@@ -2830,22 +2902,37 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('3–8', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('M', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'recon drone'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('K', 'laser'), K('N', 'NV')];
+    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('0', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hack phone'), K('TAB', 'tablet · ISR (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
     if (game.net) { shooterKeys.push(K('M', 'mic'), K('K', 'talk')); spotterKeys.push(K('M', 'mic'), K('K', 'talk')); }
-    this.el.keys.innerHTML = (game.operative ? [...shooterKeys, K('Q', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
+    this.el.keys.innerHTML = (game.operative ? [...shooterKeys, K('Y', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
     this.objective(0, OBJECTIVES[0], false);
     // Spotter (and lone operative): picture-in-picture squares for the console and the drone.
     const pipOn = game.role === 'spotter' || game.operative;
     this.el.pip.style.display = pipOn ? '' : 'none';
-    root.querySelectorAll('.c-sq').forEach((sq) => sq.addEventListener('pointerdown', (e) => {
+    // Tap (or click) any on-screen view to collapse it to its title strip; tap again to bring it
+    // back: the objective board, the console / ISR squares and the bodycams. Caught before the
+    // touch layer so the tap never aims or fires.
+    const views = () => [root.querySelector('.c-obj'), ...root.querySelectorAll('.c-pip .c-sq'), ...document.querySelectorAll('#cell-bodycams .bc')];
+    const viewAt = (x, y) => views().find((v) => {
+      if (!v || !v.getClientRects().length || getComputedStyle(v).display === 'none') return false;
+      const r = v.getBoundingClientRect();
+      return r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    });
+    const tapView = (e) => {
+      if (game.paused || game.ended || document.pointerLockElement) return;
+      const pt = e.touches ? e.changedTouches[0] : e;
+      const v = pt && viewAt(pt.clientX, pt.clientY);
+      if (!v) return;
       e.preventDefault();
-      if (sq.dataset.sq === 'ops') game.tablet.open();
-      else { if (game.isr.active) game.isr.exit(); else game.isr.enter(); }
-    }));
+      e.stopPropagation();
+      if (e.type === 'touchstart' || e.type === 'mousedown') { v.classList.toggle('min'); game.audio.click && game.audio.click(); }
+    };
+    addEventListener('touchstart', tapView, { capture: true, passive: false });
+    addEventListener('mousedown', tapView, { capture: true });
     this.sqOps = root.querySelector('[data-sq="ops"] canvas');
     this.sqIsr = root.querySelector('[data-sq="isr"] canvas');
     // The shooter's HUD stays minimal: hints fade once you've read them.
@@ -2880,15 +2967,29 @@ class CellHud {
     if (!t) return;
     const bar = document.createElement('div');
     bar.className = 'cell-tbar';
-    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP'], ['cell-hack', 'HACK']] : [];
-    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-tag', 'TAG'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ...(g.role === 'spotter' ? [['cell-bino', 'BINO']] : []), ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
+    // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
+    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
+    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
-      ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-quad', 'DRONE'], ['cell-recall', 'RECALL'], ...common]
+      ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-dart', 'DART'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
-        : [['cell-tab', 'TABLET'], ['cell-ability', 'DRONE'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
-    bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill" id="cell-tpause">❚❚</div>';
+        ? [['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
+        : [['cell-tab', 'TABLET'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
+    const KEEP = new Set(['cell-use', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
+    bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
+    // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
+    const AB = g.operative
+      ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
+      : g.role === 'shooter'
+        ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
+        : [['cell-ability', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
+    const ab = document.createElement('div');
+    ab.className = 'cell-abil';
+    ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
+    t.appendChild(ab);
+    this.abEl = ab;
+    this.abBtns = [...ab.children].map((el) => ({ el, k: el.dataset.k, bar: el.querySelector('b'), cnt: el.querySelector('em'), last: '' }));
     bar.querySelector('#cell-tpause').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.setPause(true); }, { passive: false });
     // PING: hold and drag your thumb to pick from the wheel.
     const ping = bar.querySelector('[data-act="cell-ping"]');
@@ -2900,6 +3001,74 @@ class CellHud {
     }, { passive: true });
     addEventListener('touchend', (e) => { for (const t of e.changedTouches) if (t.identifier === pid) pid = null; });
     this.tbar = bar;
+  }
+
+  // Ability buttons (touch): fill = how charged / ready it is; 'cd' greys it out, 'on' = active.
+  _abilTick(dt) {
+    const g = this.g, K = g.kit, A = g.ab, C = g.cloak;
+    for (const b of this.abBtns) {
+      let f = 1, st = '', n = '';
+      if (b.k === 'camo') { f = C.bat / 100; st = C.on ? 'on' : C.bat < 10 || C.lockT > 0 ? 'cd' : ''; }
+      else if (b.k === 'deadeye' && K) { if (K.deadeye > 0) { f = K.deadeye / KIT.deadeye.dur; st = 'on'; } else if (K.deadeyeCd > 0) { f = 1 - K.deadeyeCd / KIT.deadeye.cd; st = 'cd'; n = Math.ceil(K.deadeyeCd) + 's'; } }
+      else if (b.k === 'lure' && K) { const mx = Math.max(K.lures, g.loadout.shooter.perk === 'lures' ? 5 : KIT.lure.charges); f = K.lures / mx; st = K.lures ? '' : 'cd'; n = '\u00D7' + K.lures; }
+      else if (b.k === 'exec' && K) { f = K.execs / KIT.exec.max; st = K.execs ? 'on' : 'cd'; n = '\u00D7' + K.execs; }
+      else if (b.k === 'dart' && A) { f = A.darts / 3; st = A.darts ? '' : 'cd'; n = '\u00D7' + A.darts; }
+      else if (b.k === 'drone') {
+        const out = g._quadOut && g._quadOut();
+        if (g.quadCd > 0) { this._qcdMax = Math.max(this._qcdMax || 0, g.quadCd); f = 1 - g.quadCd / this._qcdMax; st = 'cd'; n = Math.ceil(g.quadCd) + 's'; }
+        else { this._qcdMax = 0; f = (out && g.quad ? g.quad.bat : g.quadBat ?? 300) / 300; st = out ? 'on' : ''; }
+      } else if (b.k === 'isr') { const cd = g.isr.sweepCd || 0; f = 1 - cd / 25; st = g.isr.active ? 'on' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
+      else if (b.k === 'hack') { f = g.ops ? g.ops.bw / 100 : 0; st = g.qh && g.qh.on ? 'on' : ''; }
+      f = Math.max(0, Math.min(1, f));
+      const key = st + '|' + n + '|' + Math.round(f * 50);
+      if (key === b.last) continue;
+      b.last = key;
+      b.el.classList.toggle('on', st === 'on');
+      b.el.classList.toggle('cd', st === 'cd');
+      b.el.classList.toggle('full', f >= 0.999);
+      b.bar.style.width = `${Math.round(f * 100)}%`;
+      b.cnt.textContent = n;
+    }
+    this._abPlaceT = (this._abPlaceT || 0) - dt;
+    if (this._abPlaceT <= 0) {
+      this._abPlaceT = 1;
+      // Phones (or any small touch screen): the middle strip folds into the press-and-hold wheel.
+      document.body.classList.toggle('cell-compact', innerWidth < 1000 || innerHeight < 560);
+      this._abilPlace();
+    }
+  }
+
+  // Put the ability buttons on the left, below the objective board, without covering anything:
+  // try a few column counts and offsets, take the first that clears every other control.
+  _abilPlace() {
+    const el = this.abEl;
+    if (!el || !el.getClientRects().length) return;
+    const W = innerWidth, H = innerHeight, n = this.abBtns.length;
+    const avoid = [...document.querySelectorAll('#touch .tb, #touch .cell-tbar .pill, #touch .stick, #cell-hud .c-obj, #cell-hud .c-vis, #cell-hud .c-vitals, #cell-bodycams')]
+      .filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden')
+      .map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    const hits = (x, y, w, h) => avoid.some((r) => x < r.right + 4 && x + w > r.left - 4 && y < r.bottom + 4 && y + h > r.top - 4);
+    const obj = document.querySelector('#cell-hud .c-obj');
+    const or = obj && obj.getClientRects().length ? obj.getBoundingClientRect() : null;
+    const top0 = or ? or.bottom + 8 : 70;
+    for (const size of [50, 44, 40]) {
+      const gap = 6;
+      for (const cols of [1, 2, 3, 4, n]) {
+        const rows = Math.ceil(n / cols), w = cols * size + (cols - 1) * gap, h = rows * size + (rows - 1) * gap;
+        for (let y = top0; y + h < H - 8; y += 12) {
+          for (let x = 12; x + w < W * 0.45; x += 12) {
+            if (!hits(x, y, w, h)) { this._abSet(x, y, cols, size); return; }
+          }
+        }
+      }
+    }
+    this._abSet(12, top0, 2, 40);
+  }
+  _abSet(x, y, cols, size) {
+    const s = this.abEl.style;
+    s.left = `${Math.round(x)}px`; s.top = `${Math.round(y)}px`;
+    s.gridTemplateColumns = `repeat(${cols}, ${size}px)`;
+    s.setProperty('--ab', `${size}px`);
   }
 
   intro(M, who) {
@@ -2996,6 +3165,22 @@ class CellHud {
 
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
+    if (this.abBtns) this._abilTick(dt);
+    // Context buttons only while they do something: DROP (carrying the drive), SEND / DENY (a
+    // request waiting), RECALL (drone out).
+    if (this.tbar) {
+      const ctx = { 'cell-drop': g.obj.drive === g.role, 'cell-yes': g.requests.some((r) => r.st === 'pending'), 'cell-no': g.requests.some((r) => r.st === 'pending'), 'cell-recall': !!(g._quadOut && g._quadOut()) };
+      for (const [a, on] of Object.entries(ctx)) {
+        const el = this._ctxEl?.[a] ?? ((this._ctxEl = this._ctxEl || {})[a] = this.tbar.querySelector(`[data-act="${a}"]`) || 0);
+        if (el && (el.style.display === 'none') === on) el.style.display = on ? '' : 'none';
+      }
+    }
+    // Touch swap button names what you'd swap to. The spotter's P-9 is primary, binoculars secondary.
+    if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
+    if (this.elSwap) {
+      const lbl = ({ p: 'PRIMARY', s: 'SECONDARY', k: 'KNIFE' })[g._wpnNextK ? g._wpnNextK() : 's'];
+      if (this.elSwap.textContent !== lbl) this.elSwap.textContent = lbl;
+    }
     // Objective & alarm.
     const lab = S.alarmLabel;
     if (lab !== this._al) { this._al = lab; this.el.alS.textContent = lab; this.el.alarm.dataset.s = lab.toLowerCase(); }
@@ -3037,7 +3222,7 @@ class CellHud {
     this.el.amR.textContent = '/ ' + w.reserve;
     this.el.amW.textContent = P.def.name + (P.def.slot === 'rifle' ? ' · SUPPRESSED' : '');
     const sec = P.def.slot === 'pistol';
-    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 NIGHT VISION${w.ammo && w.ammo !== 'std' ? ' \u00B7 ' + AMMO_NAME[w.ammo] : ''}` : w.ammo && w.ammo !== 'std' ? `${AMMO_NAME[w.ammo]} ROUNDS (Z: rounds menu)` : '';
+    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 ${this.g.scopeNV === false ? 'PLAIN' : 'NIGHT VISION'}${w.ammo && w.ammo !== 'std' ? ' \u00B7 ' + AMMO_NAME[w.ammo] : ''}` : w.ammo && w.ammo !== 'std' ? `${AMMO_NAME[w.ammo]} ROUNDS (Z: rounds menu)` : '';
     this.el.amS.classList.toggle('loud', sec && !w.sup);
     // Prompt.
     let pr = g.prompts[g.role];
@@ -3273,7 +3458,7 @@ class CellHud {
     c.fillText(this._range ? `${this._range.toFixed(1)} m` : '--- m', W / 2 + R * 0.18, H / 2 - R * 0.06);
     c.textAlign = 'center';
     if (this._onTarget) { c.strokeStyle = 'rgba(255,60,80,0.95)'; c.beginPath(); c.arc(W / 2, H / 2, R * 0.12, 0, Math.PI * 2); c.stroke(); }
-    c.fillText('NIGHT VISION', W / 2, H / 2 + R * 0.86);
+    c.fillText(g.scopeNV === false ? 'PLAIN \u00B7 N: NIGHT VISION' : 'NIGHT VISION \u00B7 N: PLAIN', W / 2, H / 2 + R * 0.86);
     // Wind: speed and direction across your shot, and a hold-off dot for this range.
     if (P.def.slot === 'rifle') {
       const cw = g._crosswind(P.yaw), drift = g._windDrift(P.yaw, this._range || 300);
@@ -3393,4 +3578,5 @@ installSpatial(CellGame);
 installPhone(CellGame);
 installXRounds(CellGame);
 installAbilities(CellGame);
+installMelee(CellGame);
 installDevices(CellGame);

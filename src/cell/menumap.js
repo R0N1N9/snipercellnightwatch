@@ -119,7 +119,6 @@ export function drawCellMap(canvas, sel = 'draw', t = 0) {
   for (let z = DROPS.draw.insert[0].z; z > 150; z -= 6) drawRoute.push([drawX(z), z]);
   drawRoute.push([2, 146], [2, SPOTS.perches[0].z + 2]);
   route(drawRoute, sel === 'draw');
-  route([[6, DROPS.ridge.insert[0].z], [2, SPOTS.perches[0].z + 2]], sel === 'ridge');
   // HALO drops: the transport's run-in, from off the map onto the knoll.
   for (const [k, D] of Object.entries(DROPS)) {
     if (!D.air) continue;
@@ -144,8 +143,8 @@ export function drawCellMap(canvas, sel = 'draw', t = 0) {
     c.fillRect(-r / 1.4, -r / 1.4, (r / 1.4) * 2, (r / 1.4) * 2); c.strokeRect(-r / 1.4, -r / 1.4, (r / 1.4) * 2, (r / 1.4) * 2);
     c.restore();
     c.font = '700 11px JetBrains Mono, monospace';
-    const left = k === 'ridge' || k === 'east'; // keep clear of the perch labels
-    const dy = D.air || k === 'ridge' ? -14 : 4;
+    const left = k === 'east'; // keep clear of the perch labels
+    const dy = D.air ? -14 : 4;
     c.textAlign = left ? 'right' : 'left';
     c.fillStyle = on ? '#00ffe0' : 'rgba(0,255,224,0.6)';
     c.fillText(`${D.air ? 'HALO' : 'DROP'} · ${D.name}${on ? ' ✓' : ''}`, x + (left ? -14 : 14), y + dy);

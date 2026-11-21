@@ -15,7 +15,7 @@ import { Wheel } from './wheel.js';
 const RANGE = 45;
 const OPTS = {
   cam: [{ k: 'cam', name: 'LOOP CAMERA', bw: 6 }],
-  drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }],
+  drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }, { k: 'pcrash', name: 'DISRUPT', bw: 18 }],
   iot: [{ k: 'iot', name: 'DISTRACT', bw: 6 }],
   door: [{ k: 'door', name: 'OPEN DOOR', bw: 6 }],
   light: [{ k: 'plight', name: 'CUT LIGHT', bw: 4 }],
@@ -24,7 +24,7 @@ const OPTS = {
 const EXEC = 0.6;
 // Commands at the spot under your crosshair (when nothing hackable is targeted): the console's
 // payloads, sent from the phone. Same costs and cooldowns as the tablet.
-// What the shooter can request at the crosshair (keys 3–8, or press-and-hold on touch).
+// What the shooter can request at the crosshair (keys 4–9, or press-and-hold on touch).
 export const SHOOTER_REQ = [
   { k: 'supply', name: 'SUPPLY' },
   { k: 'scan', name: 'SCAN' },
@@ -32,6 +32,7 @@ export const SHOOTER_REQ = [
   { k: 'decoy', name: 'DECOY' },
   { k: 'lights', name: 'LIGHTS' },
   { k: 'drone', name: 'DRONE' },
+  { k: 'supplyme', name: 'SUPPLY ON ME', req: 'supply', me: true }, // the supply drone drops it at your feet
 ];
 // Console commands at the crosshair, in the tablet's order (so the number keys match).
 export const CMDS = [
@@ -141,7 +142,7 @@ export const Phone = {
     let best = null, bs = lim;
     const consider = (kind, id, x, y, z, name) => {
       const v = new THREE.Vector3(x, y, z).sub(o), d = v.length();
-      if (d > RANGE) return;
+      if (d > (kind === 'drone' ? RANGE * 1.6 : RANGE)) return;
       const n = v.clone().normalize();
       const a = n.angleTo(dir);
       if (a > half) return;
@@ -152,7 +153,8 @@ export const Phone = {
       if (a < bs) { bs = a; best = e; }
     };
     for (const c of S.cams) if (!c.hacked) consider('cam', c.id, c.x, c.y, c.z, 'CAMERA');
-    for (const d of S.drones) if (d.state !== 'dead' && !(d.empT > 0)) consider('drone', d.id, d.x, d.y, d.z, 'PATROL DRONE');
+    // Drones (patrol and spotlight) can be hacked out of the sky; the big spotlight helis from a little further.
+    for (const d of S.drones) if (d.state !== 'dead') consider('drone', d.id, d.x, d.y, d.z, d.heli ? 'SPOTLIGHT DRONE' : 'PATROL DRONE');
     for (const D of F.devices) consider('iot', D.id, D.x, D.y, D.z, D.kind.toUpperCase());
     for (const d of Object.values(F.doors)) if ((d.kind === 'elec' || d.kind === 'dock') && !d.open && !d.sealed && !d.unlocked) consider('door', d.id, d.x, (d.y || 0) + 1.2, d.z, 'E-LOCK DOOR');
     for (const L of F.lightSources || []) if (!L.broken && !(L.offT > 0)) consider('light', L.id, L.x, L.y, L.z, L.kind === 'panel' ? 'CEILING PANEL' : 'LAMP');
@@ -178,6 +180,7 @@ export const Phone = {
     // The phone in your left hand.
     const ph = this.phoneObj;
     const k = Math.max(Q.k, pk);
+    Q.vis = k; // the viewmodel's support hand lets go of the gun while the phone is up
     ph.visible = k > 0.02;
     if (ph.visible) {
       ph.position.set(-0.3 + 0.17 * k, -0.48 + 0.35 * k - Q.press * 0.012, -0.38 + 0.03 * k - Q.press * 0.01);
@@ -231,11 +234,23 @@ export const Phone = {
     this.cmdWheel = null;
     if (!this.input) return;
     const spot = this.role === 'spotter' || this.operative;
-    const ICON = { scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
-    const SHORT = { 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON DRONE': 'DRONE' };
-    // Spotter: console commands. Shooter: requests to the spotter, landing on your crosshair.
+    const ICON = { supplyme: '⬇', scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
+    const SHORT = { 'SUPPLY ON ME': 'SUPPLY → ME', 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON DRONE': 'DRONE' };
+    // One grouped wheel: commands (spotter) / requests (sniper) down the right, operator toggles
+    // down the left, pings across the top and bottom.
     const list = spot ? CMDS : SHOOTER_REQ;
-    const W = (this.cmdWheel = new Wheel(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
+    const cols = (arr, side) => arr.map((o, i) => {
+      const rows = Math.ceil(arr.length / 2), row = Math.floor(i / 2), col = i % 2;
+      return { ...o, x: side * (col ? 1.12 : 0.6), y: rows > 1 ? -0.72 + (1.44 * row) / (rows - 1) : 0 };
+    });
+    const cmdItems = cols(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), 1);
+    const TOG = spot
+      ? [['cell-hack', 'HACK', '📱'], ...(this.loadout && this.loadout.spotter.primary === 'smg' && this.role === 'spotter' ? [['cell-bino', 'BINO', '◎']] : []), ['cell-tab', 'TABLET', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])]
+      : [['cell-xr', 'ROUNDS', '⁂'], ['cell-breath', 'BREATH', '≋'], ['cell-tab', 'MAP', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])];
+    const togItems = cols(TOG.map(([a, l, ic]) => ({ k: 't:' + a, label: l, group: 'tog', icon: ic })), -1);
+    const PINGS = [['look', 'LOOK', '◎'], ['enemy', 'ENEMY', '◆'], ['move', 'MOVE', '➤'], ['hold', 'HOLD', '✋'], ['regroup', 'ON ME', '⬤'], ['cover', 'COVER', '⛨'], ['sync', 'SYNC', '⦿'], ['perch', 'SNIPER POS', '⌖']];
+    const pingItems = PINGS.map(([k, l, ic], i) => ({ k: 'p:' + k, label: l, group: 'comms', icon: ic, x: -0.69 + (i % 4) * 0.46, y: i < 4 ? -1.08 : 1.08 }));
+    const W = (this.cmdWheel = new Wheel([...pingItems, ...cmdItems, ...togItems], { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
     let hold = null;
     this.input.onLookTouch = (type, t) => {
       if (type === 'start') {
@@ -244,7 +259,11 @@ export const Phone = {
         h.timer = setTimeout(() => {
           if (hold !== h || !this._cmdWheelOk()) return;
           h.open = true;
-          W.show(h.x, h.y, spot ? 'DROPS ON YOUR CROSSHAIR' : 'REQUEST \u2192 YOUR CROSSHAIR');
+          const e = this._crosshairEnemy && this._crosshairEnemy();
+          this._cwAt = this._aimPoint();
+          this._cwEnemy = e ? e.id : null;
+          const L = this._wheelLabels ? this._wheelLabels() : {};
+          W.show(h.x, h.y, spot ? 'COMMANDS \u2192 CROSSHAIR' : 'REQUESTS \u2192 CROSSHAIR', L.enemy ? { 'p:enemy': L.enemy } : {});
           this._phonePulse && this._phonePulse();
           navigator.vibrate && navigator.vibrate(12);
         }, 450);
@@ -262,13 +281,21 @@ export const Phone = {
       hold = null;
       if (!was) return false;
       const k = W.close();
+      if (k && k.startsWith('t:')) { this.input.pressedSet.add(k.slice(2)); return true; } // a toggle: as if its button was tapped
+      if (k && k.startsWith('p:')) { if (this._cmdWheelOk()) this._wheelPick(k.slice(2), this._cwAt || this._aimPoint(), this._cwEnemy); return true; }
       const o = k && list.find((c) => c.k === k);
-      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.k, this._aimPoint()); }
+      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.req || o.k, o.me ? this._myPoint() : this._aimPoint()); }
       return true;
     };
   },
+  // A couple of metres in front of you (where you're facing), for a drop "on me".
+  _myPoint() {
+    const P = this.player.pos, y = this.player.yaw;
+    return { x: P.x - Math.sin(y) * 2.5, y: P.y, z: P.z - Math.cos(y) * 2.5 };
+  },
   _cmdWheelOk() {
-    return !((this.qh && this.qh.on) || this.tablet.visible || this.isr.active || (this.quad && this.quad.active) || this.mini.open || this.downed || this.kia || this.paused || this.ended || (this.wheel && this.wheel.open) || (this.cine && this.cine.active));
+    // Never while scoped: that thumb is aiming.
+    return !(this.player.scoped || this.player.scopeT > 0.1 || (this.bino && this.bino.on && this.bino.k > 0.1) || (this.qh && this.qh.on) || this.tablet.visible || this.isr.active || (this.quad && this.quad.active) || this.mini.open || this.downed || this.kia || this.paused || this.ended || (this.wheel && this.wheel.open) || (this.cine && this.cine.active));
   },
 
   // Spotter, outside the tablet: number keys 1–9 fire that console command straight at the
@@ -278,9 +305,11 @@ export const Phone = {
     if (this.cmdWheel && this.cmdWheel.open && !this._cmdWheelOk()) this.cmdWheel.cancel();
     if (this.xr && this.xr.menu) return; // the rounds menu has the number keys
     if (this.role === 'shooter' && !this.operative) {
-      // Shooter: keys 3–8 request that support at the crosshair (1 / 2 are your weapons).
+      // Shooter: keys 4–9 request that support at the crosshair (1 / 2 / 3 are your weapons).
       if (this.tablet.visible || this.downed || this.kia || this.paused || (this._voteOpen && this._voteOpen())) return;
-      for (let i = 0; i < SHOOTER_REQ.length; i++) if (I.pressed('Digit' + (i + 3))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
+      // Shift+4: a supply drop in front of you.
+      if (I.pressed('Digit4') && (I.held('ShiftLeft') || I.held('ShiftRight'))) { this._requestPayload('supply', this._myPoint()); return; }
+      for (let i = 0; i < 6; i++) if (I.pressed('Digit' + (i + 4))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
       return;
     }
     if (!(this.role === 'spotter' || this.operative) || !this.ops) return;
@@ -399,7 +428,7 @@ export const Phone = {
     c.textAlign = 'center';
     c.font = '600 12px JetBrains Mono, monospace';
     c.fillStyle = 'rgba(200,240,235,0.85)';
-    c.fillText(this.input.touch ? 'TAP AN OPTION  \u00B7  HACK \u2014 PUT AWAY' : 'CLICK / E \u2014 RUN  \u00B7  WHEEL / NUMBER \u2014 CHOOSE  \u00B7  RELEASE TAB \u2014 PUT AWAY', W / 2, H - 140);
+    c.fillText(this.input.touch ? 'TAP AN OPTION  \u00B7  HACK \u2014 PUT AWAY' : 'CLICK / E \u2014 RUN  \u00B7  WHEEL / NUMBER \u2014 CHOOSE  \u00B7  H or release TAB \u2014 PUT AWAY', W / 2, H - 140);
     c.restore();
   },
 };

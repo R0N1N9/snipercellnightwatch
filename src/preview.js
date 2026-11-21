@@ -58,7 +58,7 @@ function frame(t) {
     P.idle += dt;
     if (P.idle > 1.2) P.yaw += dt * 0.45;
   }
-  P.av.update(dt, { p: new THREE.Vector3(0, 0, 0), yaw: 0, pitch: 0, st: 0, moving: false, w: !!P.w });
+  P.av.update(dt, { p: new THREE.Vector3(0, 0, 0), yaw: 0, pitch: 0, st: 0, moving: false, w: !!P.w, lowReady: !!P.low });
   P.av.root.rotation.y = P.yaw;
   // Fit ~2.1 m tall and ~1.7 m wide (the rifle swings round as it turns).
   const tv = Math.tan(THREE.MathUtils.degToRad(P.cam.fov / 2));
@@ -69,7 +69,7 @@ function frame(t) {
 }
 
 // Put the preview inside `container`, showing `look` ({ outfit, poncho }); w: sidearm drawn.
-export function showPreview(container, look, w = false) {
+export function showPreview(container, look, w = false, low = false) {
   try {
     if (!P) init();
   } catch {
@@ -79,5 +79,6 @@ export function showPreview(container, look, w = false) {
   if (el.parentNode !== container) container.appendChild(el);
   P.av.setLook(look);
   P.w = w;
+  P.low = low;
   if (!P.raf) P.raf = requestAnimationFrame(frame);
 }

@@ -30,9 +30,14 @@ export class Wheel {
     el.id = opts.id || 'cell-wheel';
     el.className = 'cell-wheel';
     const n = WHEEL.length;
+    // Items can carry their own spot (x, y in units of the radius) for grouped layouts; then the
+    // pick is the item nearest the finger instead of the nearest angle.
+    this.laid = WHEEL.some((o) => o.x !== undefined);
+    if (this.laid) el.classList.add('laid');
     el.innerHTML = '<div class="cw-ring"></div>' + WHEEL.map((o, i) => {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-      return `<div class="cw-item cw-${o.group}" data-i="${i}" style="--x:${Math.cos(a).toFixed(3)};--y:${Math.sin(a).toFixed(3)}"><i>${o.icon}</i><b>${o.label}</b></div>`;
+      const x = o.x !== undefined ? o.x : Math.cos(a), y = o.y !== undefined ? o.y : Math.sin(a);
+      return `<div class="cw-item cw-${o.group}" data-i="${i}" style="--x:${x.toFixed(3)};--y:${y.toFixed(3)}"><i>${o.icon}</i><b>${o.label}</b></div>`;
     }).join('') + `<div class="cw-centre"><b class="cw-sel">${this.centre}</b><span class="cw-sub"></span></div>`;
     document.body.appendChild(el);
     this.items = [...el.querySelectorAll('.cw-item')];
@@ -47,6 +52,13 @@ export class Wheel {
     this.cy = y;
     this.dx = this.dy = 0;
     this.sel = -1;
+    if (this.laid) {
+      // Keep the whole grouped wheel on screen.
+      this.rpx = Math.min(150, 0.34 * Math.min(innerWidth, innerHeight));
+      const ex = Math.max(...this.list.map((o) => Math.abs(o.x))) * this.rpx + 34, ey = Math.max(...this.list.map((o) => Math.abs(o.y))) * this.rpx + 22;
+      x = this.cx = Math.min(innerWidth - ex, Math.max(ex, x));
+      y = this.cy = Math.min(innerHeight - ey, Math.max(ey, y));
+    }
     this.el.style.left = x + 'px';
     this.el.style.top = y + 'px';
     this.el.classList.add('on');
@@ -70,6 +82,14 @@ export class Wheel {
   _pick() {
     const d = Math.hypot(this.dx, this.dy);
     if (d < 26) { this.sel = -1; this._paint(); return; }
+    if (this.laid) {
+      const r = this.rpx || 120;
+      let best = -1, bd = Infinity;
+      this.list.forEach((o, i) => { const q = Math.hypot(o.x * r - this.dx, o.y * r - this.dy); if (q < bd) { bd = q; best = i; } });
+      this.sel = best;
+      this._paint();
+      return;
+    }
     let a = Math.atan2(this.dy, this.dx) + Math.PI / 2;
     if (a < 0) a += Math.PI * 2;
     this.sel = Math.round((a / (Math.PI * 2)) * this.list.length) % this.list.length;
