@@ -496,3 +496,7 @@ body.touch #cell-hud.has-pip .c-partner { top: 14px; }
 /* FIRE as TAKEDOWN / SWARM. */
 #touch .tb.fire.fire-alt { border-color: #7fe8ff !important; box-shadow: 0 0 14px rgba(127, 232, 255, 0.45); }
 #touch .tb.fire.fire-alt span { color: #7fe8ff; }
+
+/* CALL FOR HELP: mid-screen while you're down. */
+#touch .cell-helpbtn { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 9; padding: 14px 22px !important; font-size: 15px !important; letter-spacing: 0.14em; color: #ff6a6a !important; border: 2px solid #ff4a4a !important; background: rgba(40, 6, 8, 0.7) !important; animation: helppulse 1s ease-in-out infinite alternate; }
+@keyframes helppulse { to { box-shadow: 0 0 18px rgba(255, 74, 74, 0.6); } }

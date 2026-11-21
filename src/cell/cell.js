@@ -2949,8 +2949,8 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('Z', 'rounds menu'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hold: hack phone'), K('TAB', 'tablet (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
+    const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'slingshot lure'), K('Z', 'rounds menu'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hold: hack phone'), K('T', 'slingshot lure'), K('TAB', 'tablet (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
@@ -3029,8 +3029,8 @@ class CellHud {
     const AB = g.operative && g.role === 'shooter'
       ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
-        ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure']]
-        : [['cell-ability', 'DRONE', 'drone'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm'], ['cell-lase', 'LASE', 'lase']]), ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
+        ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'SLING', 'lure']]
+        : [['cell-ability', 'DRONE', 'drone'], ['cell-lure', 'SLING', 'lure'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm'], ['cell-lase', 'LASE', 'lase']])];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
     ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
@@ -3044,6 +3044,14 @@ class CellHud {
     use.style.display = 'none';
     t.appendChild(use);
     this.useBtn = use;
+    // CALL FOR HELP: big, mid-screen, only while you're down.
+    const help = document.createElement('div');
+    help.className = 'pill cell-helpbtn';
+    help.dataset.act = 'cell-help';
+    help.textContent = 'CALL FOR HELP \u271A';
+    help.style.display = 'none';
+    t.appendChild(help);
+    this.helpBtn = help;
     this.abBtns = [...ab.children].map((el) => ({ el, k: el.dataset.k, bar: el.querySelector('b'), cnt: el.querySelector('em'), last: '' }));
     bar.querySelector('#cell-tpause').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.setPause(true); }, { passive: false });
     // PING: hold and drag your thumb to pick from the wheel.
@@ -3113,46 +3121,67 @@ class CellHud {
     const R = sr && sr.width ? sr.width / 2 : 70;
     const obj = document.querySelector('#cell-hud .c-obj');
     const top0 = obj && obj.getClientRects().length ? obj.getBoundingClientRect().bottom + 6 : 60;
+    const placedRects = [];
+    const blockers = [...avoid, ...placedRects];
+    const n = this.abBtns.length, gap = 10;
+    const okSpot = (x, y, others) => x - size / 2 >= 6 && x + size / 2 <= W * 0.5 && y - size / 2 >= top0 && y + size / 2 <= H - 16
+      && !blockers.some((r) => x + size / 2 > r.left - 6 && x - size / 2 < r.right + 6 && y + size / 2 > r.top - 6 && y - size / 2 < r.bottom + 6)
+      && !others.some(([px, py]) => Math.hypot(px - x, py - y) < size + gap);
+    // A tidy cluster just above PRONE, CROUCH and the left FIRE button: rows of evenly spaced
+    // buttons centred over them, stepping up a row (or sliding along) until nothing overlaps.
+    const anchors = ['#touch .prone', '#touch .crouch', '#touch .fire-l'].map((q) => document.querySelector(q)).filter((e) => e && e.getClientRects().length).map((e) => e.getBoundingClientRect());
+    const aL = anchors.length ? Math.min(...anchors.map((r) => r.left)) : 12, aR = anchors.length ? Math.max(...anchors.map((r) => r.right)) : W * 0.35;
+    const aTop = anchors.length ? Math.min(...anchors.map((r) => r.top)) : H * 0.6;
+    const fit = Math.max(1, Math.min(n, Math.floor((aR - aL + gap) / (size + gap)) || 1));
+    let layout = null;
+    // Nearest first: just above them, then nudged down into the gaps between them, rows of
+    // different widths, sliding sideways a little.
+    const lifts = [];
+    for (let d = 0; d < H; d += 6) { lifts.push(d); if (d) lifts.push(-d); }
+    for (const lift of lifts) for (const perRow of [...new Set([fit, n, 2, 3])]) {
+      if (layout) break;
+      for (const shift of [0, 20, -20, 40, -40, 60, -60, 90, -90, 120]) {
+        const pts = [];
+        for (let k = 0; k < n; k++) {
+          const row = Math.floor(k / perRow), inRow = Math.min(perRow, n - row * perRow), col = k % perRow;
+          const rowW = inRow * size + (inRow - 1) * gap, x0 = (aL + aR) / 2 - rowW / 2 + shift;
+          const p = [x0 + col * (size + gap) + size / 2, aTop - gap - size / 2 - lift - row * (size + gap)];
+          if (!okSpot(p[0], p[1], pts)) break;
+          pts.push(p);
+        }
+        if (pts.length === n) { layout = pts; break; }
+      }
+    }
+    // Couldn't fit the cluster: the nearest clear spots, still kept apart.
+    if (!layout) {
+      // A grid aligned on the cluster point (above the anchors), filled nearest-first, so the
+      // buttons still sit together in neat rows and columns.
+      layout = [];
+      const hx = (aL + aR) / 2, hy = aTop - gap - size / 2, step = size + gap, cand = [];
+      for (let gy = -8; gy <= 8; gy++) for (let gx = -8; gx <= 8; gx++) cand.push([hx + gx * step, hy + gy * step]);
+      for (let gy = -16; gy <= 16; gy++) for (let gx = -16; gx <= 16; gx++) cand.push([hx + gx * step / 2, hy + gy * step / 2]);
+      cand.sort((p, q) => Math.hypot(p[0] - hx, (p[1] - hy) * 1.3) - Math.hypot(q[0] - hx, (q[1] - hy) * 1.3));
+      for (let k = 0; k < n; k++) layout.push(cand.find(([x, y]) => okSpot(x, y, layout)) || [6 + size / 2 + k * (size + 8), top0 + size / 2]);
+    }
+    // Then the magazine strip, clear of the buttons too.
+    const abRects = layout.map(([x, y]) => ({ left: x - size / 2, top: y - size / 2, right: x + size / 2, bottom: y + size / 2 }));
     // The magazine strip (sniper): a column (or a row) in the first clear spot on the left.
     const mags = document.getElementById('cell-mags');
-    const placedRects = [];
     if (mags && mags.style.display !== 'none' && mags.children.length) {
       const n = mags.children.length, iw = 40, ih = 52, gap = 5;
       let done = false;
-      for (const col of [true, false]) {
+      for (const [col, maxX] of [[true, 0.42], [false, 0.42], [true, 0.62], [false, 0.62]]) {
         const mw = col ? iw : n * iw + (n - 1) * gap, mh = col ? n * ih + (n - 1) * gap : ih;
-        for (let y = top0; y + mh < H - 16 && !done; y += 8) for (let x = 6; x + mw < W * 0.42 && !done; x += 8) {
-          if (!avoid.some((r) => x + mw > r.left - 6 && x < r.right + 6 && y + mh > r.top - 6 && y < r.bottom + 6)) {
+        for (let y = top0; y + mh < H - 16 && !done; y += 8) for (let x = 6; x + mw < W * maxX && !done; x += 8) {
+          if (![...avoid, ...abRects].some((r) => x + mw > r.left - 6 && x < r.right + 6 && y + mh > r.top - 6 && y < r.bottom + 6)) {
             mags.classList.toggle('col', col); mags.style.left = `${x}px`; mags.style.top = `${y}px`;
             placedRects.push({ left: x, top: y, right: x + mw, bottom: y + mh }); done = true;
           }
         }
         if (done) break;
       }
-    }
-    const blockers = [...avoid, ...placedRects];
-    const n = this.abBtns.length, gapMin = size + 14;
-    const okSpot = (x, y, others) => x - size / 2 >= 6 && x + size / 2 <= W * 0.5 && y - size / 2 >= top0 && y + size / 2 <= H - 16
-      && !blockers.some((r) => x + size / 2 > r.left - 8 && x - size / 2 < r.right + 8 && y + size / 2 > r.top - 8 && y - size / 2 < r.bottom + 8)
-      && !others.some(([px, py]) => Math.hypot(px - x, py - y) < gapMin);
-    // Evenly spaced along one arc round the stick: the tightest arc where every button fits.
-    let layout = null;
-    for (let rr = R + size * 1.8; rr < R + size * 7 && !layout; rr += size * 0.4) {
-      for (const [a0, a1] of [[-165, -15], [-170, -40], [-150, -10], [-175, -60], [-120, -5]]) {
-        const step = n > 1 ? (a1 - a0) / (n - 1) : 0;
-        if (n > 1 && Math.abs((step * Math.PI) / 180) * rr < gapMin) continue;
-        const pts = [];
-        for (let k = 0; k < n; k++) { const ang = ((n > 1 ? a0 + step * k : (a0 + a1) / 2) * Math.PI) / 180; const p = [cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr]; if (!okSpot(p[0], p[1], pts)) break; pts.push(p); }
-        if (pts.length === n) { layout = pts; break; }
-      }
-    }
-    // Couldn't fit one arc: the nearest clear spots, still kept apart.
-    if (!layout) {
-      layout = [];
-      const cand = [];
-      for (let y = top0 + size / 2; y < H - size; y += 10) for (let x = 6 + size / 2; x < W * 0.45; x += 10) cand.push([x, y]);
-      cand.sort((p, q) => Math.hypot(p[0] - cx, p[1] - cy) - Math.hypot(q[0] - cx, q[1] - cy));
-      for (let k = 0; k < n; k++) layout.push(cand.find(([x, y]) => okSpot(x, y, layout)) || [6 + size / 2 + k * (size + 8), top0 + size / 2]);
+      // Nowhere clear at all: keep it out of the way rather than overlapping buttons.
+      mags.style.visibility = done ? '' : 'hidden';
     }
     el.style.setProperty('--ab', `${size}px`);
     this.abBtns.forEach((b, k) => { b.el.style.left = `${Math.round(layout[k][0] - size / 2)}px`; b.el.style.top = `${Math.round(layout[k][1] - size / 2)}px`; });
@@ -3253,10 +3282,15 @@ class CellHud {
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
     if (this.abBtns) this._abilTick(dt);
-    const fl = g._tdTarget ? 'TAKEDOWN' : g.bino && g.bino.up && g.role === 'spotter' ? 'SWARM' : 'FIRE';
+    const fl = g.kit && g.kit.deadeye > 0 && (g.kit.deMarks || []).length ? 'EXECUTE' : g._tdTarget ? 'TAKEDOWN' : g.bino && g.bino.up && g.role === 'spotter' ? 'SWARM' : 'FIRE';
     if (fl !== this._fireLbl) {
       this._fireLbl = fl;
       for (const b of document.querySelectorAll('#touch .tb.fire')) { const s = b.querySelector('span'); if (s) s.textContent = fl; b.classList.toggle('fire-alt', fl !== 'FIRE'); }
+    }
+    if (this.helpBtn) {
+      const on = !!g.downed && !g.kia;
+      if ((this.helpBtn.style.display !== 'none') !== on) this.helpBtn.style.display = on ? '' : 'none';
+      if (on) { const lbl = (g._helpCd || 0) > 0 ? `HELP CALLED \u00B7 ${Math.ceil(g._helpCd)} s` : 'CALL FOR HELP \u271A'; if (this.helpBtn.textContent !== lbl) this.helpBtn.textContent = lbl; }
     }
     if (this.useBtn) {
       const pr = g.prompts && g.prompts[g.role];
@@ -3489,12 +3523,16 @@ class CellHud {
     g._kitDraw(c, W, H, proj);
     // Hit markers.
     for (const h of this.hits) h.t += dt;
-    this.hits = this.hits.filter((h) => h.t < 0.3);
+    this.hits = this.hits.filter((h) => h.t < 0.32);
+    // CoD-style: a crisp X round the crosshair that pops slightly and fades (red on a headshot).
     for (const h of this.hits) {
-      c.strokeStyle = h.head ? '#ff4060' : '#ffffff';
-      c.lineWidth = 2;
-      const s = 6 + h.t * 20, o = 4;
-      for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { c.beginPath(); c.moveTo(W / 2 + sx * o, H / 2 + sy * o); c.lineTo(W / 2 + sx * s, H / 2 + sy * s); c.stroke(); }
+      const k = h.t / 0.32, pop = h.t < 0.05 ? 1.25 - h.t * 5 : 1, o = 7 * pop, s = 15 * pop;
+      c.globalAlpha = 1 - k * k;
+      for (const [col, lw] of [['rgba(0,0,0,0.55)', 4.5], [h.head ? '#ff3a4e' : '#ffffff', 2.4]]) {
+        c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round';
+        for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { c.beginPath(); c.moveTo(W / 2 + sx * o, H / 2 + sy * o); c.lineTo(W / 2 + sx * s, H / 2 + sy * s); c.stroke(); }
+      }
+      c.globalAlpha = 1; c.lineCap = 'butt';
     }
     // Scope (Halo-style ring with a range readout) or a small crosshair.
     g._neuroHud(c, proj, W, H);
