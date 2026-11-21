@@ -22,6 +22,45 @@
 // Reinforcements always come from OUTSIDE the building: the barracks door and the south gate.
 import * as THREE from 'three';
 import { lam, glowMat, SPOTS, ROOMS, drawX, BUILDING, mergeBoxes } from './facility.js';
+import { withHaze } from '../atmosphere.js';
+
+// A shared fabric texture for enemy kit: a fine weave, faint camo blotches, grain and a few
+// stitched seams, in greys so each part's colour still shows through.
+let _fab = null;
+function fabricTex() {
+  if (_fab) return _fab;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#d6d6d6';
+  x.fillRect(0, 0, 128, 128);
+  let s = 11;
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 30; i++) {
+    const v = Math.floor(120 + r() * 100);
+    x.fillStyle = `rgba(${v},${v},${v},0.45)`;
+    x.beginPath(); x.ellipse(r() * 128, r() * 128, 6 + r() * 16, 4 + r() * 10, r() * 3, 0, Math.PI * 2); x.fill();
+  }
+  x.fillStyle = 'rgba(0,0,0,0.07)';
+  for (let y = 0; y < 128; y += 2) x.fillRect(0, y, 128, 1);
+  x.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let k = 0; k < 128; k += 3) x.fillRect(k, 0, 1, 128);
+  const d = x.getImageData(0, 0, 128, 128);
+  for (let i = 0; i < d.data.length; i += 4) { const n = (r() - 0.5) * 26; d.data[i] += n; d.data[i + 1] += n; d.data[i + 2] += n; }
+  x.putImageData(d, 0, 0);
+  x.strokeStyle = 'rgba(0,0,0,0.25)';
+  x.setLineDash([2, 2]);
+  for (const y of [18, 70, 110]) { x.beginPath(); x.moveTo(0, y); x.lineTo(128, y); x.stroke(); }
+  _fab = new THREE.CanvasTexture(c);
+  _fab.wrapS = _fab.wrapT = THREE.RepeatWrapping;
+  _fab.colorSpace = THREE.SRGBColorSpace;
+  return _fab;
+}
+const _texMats = new Map();
+function texLam(hex) {
+  if (!_texMats.has(hex)) _texMats.set(hex, withHaze(new THREE.MeshLambertMaterial({ color: hex, map: fabricTex() }), { key: 'cellTex' }));
+  return _texMats.get(hex);
+}
 import { clamp, mulberry32 } from '../util.js';
 
 export const DIFFS = {
@@ -46,7 +85,8 @@ const HELI_HP = 140; // spotlight helicopter drone: one KR-50 round, or a long S
 const HELI_R = 6.5; // the light's pool on the ground
 const EYE = 1.62;
 // The bulwark's hard-light wall, in its local frame (feet at origin, facing -Z, before scale).
-export const WALL = { z: -0.55, w: 0.95, y0: 0.3, y1: 1.85, port: { x0: 0.04, x1: 0.32, y0: 1.38, y1: 1.76 } };
+// The sight-port is a notch cut down from the top edge (a Halo-style dip), so it's easy to read.
+export const WALL = { z: -0.55, w: 0.95, y0: 0.3, y1: 1.85, port: { x0: 0.03, x1: 0.33, y0: 1.36, y1: 1.85 } };
 
 // ---------------------------------------------------------------------------
 // Models
@@ -100,7 +140,11 @@ function wallMat() {
     fragmentShader: `uniform float uT, uA; varying vec2 vUv;
       void main(){
         vec2 p = vUv;
-        // The sight-port: a notch near the top on the weapon side.
+        // The sight-port: a notch cut down from the top edge on the weapon side, with a bright
+        // amber rim so it reads at a glance.
+        float px0 = ${(0.5 + WALL.port.x0 / WALL.w).toFixed(3)}, px1 = ${(0.5 + WALL.port.x1 / WALL.w).toFixed(3)}, py0 = ${((WALL.port.y0 - WALL.y0) / (WALL.y1 - WALL.y0)).toFixed(3)};
+        float pd = max(max(px0 - p.x, p.x - px1), py0 - p.y);
+        float rim = (1.0 - smoothstep(0.0, 0.05, pd)) * step(0.0, pd);
         float port = step(${(0.5 + WALL.port.x0 / WALL.w).toFixed(3)}, p.x) * step(p.x, ${(0.5 + WALL.port.x1 / WALL.w).toFixed(3)}) * step(${((WALL.port.y0 - WALL.y0) / (WALL.y1 - WALL.y0)).toFixed(3)}, p.y) * step(p.y, ${((WALL.port.y1 - WALL.y0) / (WALL.y1 - WALL.y0)).toFixed(3)});
         if (port > 0.5) discard;
         float edge = 1.0 - smoothstep(0.0, 0.06, min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y)));
@@ -108,6 +152,7 @@ function wallMat() {
         float grid = smoothstep(0.42, 0.5, hx);
         float scan = 0.5 + 0.5 * sin(p.y * 60.0 - uT * 6.0);
         vec3 c = vec3(0.2, 0.85, 1.0) * (0.12 + edge * 0.9 + grid * 0.25 + scan * 0.05);
+        c += vec3(1.0, 0.75, 0.3) * rim * (1.1 + 0.25 * sin(uT * 5.0));
         gl_FragColor = vec4(c * uA, 1.0);
       }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
@@ -201,6 +246,14 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.BoxGeometry(0.3, 0.36, 0.08), kitC, 0, 1.25, 0.19);
     belt(mk, padC);
     kneePads(legs, mk, padC);
+    // MOLLE webbing front and back, a thigh holster, a dump pouch, boot soles and toe caps, and
+    // a small IR patch on the shoulder.
+    for (const y of [1.05, 1.27]) for (const z of [-0.223, 0.235]) mk(new THREE.BoxGeometry(0.34, 0.012, 0.006), '#111214', 0, y, z);
+    mk(new THREE.BoxGeometry(0.08, 0.17, 0.1), padC, 0.1, -0.24, 0.0, legs[1]);
+    mk(new THREE.BoxGeometry(0.04, 0.05, 0.06), '#111214', 0.1, -0.13, -0.02, legs[1]);
+    mk(new THREE.BoxGeometry(0.14, 0.12, 0.1), kitC, -0.12, 0.88, 0.17);
+    for (const L of legs) { mk(new THREE.BoxGeometry(0.17, 0.03, 0.3), '#0b0c0d', 0, -0.94, -0.04, L); mk(new THREE.BoxGeometry(0.16, 0.05, 0.06), '#202226', 0, -0.88, -0.17, L); }
+    glow(new THREE.BoxGeometry(0.05, 0.03, 0.005), chief ? '#c070ff' : '#ff4050', -0.28, 1.47, -0.08, body, 0.9);
   } else if (type === 'scav') {
     // Hunched little conscript: coolant pack on its back, slit visor, twitchy.
     const C = { suit: '#2b2a2f', boot: '#121214' };
@@ -225,6 +278,8 @@ export function buildUnit(type = 'guard', chief = false) {
     for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.05, 0.5, 0.02), '#1d1c1a', s * 0.12, 1.2, -0.21).rotation.x = 0.35; mk(new THREE.BoxGeometry(0.16, 0.07, 0.24), '#4a3f30', s * 0.3, 1.42, -0.02).rotation.z = s * 0.4; }
     belt(mk, '#1d1c1a', 0.94, 0.46);
     kneePads(legs, mk, '#1d1c1a');
+    for (const y of [1.28, 1.46, 1.64]) mk(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10), '#1d1c1a', 0, y, 0.47);
+    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.3, 0.015, 0.01), '#1a1918', 0, 1.3 + i * 0.06, 0.155);
   } else if (type === 'jugg' || type === 'overseer') {
     // Hulking enforcer: plated, neon seams, heavy cannon on the left, energy blade on the right.
     const boss = type === 'overseer';
@@ -285,6 +340,7 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.BoxGeometry(0.14, 0.06, 0.2), '#2c3438', 0.22, 1.4, 0.02).rotation.z = 0.4;
     belt(mk, '#1b2024', 0.94, 0.38);
     kneePads(legs, mk, '#1b2024');
+    mk(new THREE.BoxGeometry(0.1, 0.08, 0.34), '#2c3438', -0.2, 1.2, -0.2);
     gun.position.set(0.22, 1.2, -0.3);
     mk(new THREE.BoxGeometry(0.06, 0.08, 0.6), '#1b1e22', 0, 0, -0.15, gun);
     glow(new THREE.BoxGeometry(0.02, 0.02, 0.5), '#30e0ff', 0, 0.05, -0.15, gun, 1.4);
@@ -323,6 +379,11 @@ export function buildUnit(type = 'guard', chief = false) {
       grp.add(merged);
     }
   };
+  // Fabric texture on every plain (non-glowing) part.
+  for (const grp of [body, gun, ...(legs || [])]) for (const o of grp.children) {
+    const m = o.isMesh && o !== beam && o !== blade ? o.material : null;
+    if (m && m.isMeshLambertMaterial && !m.map && !(m.emissive && m.emissive.getHex() !== 0)) o.material = texLam('#' + m.color.getHexString());
+  }
   for (const grp of [body, gun, ...(legs || [])]) mergeIn(grp);
   body.scale.setScalar(T.scale);
   root.userData = { body, legs, gun, beam, tag, shell, wall, blade, helmet, phase: Math.random() * 6, scale: T.scale };

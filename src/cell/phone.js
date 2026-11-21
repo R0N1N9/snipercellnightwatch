@@ -24,7 +24,7 @@ const OPTS = {
 const EXEC = 0.6;
 // Commands at the spot under your crosshair (when nothing hackable is targeted): the console's
 // payloads, sent from the phone. Same costs and cooldowns as the tablet.
-// What the shooter can request at the crosshair (keys 3–8, or press-and-hold on touch).
+// What the shooter can request at the crosshair (keys 4–9, or press-and-hold on touch).
 export const SHOOTER_REQ = [
   { k: 'supply', name: 'SUPPLY' },
   { k: 'scan', name: 'SCAN' },
@@ -268,9 +268,10 @@ export const Phone = {
       return true;
     };
   },
+  // A couple of metres in front of you (where you're facing), for a drop "on me".
   _myPoint() {
-    const P = this.player.pos;
-    return { x: P.x + 1.2, y: P.y, z: P.z + 0.8 };
+    const P = this.player.pos, y = this.player.yaw;
+    return { x: P.x - Math.sin(y) * 2.5, y: P.y, z: P.z - Math.cos(y) * 2.5 };
   },
   _cmdWheelOk() {
     // Never while scoped: that thumb is aiming.
@@ -284,11 +285,11 @@ export const Phone = {
     if (this.cmdWheel && this.cmdWheel.open && !this._cmdWheelOk()) this.cmdWheel.cancel();
     if (this.xr && this.xr.menu) return; // the rounds menu has the number keys
     if (this.role === 'shooter' && !this.operative) {
-      // Shooter: keys 3–8 request that support at the crosshair (1 / 2 are your weapons).
+      // Shooter: keys 4–9 request that support at the crosshair (1 / 2 / 3 are your weapons).
       if (this.tablet.visible || this.downed || this.kia || this.paused || (this._voteOpen && this._voteOpen())) return;
-      // Shift+3: a supply drop on yourself.
-      if (I.pressed('Digit3') && (I.held('ShiftLeft') || I.held('ShiftRight'))) { this._requestPayload('supply', this._myPoint()); return; }
-      for (let i = 0; i < 6; i++) if (I.pressed('Digit' + (i + 3))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
+      // Shift+4: a supply drop in front of you.
+      if (I.pressed('Digit4') && (I.held('ShiftLeft') || I.held('ShiftRight'))) { this._requestPayload('supply', this._myPoint()); return; }
+      for (let i = 0; i < 6; i++) if (I.pressed('Digit' + (i + 4))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
       return;
     }
     if (!(this.role === 'spotter' || this.operative) || !this.ops) return;

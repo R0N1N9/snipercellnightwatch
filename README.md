@@ -279,8 +279,9 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Spotlight drones:** a helicopter drone circles high over each way in (west, east and south), sweeping a spotlight across the ground. Stand in the light too long and it locks on: an alarm, and every guard near you comes. Stay out of the light, or shoot it down. The wreck makes a crash the guards nearby hear.
 - **Tap to collapse:** tap (or click) the objective board, the console / ISR squares or a bodycam to shrink it to its title strip; tap again to bring it back.
 - **Tracers:** each round type has its own colour: standard white-blue, explosive orange, penetrator violet, EMP electric cyan.
-- **Supply on me:** the sniper's request wheel has **SUPPLY → ME** (desktop: Shift+3): the supply drone drops at your feet instead of at the crosshair.
-- **Enemies** wear proper kit: helmets with NVG mounts and rails, plate carriers with mag pouches and radios, belts, packs, knee and elbow pads, railed carbines with slotted handguards; the heavies get armoured knees and plating detail.
+- **Supply on me:** the sniper's request wheel has **SUPPLY → ME** (desktop: Shift+4): the supply drone drops it a couple of metres in front of you instead of at the crosshair.
+- **Knife as a weapon:** both operators carry the knife as a third weapon. Sniper: KR-50 / secondary / knife on **1 / 2 / 3**; spotter: P-9 / binoculars / knife. The mouse wheel (not scoped) steps through them. On touch, tap the weapon-swap button for the next one (its label names it) or **press and hold** it for the weapon wheel and let go on a weapon. With the knife out, fire swings it; **V** still stabs from any weapon. (The sniper's requests moved to **4–9** and the camera dart to **0**.)
+- **Enemies** wear a fabric camo texture over proper kit: helmets with NVG mounts and rails, plate carriers with mag pouches and radios, belts, packs, knee and elbow pads, railed carbines with slotted handguards; the heavies get armoured knees and plating detail. Guards also have MOLLE webbing, a thigh holster, a dump pouch, boot soles and an IR patch. A bulwark's hard-light shield has its sight-port as a notch cut down from the top edge with a glowing amber rim, so the gap is easy to find.
 - **Title:** with NightWatch selected, the menu and loading screen read **SNIPER CELL: NIGHTWATCH** (NIGHT in cyan, WATCH in red).
 - **Look:** both operators wear multicam black with flat dark earth load-bearing kit (carrier and rig) with black accents (pouches and webbing) and IR-reflective red markers. The shooter has a clear coiled earpiece under the hood; the spotter has a ball cap and a headset with flat dark earth cups and a black band, ear cushions and boom mic.
 
@@ -304,7 +305,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Overwatch lock:** hold the scope steady on an area for 1.5 s and everything around your point of aim is marked for the team while you hold it. Your partner sees the ring.
 - **Counter-sniper read:** the tower snipers' sightlines show to you as red lasers.
 - **Spotter relay:** tagged enemies off your screen get an arrow at the edge with their range.
-- **9: camera darts** (three): fire a tiny camera into a wall or the ground. It marks enemies in front of it and appears on the tablet map; click it to watch its feed.
+- **0: camera darts** (three): fire a tiny camera into a wall or the ground. It marks enemies in front of it and appears on the tablet map; click it to watch its feed.
 - **First-use hints:** the first time you use an ability, a short card explains it.
 - Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi; railed upper, slotted handguard, hooded red dot) or the **M50 Magnum** (a big modern hand cannon with a brushed-steel slide, ported compensator and green-rear / red-front night sights; 7 rounds, slow and heavy: a deep boom, a big kick and a wide hip spread, so aim down sights or get close). Its suppressor is fitted by default and removable: your support hand comes up to the muzzle and twists the can off and pockets it (or threads it back on). You can't fire mid-gesture.
 - **Stealth kit:**
@@ -313,7 +314,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
   - **X** lures.
   - **T** Mark & Execute.
   - **E** knife takedown.
-- **Requests at the crosshair:** keys **3–8** request supply, scan, EMP, decoy, lights or the recon drone on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
+- **Requests at the crosshair:** keys **4–9** request supply, scan, EMP, decoy, lights or the recon drone on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
 - **Ping and mark (Q, or PING on touch):** tap on an enemy to mark it; tap on open ground for a PING marker; hold for the ping wheel. **F** is the sync mark.
 - **Knife (V, or KNIFE on touch):** a strike on whoever is within arm's reach in front of you. From behind, or on someone who hasn't noticed you, it's a silent takedown; head-on it's a heavy wound.
 - **Firing while running** drops you out of the sprint and the shot goes; **running doesn't break a reload**.
