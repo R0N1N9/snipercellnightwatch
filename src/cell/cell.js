@@ -3003,7 +3003,7 @@ class CellHud {
     const pills = g.operative && g.role === 'shooter'
       ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ...common]
+        ? [['cell-tab', 'TABLET'], ['cell-breath', 'BREATH'], ...common]
         : [['cell-tab', 'TABLET'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
     const KEEP = new Set(['cell-tab', 'cell-drop', 'cell-yes', 'cell-no', 'cell-recall', 'cell-talk']); // still shown on phones
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
@@ -3023,7 +3023,7 @@ class CellHud {
     const use = document.createElement('div');
     use.className = 'tb sm cell-usebtn';
     use.dataset.act = 'cell-use';
-    use.innerHTML = '<i>\u261D</i><span>USE</span>';
+    use.innerHTML = '<span>USE</span>';
     use.style.display = 'none';
     t.appendChild(use);
     this.useBtn = use;
@@ -3096,25 +3096,49 @@ class CellHud {
     const R = sr && sr.width ? sr.width / 2 : 70;
     const obj = document.querySelector('#cell-hud .c-obj');
     const top0 = obj && obj.getClientRects().length ? obj.getBoundingClientRect().bottom + 6 : 60;
-    const spots = [];
-    for (const rr of [R + size * 1.9, R + size * 3.1, R + size * 4.3, R + size * 5.5]) {
-      for (let a = -100; a >= -175; a -= 15) spots.push([cx + Math.cos((a * Math.PI) / 180) * rr, cy + Math.sin((a * Math.PI) / 180) * rr]);
-      for (let a = -85; a <= -20; a += 15) spots.push([cx + Math.cos((a * Math.PI) / 180) * rr, cy + Math.sin((a * Math.PI) / 180) * rr]);
+    // The magazine strip (sniper): a column (or a row) in the first clear spot on the left.
+    const mags = document.getElementById('cell-mags');
+    const placedRects = [];
+    if (mags && mags.style.display !== 'none' && mags.children.length) {
+      const n = mags.children.length, iw = 40, ih = 52, gap = 5;
+      let done = false;
+      for (const col of [true, false]) {
+        const mw = col ? iw : n * iw + (n - 1) * gap, mh = col ? n * ih + (n - 1) * gap : ih;
+        for (let y = top0; y + mh < H - 16 && !done; y += 8) for (let x = 6; x + mw < W * 0.42 && !done; x += 8) {
+          if (!avoid.some((r) => x + mw > r.left - 6 && x < r.right + 6 && y + mh > r.top - 6 && y < r.bottom + 6)) {
+            mags.classList.toggle('col', col); mags.style.left = `${x}px`; mags.style.top = `${y}px`;
+            placedRects.push({ left: x, top: y, right: x + mw, bottom: y + mh }); done = true;
+          }
+        }
+        if (done) break;
+      }
     }
-    spots.sort((p, q) => Math.hypot(p[0] - cx, p[1] - cy) - Math.hypot(q[0] - cx, q[1] - cy));
-    const placed = [];
-    const clear = (x, y) => x - size / 2 >= 6 && x + size / 2 <= W * 0.5 && y - size / 2 >= top0 && y + size / 2 <= H - 16
-      && !avoid.some((r) => x + size / 2 > r.left - 6 && x - size / 2 < r.right + 6 && y + size / 2 > r.top - 6 && y - size / 2 < r.bottom + 6)
-      && !placed.some(([px, py]) => Math.hypot(px - x, py - y) < size + 8);
+    const blockers = [...avoid, ...placedRects];
+    const n = this.abBtns.length, gapMin = size + 14;
+    const okSpot = (x, y, others) => x - size / 2 >= 6 && x + size / 2 <= W * 0.5 && y - size / 2 >= top0 && y + size / 2 <= H - 16
+      && !blockers.some((r) => x + size / 2 > r.left - 8 && x - size / 2 < r.right + 8 && y + size / 2 > r.top - 8 && y - size / 2 < r.bottom + 8)
+      && !others.some(([px, py]) => Math.hypot(px - x, py - y) < gapMin);
+    // Evenly spaced along one arc round the stick: the tightest arc where every button fits.
+    let layout = null;
+    for (let rr = R + size * 1.8; rr < R + size * 7 && !layout; rr += size * 0.4) {
+      for (const [a0, a1] of [[-165, -15], [-170, -40], [-150, -10], [-175, -60], [-120, -5]]) {
+        const step = n > 1 ? (a1 - a0) / (n - 1) : 0;
+        if (n > 1 && Math.abs((step * Math.PI) / 180) * rr < gapMin) continue;
+        const pts = [];
+        for (let k = 0; k < n; k++) { const ang = ((n > 1 ? a0 + step * k : (a0 + a1) / 2) * Math.PI) / 180; const p = [cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr]; if (!okSpot(p[0], p[1], pts)) break; pts.push(p); }
+        if (pts.length === n) { layout = pts; break; }
+      }
+    }
+    // Couldn't fit one arc: the nearest clear spots, still kept apart.
+    if (!layout) {
+      layout = [];
+      const cand = [];
+      for (let y = top0 + size / 2; y < H - size; y += 10) for (let x = 6 + size / 2; x < W * 0.45; x += 10) cand.push([x, y]);
+      cand.sort((p, q) => Math.hypot(p[0] - cx, p[1] - cy) - Math.hypot(q[0] - cx, q[1] - cy));
+      for (let k = 0; k < n; k++) layout.push(cand.find(([x, y]) => okSpot(x, y, layout)) || [6 + size / 2 + k * (size + 8), top0 + size / 2]);
+    }
     el.style.setProperty('--ab', `${size}px`);
-    for (const b of this.abBtns) {
-      let spot = spots.find(([x, y]) => clear(x, y));
-      if (!spot) { for (let y = top0 + size / 2; y < H - size && !spot; y += 12) for (let x = 12 + size / 2; x < W * 0.45 && !spot; x += 12) if (clear(x, y)) spot = [x, y]; }
-      if (!spot) spot = [12 + size / 2 + (placed.length % 3) * (size + 6), top0 + size / 2 + Math.floor(placed.length / 3) * (size + 6)];
-      placed.push(spot);
-      b.el.style.left = `${Math.round(spot[0] - size / 2)}px`;
-      b.el.style.top = `${Math.round(spot[1] - size / 2)}px`;
-    }
+    this.abBtns.forEach((b, k) => { b.el.style.left = `${Math.round(layout[k][0] - size / 2)}px`; b.el.style.top = `${Math.round(layout[k][1] - size / 2)}px`; });
   }
 
   intro(M, who) {
@@ -3221,14 +3245,19 @@ class CellHud {
         if (on && f) {
           // A free spot round FIRE (left, up-left, up...), clear of the other buttons.
           const r = f.getBoundingClientRect(), fx = r.left + r.width / 2, fy = r.top + r.height / 2, R = r.width / 2 + 36, s = 50;
-          const others = [...document.querySelectorAll('#touch .tb, #touch .cell-tbar .pill')].filter((e) => e !== this.useBtn && e.getClientRects().length && getComputedStyle(e).display !== 'none').map((e) => e.getBoundingClientRect());
-          let best = [fx - R, fy];
-          for (const a of [180, 200, 160, 220, 140, 240, 120, 260, 100]) {
-            const x = fx + Math.cos((a * Math.PI) / 180) * R, y = fy - Math.sin(((a - 180) * Math.PI) / 180) * R * -1;
-            const yy = fy + Math.sin((a * Math.PI) / 180) * -R;
-            if (x - s / 2 < 4 || yy - s / 2 < 4 || yy + s / 2 > innerHeight - 4) continue;
-            if (!others.some((o) => x + s / 2 > o.left - 4 && x - s / 2 < o.right + 4 && yy + s / 2 > o.top - 4 && yy - s / 2 < o.bottom + 4)) { best = [x, yy]; void y; break; }
+          const others = [...document.querySelectorAll('#touch .tb, #touch .cell-tbar .pill, #cell-hud .c-ammo, #touch .cell-abil .ab, #cell-mags')].filter((e) => e !== this.useBtn && e.getClientRects().length && getComputedStyle(e).display !== 'none').map((e) => e.getBoundingClientRect());
+          // Try rings round FIRE (nearest first), every 15°, and take the first clear spot.
+          let best = null;
+          const ov = (x, y) => others.some((o) => x + s / 2 > o.left - 4 && x - s / 2 < o.right + 4 && y + s / 2 > o.top - 4 && y - s / 2 < o.bottom + 4);
+          for (const rr of [R, R + 28, R + 56, R + 84]) {
+            for (const a of [180, 195, 165, 210, 150, 225, 135, 240, 120, 255, 105, 270, 90]) {
+              const x = fx + Math.cos((a * Math.PI) / 180) * rr, y = fy - Math.sin((a * Math.PI) / 180) * rr;
+              if (x - s / 2 < 4 || x + s / 2 > innerWidth - 4 || y - s / 2 < 4 || y + s / 2 > innerHeight - 4) continue;
+              if (!ov(x, y)) { best = [x, y]; break; }
+            }
+            if (best) break;
           }
+          if (!best) best = [fx - R, fy - R];
           this.useBtn.style.left = `${Math.round(best[0] - s / 2)}px`;
           this.useBtn.style.top = `${Math.round(best[1] - s / 2)}px`;
         }

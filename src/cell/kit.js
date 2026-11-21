@@ -14,7 +14,7 @@ import { WHEEL } from './wheel.js';
 import { buildVan, SEATS, setVanLights } from './van.js';
 
 export const KIT = {
-  deadeye: { dur: 8, cd: 35 },
+  deadeye: { dur: 8, cd: 60 },
   lure: { charges: 3, life: 7, radius: 16 },
   exec: { max: 2, start: 1, range: 35, targets: 3, gap: 0.22 },
 };
@@ -141,7 +141,7 @@ export const KitMethods = {
     K.deadeye = KIT.deadeye.dur;
     K.deMarks = [];
     this.sfx.ui(true);
-    this.hud.flash('DEADEYE \u2014 MARK UP TO 3, THEN FIRE', 'cyan', 1.2);
+    this.hud.flash('DEADEYE \u2014 3 CLOSEST IN SIGHT MARKED \u00B7 FIRE', 'cyan', 1.2);
   },
   // Per frame. Returns true while the sequence owns the trigger.
   _deadeyeStep(dt, act, live) {
@@ -184,11 +184,19 @@ export const KitMethods = {
       return true;
     }
     if (!(K.deadeye > 0) || this.role !== 'shooter' && !this.operative) return false;
-    // Marking: whatever the crosshair crosses (guards in the clear, up to three).
-    K.deMarks = (K.deMarks || []).filter((id) => { const g = S.byId(id); return g && g.state !== 'dead'; });
-    if (live && K.deMarks.length < 3) {
-      const e = this._crosshairEnemy();
-      if (e && e.kind === 'g' && !K.deMarks.includes(e.id)) { K.deMarks.push(e.id); this.audio.ping && this.audio.ping(); }
+    // Marking: the three closest enemies in line of sight are marked automatically (refreshed a
+    // few times a second as you move and they move).
+    K.deMarkT = (K.deMarkT || 0) - dt;
+    if (live && K.deMarkT <= 0) {
+      K.deMarkT = 0.15;
+      const o = P.eyePos(new THREE.Vector3()), fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+      const prev = K.deMarks || [];
+      K.deMarks = S.guards
+        .filter((g) => g.state !== 'dead')
+        .map((g) => { const h = guardCapsules(g)[0].a; const v = new THREE.Vector3(h.x, h.y, h.z).sub(o); return { g, h, d: v.length(), a: v.normalize().angleTo(fwd) }; })
+        .filter((q) => q.d < 60 && q.a < 1.2 && this.fac.los(o, q.h))
+        .sort((a, b) => a.d - b.d).slice(0, 3).map((q) => q.g.id);
+      if (K.deMarks.some((id) => !prev.includes(id))) this.audio.ping && this.audio.ping();
     }
     if (live && (act.fire) && K.deMarks.length) {
       this.deSeq = { t: 0, ids: K.deMarks.slice(), i: 0, phase: 'draw', switchT: 0.35 };
@@ -726,7 +734,7 @@ export const KitMethods = {
       c.beginPath(); c.moveTo(p.x, p.y - 11); c.lineTo(p.x + 9, p.y); c.lineTo(p.x, p.y + 11); c.lineTo(p.x - 9, p.y); c.closePath(); c.fill(); c.stroke();
       c.fillStyle = '#ffffff'; c.font = '700 11px JetBrains Mono, monospace'; c.textAlign = 'center'; c.fillText(String(i + 1), p.x, p.y + 4);
     }
-    if (K.deadeye > 0) { c.fillStyle = 'rgba(255,90,100,0.95)'; c.font = '700 13px JetBrains Mono, monospace'; c.textAlign = 'center'; c.fillText(`DEADEYE \u00B7 ${(K.deMarks || []).length}/3 MARKED \u00B7 ${(K.deMarks || []).length ? 'FIRE TO EXECUTE' : 'SWEEP THE CROSSHAIR'} \u00B7 ${Math.ceil(K.deadeye)} s`, W / 2, H * 0.72); }
+    if (K.deadeye > 0) { c.fillStyle = 'rgba(255,90,100,0.95)'; c.font = '700 13px JetBrains Mono, monospace'; c.textAlign = 'center'; c.fillText(`DEADEYE \u00B7 ${(K.deMarks || []).length}/3 AUTO-MARKED \u00B7 ${(K.deMarks || []).length ? 'FIRE TO EXECUTE' : 'NO ONE IN SIGHT'} \u00B7 ${Math.ceil(K.deadeye)} s`, W / 2, H * 0.72); }
     // DEADEYE: heads and bulwark sight-ports glow, through the dark (not through walls).
     if (K.deadeye > 0) {
       const o = this.camera.position;

@@ -14,14 +14,14 @@
 import * as THREE from 'three';
 
 export const HINTS = {
-  deadeye: ['DEADEYE (H)', 'Sweep your crosshair over up to three enemies to mark them, then pull the trigger: Ra drops the rifle to his left hand, draws the M50 and drops all three, one after another.'],
+  deadeye: ['DEADEYE (H)', 'The three closest enemies in your line of sight are marked automatically. Pull the trigger: Ra drops the rifle to his left hand, draws the M50 and drops all three, one after another. 60 s cooldown.'],
   execute: ['MARK & EXECUTE (T)', 'Mark enemies (Q), then press T: Ra snaps through every marked target in line of sight, one suppressed shot each. Earn charges with silent takedowns.'],
   lure: ['LURE (X)', 'Throw a noise-maker. Patrols walk over to check it, off their route and into your sights.'],
   camo: ['ACTIVE CAMO (G)', 'Breaks line of sight: guards, cameras and drones can\u2019t see you past arm\u2019s length. Moving drains it; hold still and it slowly recharges even while on. Firing breaks it.'],
   rounds: ['ROUNDS (Z)', 'Pick a magazine: Standard goes through bodies; Explosive sticks and blows; Penetrator punches through walls and shields; EMP kills electronics and radios.'],
   ghillie: ['GHILLIE FREEZE', 'Prone and dead still: you all but vanish past ~15 m. Move or fire and it breaks.'],
   breath: ['BREATH CONTROL (SHIFT)', 'Hold SHIFT on the scope: the view slows and stops swaying for a few seconds. Watch the wind readout and aim at the hold-off dot.'],
-  chain: ['MARKED FOR DEATH', 'Kill three tagged enemies within 10 s of each other: Deadeye is back and the camo battery is full.'],
+  chain: ['MARKED FOR DEATH', 'Kill three tagged enemies within 10 s of each other: the camo battery is full.'],
   overwatch: ['OVERWATCH LOCK', 'Hold the scope steady on an area: everything around your point of aim is marked for the team while you keep it there.'],
   dart: ['CAMERA DART (9)', 'Fires a tiny camera into whatever you hit. It marks enemies in front of it and shows up as a feed on the tablet.'],
   drag: ['BODY DRAG (hold E)', 'Hold E on a body to drag it. Let go to drop it somewhere dark, out of a patrol’s path.'],
@@ -135,9 +135,8 @@ export const Abilities = {
     if (C.n === 1) this._hint('chain');
     if (C.n >= CHAIN.need) {
       C.n = 0;
-      this.kit.deadeyeCd = 0;
-      this.cloak.bat = 100; this.cloak.lockT = 0;
-      this.hud.flash('MARKED FOR DEATH — DEADEYE READY · CAMO FULL', 'cyan', 1.6);
+      this.cloak.bat = 100; this.cloak.lockT = 0; // (Deadeye no longer recharges on kills)
+      this.hud.flash('MARKED FOR DEATH — CAMO FULL', 'cyan', 1.6);
       this.sfx.ui(true);
     } else this.hud.flash(`MARK CHAIN ${C.n}/${CHAIN.need}`, 'amber', 0.9);
   },
