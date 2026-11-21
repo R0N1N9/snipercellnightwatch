@@ -33,6 +33,19 @@ export const SPOTS = {
   droneBay: { x: -52, z: 30 },
 };
 
+// Drop points the cell can choose in the menu. Each sets where the van comes in (vx, from z0
+// to z1), where you and your partner start, and whether there's an approach to walk.
+export const DROPS = {
+  draw: { name: 'TREE LINE', desc: 'The wooded draw south of the ridge. Walk in under the trees, clear the pickets, crest the hill.', van: [6, 336, 298], insert: [{ x: 6.9, z: 276 }, { x: 5.1, z: 276 }], approach: true },
+  ridge: { name: 'RIDGE', desc: 'Straight onto the plateau above the cliff. No approach: the compound is right below you.', van: [6, 196, 143], insert: [{ x: 6.9, z: 121 }, { x: 5.1, z: 121 }], approach: false },
+};
+export function setInsertion(kind) {
+  const D = DROPS[kind] || DROPS.draw;
+  SPOTS.insert = D.insert.map((p) => ({ ...p }));
+  SPOTS.drop = kind in DROPS ? kind : 'draw';
+  return D;
+}
+
 // Rack-room keycards: one per door, each with a coloured tag that matches the door's reader.
 export const CARDS = {
   dha: { name: 'RED', color: '#ff3a3a' },

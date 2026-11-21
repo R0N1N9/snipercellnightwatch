@@ -138,3 +138,12 @@ export function buildKnife() {
   g.add(blade, guard, handle);
   return g;
 }
+
+// What each operator wears (game and menu preview). Both wear the multicam-black kit: the
+// shooter adds a chest rig and the urban-digital poncho; the spotter wears the plate carrier
+// with a quad on the pack.
+export function cellLook(role) {
+  return role === 'shooter'
+    ? { outfit: 'wraith', theme: 'mcblack', vest: 'rig', poncho: true, ponchoTheme: 'urbandark', hat: 'none', eyes: 'goggles', kit: { stealth: 'suppressor' } }
+    : { outfit: 'wraith', theme: 'mcblack', vest: 'plate', poncho: false, hat: 'cap', eyes: 'goggles', kit: { scout: 'drone' } };
+}

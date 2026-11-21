@@ -207,6 +207,8 @@ The data center has **two storeys** with two stairwells. Guards, cameras and pat
 
 **Inside the building:** patrols on both floors.
 
+**Drop point:** the NightWatch menu shows a briefing map of Kestrel Ridge. Pick where the van drops you, on the map or with the buttons under it: **Tree line** (the default, described below) or **Ridge** (straight onto the plateau above the cliff, no approach). When you host, your pick applies to both of you.
+
 **The approach:** the van drops you in a wooded draw south of the ridge. Walk north up the draw, using the tree line as cover (tree crowns block sight), over the crest and out to the cliff that overlooks the compound. Four or five **pickets** hold the draw: a sentry at a sandbagged observation post, two walkers on the valley floor, a lookout below the crest and sometimes one on the tree line. Each one that spots you radios it in, so take them quietly. The objective board counts the ones left until you're over the crest. An AI partner walks the draw with you (crouching when you do) and moves to its post once you crest the hill.
 
 The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and spread out: no two starting guards stand within about 9 m of each other, except a pack leader and its follower.
@@ -252,6 +254,8 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
   - The comms log fades after a few seconds; the tablet keeps the full log.
   - **O** shows or hides the objective board, and **P** expands or compacts it.
 
+The **Staging area · Loadout** screen shows each operator in full kit on a turntable (drag to turn; tabs switch between shooter and spotter).
+
 ### Roles
 
 **Shooter** (default callsign **Ra**):
@@ -272,6 +276,7 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
 - **Eyes on:** anything in your field of view, in the clear and within about 40 m (60 m aimed), is marked for the team while you can see it, like the quad's neurolink. Your crosshair on an enemy tags it at once with a ping. Sight marks don't send an AI Ra after them; tag with F or ping ENEMY for that.
 - **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon quad, medevac) at the spot you're aiming at, with the phone animation. **0** (or the SWEEP button) calls an **ISR sweep** on the ground under your crosshair.
 - **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
+- **Recon quad to a spot:** drag RECON QUAD from the tablet onto the map (or fire the quad command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. Q takes the sticks; hold Q recalls it.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.

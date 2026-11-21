@@ -376,6 +376,8 @@ export class Tablet {
       if (d.req) { this.reqSel = d.k; this._click(p, px, py); return; }
       const P = PAYLOAD[d.k];
       if (!P) return;
+      // The recon quad flies itself to where you drop it (and holds there, marking).
+      if (d.k === 'quad') { const why = this.g._quadTo(p); this._say(why ? `RECON QUAD: ${why}` : 'QUAD \u2192 EN ROUTE', !why); return; }
       if (!P.aim) { this._pick(d.k); return; }
       this.selected = d.k;
       this._click(p, px, py);

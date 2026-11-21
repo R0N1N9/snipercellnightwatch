@@ -28,7 +28,7 @@ import { Input } from '../input.js';
 import { WEAPON, PLAYER } from '../config.js';
 import { RULES, applyRules } from '../rules.js';
 import { clamp, segSegClosest } from '../util.js';
-import { Facility, SPOTS, FENCE, BUILDING, ROOMS, CARDS, terrainHeight, lam, glowMat } from './facility.js';
+import { Facility, SPOTS, DROPS, setInsertion, FENCE, BUILDING, ROOMS, CARDS, terrainHeight, lam, glowMat } from './facility.js';
 import { Sentinel, DIFFS, guardCapsules, buildDrone, angDiff } from './sentinel.js';
 import { Ops, AiSpotter, PAYLOAD, HACK } from './ops.js';
 import { Tablet } from './tablet.js';
@@ -46,7 +46,7 @@ import { wallBlock } from './sentinel.js';
 import { Cinema } from './cinema.js';
 import { Radio, setVoiceSetting } from './voice.js';
 import { Minigame } from './minigame.js';
-import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildKnife, normLoadout } from './arms.js';
+import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildKnife, normLoadout, cellLook } from './arms.js';
 import { ISR, ISR_FOV } from './isr.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
 import { AtmosFX } from '../atmofx.js';
@@ -326,7 +326,7 @@ function buildSky(scene) {
 
 // ---------------------------------------------------------------------------
 export class CellGame {
-  constructor({ mode, net, role, diff = 'operative', seed = 7, quality = 'medium', settings, audio, name, partnerName, mission = 'nightwatch', look = 'inked' }) {
+  constructor({ mode, net, role, diff = 'operative', seed = 7, quality = 'medium', settings, audio, name, partnerName, mission = 'nightwatch', look = 'inked', insert = 'draw' }) {
     // 'solo' (AI partner) | 'operative' (one operator, both roles) | 'host' | 'guest'
     this.mode = mode;
     this.isHost = mode !== 'guest';
@@ -334,6 +334,9 @@ export class CellGame {
     this.operative = mode === 'operative';
     this.aiPartner = mode === 'solo';
     this.mission = MISSIONS[mission] ? mission : 'nightwatch';
+    // Drop point (menu choice; the host's applies to both): the tree-line draw or the ridge.
+    this.drop = setInsertion(insert);
+    this.dropKind = SPOTS.drop;
     if (this.operative) role = 'shooter';
     this.net = net || null;
     this.role = role;
@@ -365,7 +368,7 @@ export class CellGame {
     this._lights();
     buildSky(this.scene);
     this.fac = new Facility(this.scene, quality, seed);
-    this.sentinel = new Sentinel(this, { diff, seed, sim: this.isHost, mission: this.mission });
+    this.sentinel = new Sentinel(this, { diff, seed, sim: this.isHost, mission: this.mission, pickets: this.drop.approach });
     this.sfx = new Sfx(audio);
     this.effects = new Effects(this.scene);
     this.input = new Input(this.renderer.domElement, document.getElementById('touch'));
@@ -396,7 +399,7 @@ export class CellGame {
     this.aiSpot = this.aiPartner && this.role === 'shooter' ? new AiSpotter(this, this.ops) : null;
     this.aiShoot = this.aiPartner && this.role === 'spotter' ? { perch: 0, cool: 3, aim: null, aimT: 0, moveT: 0, sayT: 0, holdT: 0, coverT: 0 } : null;
     // The approach: until you're over the crest an AI partner walks the draw with you.
-    this.approach = true;
+    this.approach = this.drop.approach;
     this.quad = null;
     this.quadCd = 0;
     this._kitInit();
@@ -567,11 +570,7 @@ export class CellGame {
   }
 
   _look(role) {
-    // Both operators wear the multicam-black kit. The shooter adds a chest rig and the
-    // urban-digital poncho; the spotter wears the plate carrier with a quad on the pack.
-    return role === 'shooter'
-      ? { outfit: 'wraith', theme: 'mcblack', vest: 'rig', poncho: true, ponchoTheme: 'urbandark', hat: 'none', eyes: 'goggles', kit: { stealth: 'suppressor' } }
-      : { outfit: 'wraith', theme: 'mcblack', vest: 'plate', poncho: false, hat: 'cap', eyes: 'goggles', kit: { scout: 'drone' } };
+    return cellLook(role);
   }
 
   _setupPartner() {
@@ -966,7 +965,7 @@ export class CellGame {
   _afterIntro() {
     this.comms('Weapons free on your call. Stay in the dark.', 'dim');
     // Overwatch's briefing: short, clipped radio lines, each typed out as its own subtitle.
-    for (const line of BRIEF[this.mission === 'nightwatch' ? 'nightwatch' : 'infiltration']) this._voice('isr', line, true);
+    for (const line of BRIEF[this.mission === 'nightwatch' ? 'nightwatch' : 'infiltration']) if (this.drop.approach || !/^Pickets/.test(line)) this._voice('isr', line, true);
     this.input.requestLock();
   }
 
@@ -1035,7 +1034,7 @@ export class CellGame {
   _updateLocal(dt, a) {
     const P = this.player, I = this.input;
     const tab = this.tablet.visible;
-    const quad = this.quad && this.quad.active;
+    let quad = this.quad && this.quad.active;
     // Keys for this mode.
     // TAB: the spotter taps it for the tablet (tap again: ISR, again: back to first person)
     // and holds it for quickhacks (phone out). The shooter's TAB is just the map.
@@ -1093,6 +1092,8 @@ export class CellGame {
         this._qT = 0; this._qDone = false;
       }
       if (I.pressed('cell-recall') && this._quadOut()) this._recallQuad();
+      // A park / recall / launch just now changes what this frame drives.
+      quad = !!(this.quad && this.quad.active);
     }
     // F: tap = tag what's under the crosshair; hold on an enemy (or SYNC) = mark it as your
     // teammate's sync target.
@@ -1118,6 +1119,7 @@ export class CellGame {
     this._kitUpdate(dt);
     this.quadCd = Math.max(0, this.quadCd - dt);
     if (!this._quadOut() && this.quadBat !== undefined) this.quadBat = Math.min(QUAD_BAT, this.quadBat + dt * 3);
+    if (this.quad && this.quad.parked && this.quad.auto) this._quadAuto(dt);
     if (this.quad && this.quad.parked) { this.quad.bat -= dt * 0.25; if (this.quad.bat <= 0) { this.comms('Quad battery dead \u2014 it\u2019s coming home.', 'cyan', this.name); this._endQuad(); } }
 
     // Cloak battery (Cold Archive: drain 14/s, regen 7 × camo/s).
@@ -1175,7 +1177,7 @@ export class CellGame {
     else if (this._wasSeated) { const d = this._doorWorld(this._wasSeated); P.pos.set(d.x, this.fac.groundAt(d.x, d.z, 5, 0.5), d.z); this._wasSeated = null; }
     if (this.downed) { P.vel.x *= 0.2; P.vel.z *= 0.2; }
     if (P.def.kind === 'bolt' && P.boltEvent) { P.boltEvent = false; this.audio.bolt(0.05); }
-    if (quad) this._updateQuad(dt, a);
+    if (quad && this.quad && this.quad.active) this._updateQuad(dt, a); // (a recall this frame ends it)
 
     // Fire. (A green sync pulls the trigger for you.)
     if (this._autoFire) { this._autoFire = false; if (live && !quad && !seat) { act.fire = true; this._syncShotId = this.syncAim; } }
@@ -1613,12 +1615,53 @@ export class CellGame {
   // ---- recon quad (spotter) ----------------------------------------------------------
   _startQuad() {
     if (this.role !== 'spotter' && !this.operative) return;
-    const P = this.player;
-    if (this.tablet.visible) this.tablet.close();
-    if (this.isr.active) this.isr.exit();
-    this.quad = { active: true, parked: false, x: P.pos.x, y: P.pos.y + 2.2, z: P.pos.z, yaw: P.yaw, pitch: -0.2, bat: this.quadBat ?? QUAD_BAT, hp: 30, vy: 0 };
-    this.audio.startLoop('quad', this.camera.position, 'rotor', 0.22);
-    this.comms('Quad up. Look at enemies to neurolink them. Q park \u00B7 hold Q recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+    const P = this.player, auto = this._quadAutoNext;
+    // Sent to a spot (tablet drag-and-drop, or the command at your crosshair): it flies itself
+    // there and holds, and you stay where you are. Otherwise you take the sticks.
+    if (!auto) { if (this.tablet.visible) this.tablet.close(); if (this.isr.active) this.isr.exit(); }
+    this.quad = { active: !auto, parked: !!auto, auto: auto || null, x: P.pos.x, y: P.pos.y + 2.2, z: P.pos.z, yaw: P.yaw, pitch: -0.2, bat: this.quadBat ?? QUAD_BAT, hp: 30, vy: 0 };
+    this.audio.startLoop('quad', new THREE.Vector3(this.quad.x, this.quad.y, this.quad.z), 'rotor', 0.22);
+    if (auto) this.comms('Quad en route to the mark. Q to take it, hold Q to recall.', 'cyan', this.name);
+    else this.comms('Quad up. Look at enemies to neurolink them. Q park \u00B7 hold Q recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+  }
+  // Send the quad to a spot: launch it there, or redirect it if it's already up.
+  _quadTo(at) {
+    if (!at) return 'PICK A SPOT';
+    if (this._quadOut()) {
+      const q = this.quad;
+      if (q.active) { q.active = false; q.parked = true; }
+      q.auto = { x: at.x, z: at.z };
+      this.comms('Quad moving to the mark.', 'cyan', this.name);
+      return null;
+    }
+    this._quadAutoNext = { x: at.x, z: at.z };
+    const why = this.ops ? this.ops.use('quad') : 'NO CONSOLE';
+    this._quadAutoNext = null;
+    return why;
+  }
+  // Autopilot: climb to ~9 m over the ground, fly to the mark at 12 m/s, then hold and mark.
+  _quadAuto(dt) {
+    const q = this.quad, A = q.auto;
+    const P = this.player.pos;
+    let tx = A.x, tz = A.z;
+    const lp = Math.hypot(tx - P.x, tz - P.z);
+    if (lp > 250) { tx = P.x + (tx - P.x) * 250 / lp; tz = P.z + (tz - P.z) * 250 / lp; } // signal leash
+    const dx = tx - q.x, dz = tz - q.z, d = Math.hypot(dx, dz);
+    const inside = this.fac.insideBuilding(tx, tz);
+    const want = (inside ? 0 : 0) + Math.max(this.fac.groundAt(q.x, q.z, q.y, 0.5), terrainHeight(q.x, q.z)) + (d > 6 ? 9 : 7);
+    q.y += clamp(want - q.y, -4 * dt, 5 * dt);
+    if (d > 0.8) {
+      const st = Math.min(d, 12 * dt);
+      const p = { x: q.x + (dx / d) * st, y: q.y, z: q.z + (dz / d) * st };
+      this.fac.resolveHorizontal(p, 0.4, 0.5, 0);
+      q.x = p.x; q.z = p.z;
+      q.yaw = Math.atan2(-dx, -dz);
+    } else {
+      q.auto = null;
+      this.comms('Quad on station. It keeps marking. Q to take it.', 'cyan', this.name);
+      this.sfx.ui(true);
+    }
+    this.audio.updateLoop('quad', new THREE.Vector3(q.x, q.y, q.z));
   }
   _quadOut() {
     return !!(this.quad && (this.quad.active || this.quad.parked));
@@ -1639,6 +1682,7 @@ export class CellGame {
     if (this.isr.active) this.isr.exit();
     q.active = true;
     q.parked = false;
+    q.auto = null;
     this.sfx.ui(true);
   }
   // Quick calldown: the quad comes straight home and is ready again in a few seconds.
@@ -1650,6 +1694,7 @@ export class CellGame {
   }
   _updateQuad(dt, a) {
     const q = this.quad;
+    if (!q || !q.active) return;
     q.bat -= dt * 0.5;
     const sens = 0.0022;
     q.yaw -= a.lookX * sens;
