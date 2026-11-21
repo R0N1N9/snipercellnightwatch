@@ -1197,9 +1197,13 @@ export class Avatar {
     const ap = AIM_POS[st];
     this.aim.position.set(ap[0], ap[1], ap[2]);
     this.aim.rotation.x = s.pitch;
-    // Low ready (staging): weapon down in front, canted off to the side.
-    this.aim.rotation.y = s.lowReady ? (s.w ? 0.25 : 0.55) : 0;
-    this.aim.rotation.z = s.lowReady ? (s.w ? 0.1 : 0.35) : 0;
+    // Low ready (staging), and running: weapon down in front, canted off to the side; it comes
+    // back up when you stop (blended, like the first-person view).
+    this._runK = (this._runK || 0) + ((s.sprint && st === 0 ? 1 : 0) - (this._runK || 0)) * Math.min(1, dt * 8);
+    const low = s.lowReady ? 1 : this._runK;
+    this.aim.rotation.x = s.pitch * (1 - low) + (s.lowReady ? s.pitch : -0.85 * low);
+    this.aim.rotation.y = low * (s.w ? 0.25 : 0.55);
+    this.aim.rotation.z = low * (s.w ? 0.1 : 0.35);
     this._pistolOut = !!s.w;
     this._prone = (s.st | 0) === 2;
     this.rifle.visible = !s.w && !this._pollo;

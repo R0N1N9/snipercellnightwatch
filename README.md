@@ -86,7 +86,7 @@ It also has **[NightWatch](#nightwatch-co-op)**, a co-op (or solo) night stealth
 
 - Controls sit in arcs around where each thumb rests, inset from the corners and clear of notches. A fixed joystick sits bottom-left; push it fully forward to sprint. Zero −/+, Range and the weapon swap sit in an outer ring around the right-hand FIRE button. The left thumb also has a second **FIRE** and a **BREATH** toggle, so either thumb can aim while the other fires.
 - Drag anywhere that isn't a button to aim. Left and right thumbs each have their own sensitivity in Settings.
-- **SCOPE** (the larger button just above FIRE) and **BREATH** are toggles. Breath releases itself when you unscope or run out of air. **RELOAD** sits to FIRE's left.
+- **SCOPE** (just above FIRE, the same size as RELOAD) and **BREATH** are toggles. Breath releases itself when you unscope or run out of air. **RELOAD** sits to FIRE's left.
 - **Gyro aiming** (Settings): Off, When scoped (default on phones) or Always, with its own sensitivity and invert. It needs HTTPS, so it works from the hosted page, not an opened file. iPhones ask for motion permission the first time.
 - Pills along the top hold your tools (with charges), kit, the Predator feed and the menu.
 
@@ -250,7 +250,7 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
   - **N** to reach up and pull the goggles down: your hand comes up, the goggles flip down with a click and a tube whine, and the picture irises open as the tubes warm.
   - The goggles and scope are smooth, near-white phosphor with a slight blue cast.
   - Bright lights, including a weapon light in your face, wash it out.
-  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
+  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. Both the IR and red lasers always come out along the muzzle, so they swing low with the weapon while you run. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
 - **Weapon lights (L):** a weapon light makes you easy to see. Guards also walk over to wherever the beam lands, so it works as a distraction.
 - **Sync shots:**
   1. Look at an enemy and **hold F** (or tap SYNC on touch) to mark it for your teammate: a pulsing circle sits over its head. The wheel's SYNC option works too.
@@ -283,7 +283,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 
 **Shooter** (default callsign **Ra**):
 
-- KR-50 Nightjar: bolt-action, integrally suppressed, with Halo-style hitscan and a night-vision scope.
+- KR-50 Nightjar: bolt-action, integrally suppressed, with Halo-style hitscan and a night-vision scope. Press **N** (the NV button on touch) while scoped to switch the scope between night vision and plain vision. When an operator sprints, their third-person model drops the weapon to a low carry, matching the first-person view, and brings it back up when they stop.
   - Dead-on through the scope, wide from the hip (the crosshair opens to show it), with a real kick.
   - **Standard bolt** (default): tap fire and you come off the glass to work the bolt; keep fire held to stay scoped. The **straight-pull bolt** (Staging area) cycles while you stay on target.
   - **Collateral:** every KR-50 round carries on through bodies (losing some punch each time). Walls stop it unless it's a penetrator.
