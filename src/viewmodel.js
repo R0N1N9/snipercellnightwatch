@@ -417,12 +417,20 @@ export class ViewModel {
     const adsPos = new THREE.Vector3(0, -(U.sight + 0.004) * 0.82, -0.3);
     // Canted hold (handguns, an option): centre of the screen, tilted, like CoD; aiming down
     // the sights straightens it out.
-    const cantK = pistol && st.cant && def.key !== 'smg' ? 1 - ads : 0;
-    if (cantK > 0) base.lerp(new THREE.Vector3(0.035, -0.125, -0.33), cantK);
+    // IR (night vision on): handguns and the SMG come up higher and cant over, MW-style, so
+    // the IR laser shows across the view. Firing keeps it; aiming down the sights takes it out.
+    // (Not the sniper rifle.)
+    this.irK = (this.irK || 0) + ((st.irCant && pistol ? 1 : 0) - (this.irK || 0)) * Math.min(1, dt * 6);
+    const irK = this.irK * (1 - ads);
+    const cantK = pistol && def.key !== 'smg' ? Math.max(st.cant ? 1 - ads : 0, irK) : 0;
+    if (cantK > 0) base.lerp(new THREE.Vector3(0.035, -0.125 + 0.025 * irK, -0.33), cantK);
+    const smgIr = def.key === 'smg' ? irK : 0;
+    if (smgIr > 0) base.lerp(new THREE.Vector3(0.07, -0.115, -0.33), smgIr);
     const pos = base.clone().lerp(adsPos, ads);
     const rot = new THREE.Euler(0, 0, 0, 'YXZ');
     if (!pistol) rot.y = 0.04;
-    rot.z += 0.42 * cantK; // canted so the right side of the gun rides up
+    // Canted so the right side of the gun rides up and the top leans left, as in CoD.
+    rot.z += 0.42 * cantK + 0.5 * smgIr;
 
     // Breathing + walk bob.
     const breathe = Math.sin(this.t * 1.6);

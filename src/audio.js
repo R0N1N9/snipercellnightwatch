@@ -257,7 +257,7 @@ export class Audio {
   }
 
   // A drone's zap: a dry electric crackle (it used to be a square-wave beep).
-  zap(pos) {
+  droneZap(pos) {
     if (!this.ctx) return;
     const dest = pos ? this._panner(pos, 25) : this.master;
     this._noiseBurst(dest, this.now, 0.07, 'bandpass', 2400, 1.6, 0.45, 0.05);

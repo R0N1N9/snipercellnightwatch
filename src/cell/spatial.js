@@ -51,6 +51,7 @@ export const Spatial = {
         sp.radio.set(g.id, r);
       }
     }
+    this._voicesTick(dt, ear, off, heard);
     // Patrol-drone hum: the three nearest drones within earshot.
     const want = new Set();
     if (!off) {
@@ -78,6 +79,84 @@ export const Spatial = {
     }
   },
 };
+
+// Enemy voices (Halo-style): calm guards near each other talk back and forth; a guard who
+// spots you shouts; hits draw a grunt and deaths a cry; a charging brute snarls and its blade
+// hums, louder the closer it gets. Foley.chatter keeps distant talk faint.
+const CALM = new Set(['patrol', 'idle', 'post', 'guard', 'wander', 'return']);
+Object.assign(Spatial, {
+  _voicesTick(dt, ear, off, heard) {
+    const F = this.foley, S = this.sentinel, sp = this._sp;
+    if (!F || !F.ok) return;
+    sp.vprev = sp.vprev || new Map(); sp.vhp = sp.vhp || new Map(); sp.pairT = sp.pairT || new Map(); sp.vbusy = sp.vbusy || new Map();
+    const want = new Set();
+    const at = (g) => ({ x: g.x, y: (g.y || 0) + 1.65 * (g.type === 'titan' || g.type === 'jugg' ? 1.25 : 1), z: g.z });
+    const busy = (g) => (sp.vbusy.get(g.id) || 0) > this.t;
+    const say = (g, mood, delay = 0) => {
+      if (busy(g)) return 0;
+      const d = Math.hypot(g.x - ear.x, (g.y || 0) - ear.y, g.z - ear.z);
+      if (d > (mood === 'shout' ? 70 : 45)) return 0;
+      const go = () => { const len = F.chatter(at(g), g.type, mood, !heard(g, (g.y || 0) + 1.5)); sp.vbusy.set(g.id, this.t + len + 0.2); };
+      if (delay > 0) { sp.vbusy.set(g.id, this.t + delay + 1); setTimeout(go, delay * 1000); } else go();
+      return 1;
+    };
+    const live = off ? [] : S.guards;
+    for (const g of live) {
+      const prev = sp.vprev.get(g.id), st = g.state;
+      sp.vprev.set(g.id, st);
+      if (prev === undefined) continue;
+      if (st === 'dead') {
+        if (prev !== 'dead' && Math.random() < 0.6) { const d = Math.hypot(g.x - ear.x, g.z - ear.z); if (d < 30) F.chatter(at(g), g.type, 'pain', !heard(g, (g.y || 0) + 1)); }
+        continue;
+      }
+      // Spotted you: a shout (the alarm going up).
+      if (st === 'alert' && prev !== 'alert' && prev !== 'berserk') say(g, 'shout', 0.1 + Math.random() * 0.2);
+      // Hit but still standing: a grunt.
+      const hp = typeof g.hp === 'number' ? g.hp : null, ph = sp.vhp.get(g.id);
+      if (hp != null && ph != null && hp < ph - 0.01) { sp.vbusy.set(g.id, 0); say(g, 'pain'); }
+      if (hp != null) sp.vhp.set(g.id, hp);
+      // A charging brute: the snarl and, if it has one, the blade.
+      const charging = st === 'berserk' || (g.sword && (st === 'alert' || st === 'berserk'));
+      const d = Math.hypot(g.x - ear.x, (g.y || 0) - ear.y, g.z - ear.z);
+      if (charging && d < 40) { want.add('growl' + g.id); F.loop('growl' + g.id, 'growl', at(g), 0.55); }
+      if (g.sword && d < 25) { want.add('blade' + g.id); F.loop('blade' + g.id, 'blade', { x: g.x, y: (g.y || 0) + 1.1, z: g.z }, 0.22); }
+    }
+    for (const k of [...F.loops.keys()]) if (!want.has(k)) F.stopLoop(k);
+    if (off) return;
+    // Calm conversation: pairs standing or walking near each other, now and then.
+    const calm = S.guards.filter((g) => CALM.has(g.state) && Math.hypot(g.x - ear.x, g.z - ear.z) < 45);
+    for (let i = 0; i < calm.length; i++) for (let j = i + 1; j < calm.length; j++) {
+      const A = calm[i], B = calm[j];
+      if (Math.hypot(A.x - B.x, A.z - B.z) > 12 || Math.abs((A.y || 0) - (B.y || 0)) > 2) continue;
+      const key = A.id < B.id ? A.id + ':' + B.id : B.id + ':' + A.id;
+      let t = (sp.pairT.get(key) ?? 1 + Math.random() * 3) - dt;
+      if (t <= 0 && !busy(A) && !busy(B)) {
+        t = 8 + Math.random() * 10;
+        const [x, y] = Math.random() < 0.5 ? [A, B] : [B, A];
+        if (say(x, 'talk')) {
+          const reply = (sp.vbusy.get(x.id) - this.t) + 0.25 + Math.random() * 0.5;
+          if (Math.random() < 0.85) say(y, 'talk', reply);
+        }
+      }
+      sp.pairT.set(key, t);
+    }
+    // A guard on his own talks into his radio now and then.
+    for (const g of calm) {
+      const key = 'r' + g.id;
+      let t = (sp.pairT.get(key) ?? 6 + Math.random() * 14) - dt;
+      if (t <= 0) { t = 14 + Math.random() * 16; say(g, 'talk'); }
+      sp.pairT.set(key, t);
+    }
+    // Someone searching for you mutters now and then.
+    for (const g of S.guards) {
+      if (g.state !== 'search') continue;
+      const key = 's' + g.id;
+      let t = (sp.pairT.get(key) ?? 3 + Math.random() * 5) - dt;
+      if (t <= 0) { t = 7 + Math.random() * 8; say(g, 'talk'); }
+      sp.pairT.set(key, t);
+    }
+  },
+});
 
 export function installSpatial(Cls) {
   for (const k of Object.keys(Spatial)) Cls.prototype[k] = Spatial[k];

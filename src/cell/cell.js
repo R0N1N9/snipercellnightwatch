@@ -33,6 +33,7 @@ import { Sentinel, DIFFS, guardCapsules, buildDrone, angDiff } from './sentinel.
 import { Ops, AiSpotter, PAYLOAD, HACK } from './ops.js';
 import { Tablet } from './tablet.js';
 import { Sfx } from './sfx.js';
+import { Foley } from './foley.js';
 import { Wheel } from './wheel.js';
 import { installKit, KIT } from './kit.js';
 import { installKit2 } from './kit2.js';
@@ -258,6 +259,11 @@ export function buildKR50() {
   const lens = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), new THREE.MeshBasicMaterial({ color: '#07160e' }));
   lens.position.set(0, sy, 0.062);
   g.add(lens);
+  // The eyepiece glows faintly green-white while the scope's night vision is on (a ring of
+  // light round the eyecup, with a brighter flash as it comes on).
+  const eyeRing = new THREE.Mesh(new THREE.RingGeometry(0.019, 0.03, 24), new THREE.MeshBasicMaterial({ color: '#c8ffe0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  eyeRing.position.set(0, sy, 0.064);
+  g.add(eyeRing);
   // Refinements: a toothed top rail, scope rings and turrets, an adjustable cheek riser, a
   // rubber recoil pad, a textured grip and magazine, a folded bipod and sling points.
   for (let i = 0; i < 16; i++) box(0.05, 0.007, 0.012, M.dark, 0, 0.079, 0.06 - i * 0.026);
@@ -279,7 +285,7 @@ export function buildKR50() {
   const anchor = (x, y, z) => { const a = new THREE.Object3D(); a.position.set(x, y, z); g.add(a); return a; };
   g.userData = {
     gripR: anchor(0, -0.09, 0.03), gripL: anchor(-0.005, -0.04, -0.5), muzzle: anchor(0, 0, -1.33),
-    bolt, boltKnob: anchor(0.06, 0.035, 0.01), mag: magG, magHome: magG.position.clone(), sight: sy,
+    bolt, boltKnob: anchor(0.06, 0.035, 0.01), mag: magG, magHome: magG.position.clone(), sight: sy, eye: lens, eyeRing,
   };
   return g;
 }
@@ -395,6 +401,7 @@ export class CellGame {
     this.fac = new Facility(this.scene, quality, seed, { layout });
     this.sentinel = new Sentinel(this, { diff, seed, sim: this.isHost, mission: this.mission, pickets: this.drop.approach });
     this.sfx = new Sfx(audio);
+    this.foley = new Foley(audio);
     this.effects = new Effects(this.scene);
     this.input = new Input(this.renderer.domElement, document.getElementById('touch'));
     this.input.sensitivity = this.settings.sensitivity || 1;
@@ -458,6 +465,15 @@ export class CellGame {
     if (this.mission === 'nightwatch') this.comms('Officers spook when they\u2019re alone. Juggernauts\u2019 shells break \u2014 then they charge. Bulwarks: shoot the port in the wall.', 'dim');
     // The night soundscape (wind, insects, distant sounds; air handling indoors). No hum.
     this.ambient = new Ambience(this.audio);
+    // Doors and lights changing state (host or guest alike) make their sounds where they are.
+    this.fac.onDoor = (d, open) => { if (this.t > 1) this.foley.door({ x: d.x, y: (d.y || 0) + 1.2, z: d.z }, d.kind, open); };
+    this.fac.onLight = (L, on) => {
+      // A whole room going dark at once is one clunk, not a dozen.
+      const last = this._lightSfx;
+      if (last && this.t - last.t < 0.3 && Math.hypot(last.x - L.x, last.z - L.z) < 14) return;
+      this._lightSfx = { t: this.t, x: L.x, z: L.z };
+      if (this.t > 1) (on ? this.foley.powerUp : this.foley.powerDown).call(this.foley, { x: L.x, y: L.y, z: L.z });
+    };
     this.chat = new Chat(this);
     this.cine = new Cinema(this);
     // Opening cut-scene (skippable); ?nocine skips it for testing.
@@ -565,8 +581,8 @@ export class CellGame {
     // Deadeye: a second KR-50, held low across the body in the left hand while the M50 works.
     this.deRifle = buildKR50();
     this.deRifle.scale.setScalar(0.82);
-    this.deRifle.position.set(-0.13, -0.2, -0.38);
-    this.deRifle.rotation.set(-0.48, 0.32, 0.25);
+    this.deRifle.position.set(-0.3, -0.36, -0.72);
+    this.deRifle.rotation.set(0.25, 0.9, 0.5);
     this.deRifle.visible = false;
     this.deRifle.traverse((o) => { o.renderOrder = 10; o.frustumCulled = false; });
     this.camera.add(this.deRifle);
@@ -745,6 +761,7 @@ export class CellGame {
   _onEvent(m) {
     switch (m.k) {
       case 'resupply': if (m.role === this.role) this._resupply(); break;
+      case 'sfxi': this.foley.interact({ x: m.x, y: m.y, z: m.z }, m.key); break;
       case 'ifakuse': if (this.isHost) this.obj.ifak[m.role] = Math.max(0, (this.obj.ifak[m.role] || 0) - 1); break;
       case 'medheal': if (m.role === this.role) this._medHeal(); break;
       case 'revive': if (m.role === this.role) this._revived(m.hp || 55); break;
@@ -1415,29 +1432,87 @@ export class CellGame {
     if (!this.tdAnim) this._wpnTick();
     // Deadeye: the M50 in the right hand, the KR-50 lowered in the left.
     const DE = this.deSeq;
-    // Quick-draw (sniper): pulling the sidearm with an enemy close keeps the KR-50 on screen in
-    // the support hand; the sidearm comes up one-handed on the right.
+    // Quick-swap (sniper, CoD-style): pull a handgun and the KR-50 drops to the support hand,
+    // held low on the left, while the pistol comes up one-handed on the right. Swap back while
+    // it's still in your hand and it snaps straight up. Keep the pistol out a few seconds (no
+    // shots) and the rifle is slung and the left hand joins the pistol. (Not for the SMG: that's
+    // a two-handed gun.)
+    const QDS = 3.2;
     if ((this.role === 'shooter' || this.operative) && !DE) {
       const toSlot = P.switchT > 0 && P.pendingSlot >= 0 ? P.pendingSlot : P.slot;
+      const side = P.arms[1] && P.arms[1].def;
+      const handgun = !!side && side.slot === 'pistol' && side.key !== 'smg';
       if (toSlot === 1 && this._qdSlot !== 1) {
-        const S = this.sentinel;
-        this.quickDraw = S.guards.some((q) => q.state !== 'dead' && Math.hypot(q.x - P.pos.x, q.z - P.pos.z) < 20);
+        this.quickDraw = handgun ? { t: 0, stow: 0 } : null;
+        if (handgun && P.switchT > 0.5) P.switchT = 0.5; // a fast draw
       }
-      if (toSlot !== 1) this.quickDraw = false;
+      if (toSlot === 0 && this._qdSlot === 1 && this.quickDraw && this.quickDraw.stow < 0.5 && P.switchT > 0.45) P.switchT = 0.45; // rifle still in hand
+      if (toSlot !== 1) this.quickDraw = null;
+      const Q = this.quickDraw;
+      if (Q && P.slot === 1) {
+        if (P.cycleT > 0) Q.t = 0; // still shooting: keep the rifle ready
+        Q.t += dt;
+        if (Q.t > QDS) Q.stow = Math.min(1, Q.stow + dt / 0.5);
+      }
       this._qdSlot = toSlot;
     }
-    const QD = !DE && this.quickDraw && P.slot === 1 && !this.knifeEq;
-    if (this.deRifle) this.deRifle.visible = !!((DE || QD) && this.viewmodel.root.visible);
+    const QDo = !DE && this.quickDraw && P.slot === 1 && !this.knifeEq ? this.quickDraw : null;
+    const QD = !!QDo && QDo.stow < 1;
+    // The slung rifle: down and out of view to the lower left.
+    const qs = QDo ? QDo.stow * QDo.stow * (3 - 2 * QDo.stow) : 0;
+    if (this.deRifle) {
+      // Held low in the left hand by the forend, angled up and away to the left, the stock
+      // tucked down out of the view (close to the lens it would fill the screen). Slung: it
+      // drops straight down and out.
+      this.deRifle.position.set(-0.3 - 0.1 * qs, -0.36 - 0.42 * qs, -0.72);
+      this.deRifle.rotation.set(0.25 + 0.15 * qs, 0.9, 0.5);
+      this.deRifle.visible = !!((DE || QD) && this.viewmodel.root.visible);
+    }
+    // The support hand stays on the lowered rifle's forend.
+    let qdHand = null;
+    if ((QD || DE) && this.deRifle) { this.deRifle.updateMatrix(); qdHand = this.deRifle.userData.gripL.position.clone().applyMatrix4(this.deRifle.matrix).add(new THREE.Vector3(0, -0.02, 0)); }
     this.viewmodel.update(dt, {
-      def: DE ? MAGNUM : P.def, scopeT: DE ? 0.35 : P.scopeT, leftHand: DE || QD ? new THREE.Vector3(-0.13, -0.24, -0.42) : null, cant: !DE && !QD && this.settings.pistolCant !== false, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
+      def: DE ? MAGNUM : P.def, scopeT: DE ? 0.35 : P.scopeT, leftHand: qdHand, cant: !DE && !QD && this.settings.pistolCant !== false, irCant: !DE && !QD && !!this.nv, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
       reloadT: DE ? 0 : P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: DE ? DE.switchT : P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
       empty: !DE && P.w.chamber === 0 && P.def.kind === 'semi', boltPending: false,
       supU: SA ? supU : 0, supTo: SA ? SA.to : false, supCan: SA ? canOf(SA.w) : null,
       leftOff: Math.max(this.qh ? Math.min(1, (this.qh.vis || 0) * 1.6) : 0, this.lureAnim ? 1 : 0),
     });
+    this._nvScopeGlow(dt);
+    this._reloadSfx(P);
     this._cloakViewmodel(C.on);
     this.input.isScoped = P.scoped;
     this.input.endFrame();
+  }
+
+  // Reload Foley on a timeline through the reload: mag out, mag in, then chamber (bolt, handle
+  // or slide) when it was empty. Swapping round types runs the same.
+  _reloadSfx(P) {
+    const R = this._rl || (this._rl = { on: false, u: 0, key: '' });
+    const live = P.reloadT > 0 && P.reloadDur > 0;
+    if (!live) { R.on = false; return; }
+    const u = 1 - P.reloadT / P.reloadDur, key = P.def.key;
+    if (!R.on) { R.on = true; R.u = 0; R.key = key; R.empty = !!P.reloadEmpty; }
+    const F = this.foley, at = (x) => R.u < x && u >= x;
+    if (at(0.12)) F.magOut(key);
+    if (at(0.55)) F.magIn(key);
+    if (R.empty && at(0.8)) F.charge(key);
+    R.u = u;
+  }
+
+  // KR-50 eyepiece: a soft green-white glow while the scope is in night vision, flashing
+  // brighter as it switches on or the rifle comes up.
+  _nvScopeGlow(dt) {
+    const kr = this.viewmodel.models.kr50, U = kr && kr.userData;
+    if (!U || !U.eye) return;
+    const on = this.scopeNV !== false, cur = this.viewmodel.current === 'kr50';
+    if ((on && !this._nvLensOn) || (cur && !this._nvLensCur)) this._nvFlash = 1;
+    this._nvLensOn = on; this._nvLensCur = cur;
+    this._nvFlash = Math.max(0, (this._nvFlash || 0) - dt * 2.2);
+    // Faint at rest (a dim green tint in the eyepiece and a thin halo), a brief white flash.
+    const k = on ? 0.1 + 0.9 * this._nvFlash * this._nvFlash + 0.02 * Math.sin(this.t * 7) : 0;
+    U.eye.material.color.setRGB(0.03 + 0.3 * k, 0.09 + 0.4 * k, 0.055 + 0.32 * k);
+    U.eyeRing.material.opacity = 0.32 * k;
   }
 
   _toggleCloak() {
@@ -1800,7 +1875,7 @@ export class CellGame {
     const miss = m.hit ? b : b.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, (Math.random() - 0.3) * 1.5, (Math.random() - 0.5) * 2.5));
     this._tracer(a, miss, m.zap ? '#ff4060' : '#ffb060', m.zap ? 0.12 : 0.07);
     const d = this.camera.position.distanceTo(a);
-    if (!m.zap) this.audio.shotDistant(a, d / 343, false); else this.audio.zap(a);
+    if (!m.zap) this.audio.shotDistant(a, d / 343, false); else this.audio.droneZap(a);
     if (m.role === 'quad') {
       if (m.hit) { if (this.role === 'spotter' && this.quad && this.quad.active) this._quadDamage(m.dmg); else if (this.isHost) this._broadcast({ k: 'quadhit', dmg: m.dmg }); }
       return;
@@ -2484,7 +2559,11 @@ export class CellGame {
     if (held) h.t += dt; else h.t = 0;
     this.prompts[role] = { label: best.label, p: best.dur ? clamp(h.t / best.dur, 0, 1) : 0, key: best.key };
     if (best.key === 'jack' || best.key === 'extract') return; // the operator's client opens the minigame
-    if (held && h.t >= best.dur && !h.done) { h.done = true; best.fn(); }
+    if (held && h.t >= best.dur && !h.done) {
+      h.done = true; best.fn();
+      // The sound of it, for both of you.
+      if (!/^(drag|takedown|revive)$/.test(best.key)) { const at = { x: p.x, y: p.y + 1, z: p.z }; this.foley.interact(at, best.key); this._broadcast({ k: 'sfxi', x: at.x, y: at.y, z: at.z, key: best.key }); }
+    }
     if (!held) h.done = false;
     if (held && best.key === 'pick' && Math.random() < dt * 2) this.sentinel.noise(p, 6, false);
   }
