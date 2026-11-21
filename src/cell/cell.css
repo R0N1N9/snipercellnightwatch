@@ -428,3 +428,19 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 #panel-staging .stg-prim b { font-size: 12px; letter-spacing: 0.1em; }
 
 .tag.cell-tag { font-size: 0.82em; line-height: 1.35; }
+
+/* Touch ability buttons: a small grid on the left with a recharge bar along each one's bottom. */
+#touch .cell-abil { position: fixed; display: grid; gap: 6px; z-index: 6; --ab: 50px; }
+#touch .cell-abil .ab { position: relative; width: var(--ab); height: var(--ab); border-radius: 50%; border: 1.5px solid rgba(0, 255, 224, 0.55); background: rgba(2, 10, 14, 0.62); display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+#touch .cell-abil .ab span { font: 600 8px var(--mono, monospace); letter-spacing: 0.06em; color: var(--cell, #00ffe0); margin-top: -6px; }
+#touch .cell-abil .ab em { position: absolute; top: 5px; font: normal 8px var(--mono, monospace); color: #e8f6f8; }
+#touch .cell-abil .ab i { position: absolute; left: 18%; right: 18%; bottom: 9px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+#touch .cell-abil .ab i b { display: block; height: 100%; width: 100%; background: var(--cell, #00ffe0); border-radius: 2px; transition: width 0.15s linear; }
+#touch .cell-abil .ab.full i b { box-shadow: 0 0 6px var(--cell, #00ffe0); }
+#touch .cell-abil .ab.cd { border-color: rgba(140, 150, 155, 0.45); }
+#touch .cell-abil .ab.cd span { color: #8a9296; }
+#touch .cell-abil .ab.cd i b { background: #8a9296; box-shadow: none; }
+#touch .cell-abil .ab.on { background: rgba(0, 255, 224, 0.2); border-color: #00ffe0; box-shadow: 0 0 10px rgba(0, 255, 224, 0.45); }
+#touch .cell-abil .ab.on span { color: #fff; }
+#touch .cell-abil .ab.on i b { background: #fff; }
+#touch .cell-abil .ab:active { transform: scale(0.94); }

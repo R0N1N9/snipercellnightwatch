@@ -147,8 +147,8 @@ export const Devices = {
     const card = document.querySelector('#cell-hud .c-partner');
     const cr = card && card.getBoundingClientRect();
     const top = Math.round(cr && cr.height ? cr.bottom + 8 : 60);
-    const avoid = [...document.querySelectorAll('#touch .tb, #touch .pill, #touch .stick, #cell-hud .c-ammo, #cell-hud .c-pip, #cell-hud .c-obj, #cell-hud .c-kit, #cell-hud .c-chips')]
-      .map((e) => (e.offsetParent || getComputedStyle(e).position === 'fixed') ? e.getBoundingClientRect() : null)
+    const avoid = [...document.querySelectorAll('#touch .tb, #touch .pill, #touch .stick, #touch .cell-abil .ab, #cell-hud .c-ammo, #cell-hud .c-pip, #cell-hud .c-obj, #cell-hud .c-kit, #cell-hud .c-chips')]
+      .map((e) => e.getClientRects().length ? e.getBoundingClientRect() : null)
       .filter((r) => r && r.width > 0 && r.height > 0);
     const hits = (x, y, w, h) => avoid.some((r) => x < r.right + 4 && x + w > r.left - 4 && y < r.bottom + 4 && y + h > r.top - 4);
     const right = 12;
