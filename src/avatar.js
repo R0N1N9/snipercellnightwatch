@@ -799,24 +799,28 @@ export class Avatar {
     cap.add(capPatch);
     head.add(cap);
     this.hats.cap = cap;
-    // Comms headset (flat dark earth) with a boom mic across to the mouth.
+    // Comms headset: flat dark earth cups, black band, boom and mic.
     const hs = (this.headset = new THREE.Group());
     const hsFde = '#6b5d45';
     for (const sx of [-1, 1]) {
       const hsCup = mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.034, 14).rotateZ(Math.PI / 2), hsFde);
       hsCup.position.set(sx * 0.118, -0.005, 0.005);
       hs.add(hsCup);
+      // Black ear cushion on the head side of each cup.
+      const hsPad = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 14).rotateZ(Math.PI / 2), '#1b1c1e');
+      hsPad.position.set(sx * 0.098, -0.005, 0.005);
+      hs.add(hsPad);
     }
-    const hsBand = mesh(new THREE.TorusGeometry(0.122, 0.009, 6, 18, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI / 2), hsFde);
+    const hsBand = mesh(new THREE.TorusGeometry(0.122, 0.009, 6, 18, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI / 2), '#1b1c1e');
     hsBand.rotation.set(0, 0, 0);
     hsBand.position.set(0, 0.0, 0.03);
     hsBand.rotation.z = Math.PI / 2;
     hs.add(hsBand);
-    const hsBoom = mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.13, 6).rotateX(Math.PI / 2), '#222');
+    const hsBoom = mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.13, 6).rotateX(Math.PI / 2), '#1b1c1e');
     hsBoom.position.set(-0.1, -0.045, -0.06);
     hsBoom.rotation.y = -0.55;
     hs.add(hsBoom);
-    const hsMic = mesh(new THREE.SphereGeometry(0.013, 8, 6), '#1a1a1a');
+    const hsMic = mesh(new THREE.SphereGeometry(0.013, 8, 6), '#141416');
     hsMic.position.set(-0.045, -0.06, -0.115);
     hs.add(hsMic);
     hs.visible = false;

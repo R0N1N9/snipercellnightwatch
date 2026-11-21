@@ -293,7 +293,7 @@ async function stagePreview(role) {
   stageRole = role || stageRole || cellSet.role;
   const DESC = {
     shooter: 'SHOOTER \u00B7 KR-50 Nightjar, active camo, FDE chest rig with black pouches, urban-digital poncho, covert earpiece, NVGs.',
-    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier with black pouches, FDE headset, ball cap, NVGs, recon drone on the pack.',
+    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier with black pouches, headset (FDE cups, black band and mic), ball cap, NVGs, recon drone on the pack.',
   };
   document.querySelectorAll('#stage-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.r === stageRole));
   $('stage-who').textContent = `${stageRole.toUpperCase()} \u00B7 ${cellName(stageRole)}`;
@@ -706,7 +706,7 @@ async function renderStaging() {
       <div class="stg-k">SECONDARY</div><div class="stg-opts">${opt('shooter.secondary', 'smg', 'K9 HUSH SMG', L.shooter.secondary === 'smg', '40 rounds, full / burst / semi (B). Quiet, light kick.')}${opt('shooter.secondary', 'mag50', 'M50 MAGNUM', L.shooter.secondary === 'mag50', '7 rounds, slow and heavy. Big kick, wide from the hip: aim down sights.')}</div>
       <div class="stg-k">SECONDARY SUPPRESSOR</div><div class="stg-opts">${opt('shooter.secSup', '1', 'FITTED', L.shooter.secSup, 'Quiet. Hold B in game to twist it off.')}${opt('shooter.secSup', '0', 'OFF', !L.shooter.secSup, 'Loud: every shot carries 70 m.')}</div>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('shooter')}</div></div>
-    <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3><p>Multicam black, FDE plate carrier with black pouches, ball cap, FDE headset. CYBER OPS tablet, recon drone, ISR, keycard duty.</p>
+    <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3><p>Multicam black, FDE plate carrier with black pouches, ball cap, FDE/black headset. CYBER OPS tablet, recon drone, ISR, keycard duty.</p>
       <div class="stg-k">PRIMARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, two magazines. Suppressor fitted by default.')}
       <div class="stg-k">SECOND</div>${prim('THERMAL BINOCULARS', 'X to swap from the P-9; raise them to mark every enemy in the viewfinder at any range.')}
       <div class="stg-k">P-9 SUPPRESSOR</div><div class="stg-opts">${opt('spotter.pistolSup', '1', 'FITTED', L.spotter.pistolSup, 'Quiet up close.')}${opt('spotter.pistolSup', '0', 'OFF', !L.spotter.pistolSup, 'Loud: every shot carries 70 m.')}</div>
