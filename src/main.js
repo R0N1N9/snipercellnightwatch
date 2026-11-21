@@ -293,7 +293,7 @@ async function stagePreview(role) {
   stageRole = role || stageRole || cellSet.role;
   const DESC = {
     shooter: 'SHOOTER \u00B7 KR-50 Nightjar, active camo, FDE chest rig with black pouches, urban-digital poncho, covert earpiece, NVGs.',
-    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier with black pouches, headset (FDE cups and band, black mic), ball cap, NVGs, recon drone on the pack.',
+    spotter: 'SPOTTER \u00B7 P-9 pistol, thermal binoculars, CYBER OPS tablet, FDE plate carrier with black pouches, headset (FDE cups, black band and mic), ball cap, NVGs, recon drone on the pack.',
   };
   document.querySelectorAll('#stage-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.r === stageRole));
   $('stage-who').textContent = `${stageRole.toUpperCase()} \u00B7 ${cellName(stageRole)}`;
