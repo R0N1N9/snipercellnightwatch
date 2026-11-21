@@ -245,7 +245,7 @@ export const Phone = {
     });
     const cmdItems = cols(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), 1);
     const TOG = spot
-      ? [['cell-hack', 'HACK', '📱'], ...(this.loadout && this.loadout.spotter.primary === 'smg' && this.role === 'spotter' ? [['cell-bino', 'BINO', '◎']] : []), ['cell-tab', 'TABLET', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])]
+      ? [['cell-hack', 'HACK', '📱'], ['cell-tab', 'TABLET', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])]
       : [['cell-xr', 'ROUNDS', '⁂'], ['cell-breath', 'BREATH', '≋'], ['cell-tab', 'MAP', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])];
     const togItems = cols(TOG.map(([a, l, ic]) => ({ k: 't:' + a, label: l, group: 'tog', icon: ic })), -1);
     const PINGS = [['look', 'LOOK', '◎'], ['enemy', 'ENEMY', '◆'], ['move', 'MOVE', '➤'], ['hold', 'HOLD', '✋'], ['regroup', 'ON ME', '⬤'], ['cover', 'COVER', '⛨'], ['sync', 'SYNC', '⦿'], ['perch', 'SNIPER POS', '⌖']];
