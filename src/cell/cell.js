@@ -586,6 +586,12 @@ export class CellGame {
     this.deRifle.visible = false;
     this.deRifle.traverse((o) => { o.renderOrder = 10; o.frustumCulled = false; });
     this.camera.add(this.deRifle);
+    // ...and a K9 SMG for when Deadeye goes off with the SMG in your hands.
+    this.deSmg = buildSMG();
+    this.deSmg.scale.setScalar(0.82);
+    this.deSmg.visible = false;
+    this.deSmg.traverse((o) => { o.renderOrder = 10; o.frustumCulled = false; });
+    this.camera.add(this.deSmg);
     // Knife for takedowns (camera space).
     this.knife = buildKnife();
     this.knife.visible = false;
@@ -1460,17 +1466,21 @@ export class CellGame {
     const QD = !!QDo && QDo.stow < 1;
     // The slung rifle: down and out of view to the lower left.
     const qs = QDo ? QDo.stow * QDo.stow * (3 - 2 * QDo.stow) : 0;
-    if (this.deRifle) {
-      // Held low in the left hand by the forend, angled up and away to the left, the stock
-      // tucked down out of the view (close to the lens it would fill the screen). Slung: it
-      // drops straight down and out.
-      this.deRifle.position.set(-0.3 - 0.1 * qs, -0.36 - 0.42 * qs, -0.72);
-      this.deRifle.rotation.set(0.25 + 0.15 * qs, 0.9, 0.5);
-      this.deRifle.visible = !!((DE || QD) && this.viewmodel.root.visible);
+    // The lowered gun in the left hand: the one you were holding (Deadeye with the SMG out
+    // lowers the SMG; with the M50 already out there's nothing to lower). Held low by the
+    // forend, angled up and away to the left, the stock tucked down out of the view (close to
+    // the lens it would fill the screen). Slung: it drops straight down and out.
+    const low = DE ? (P.def.key === 'smg' ? this.deSmg : P.def.key === 'mag50' ? null : this.deRifle) : QD ? this.deRifle : null;
+    for (const m of [this.deRifle, this.deSmg]) {
+      if (!m) continue;
+      const smg = m === this.deSmg;
+      m.position.set((smg ? -0.27 : -0.3) - 0.1 * qs, (smg ? -0.33 : -0.36) - 0.42 * qs, smg ? -0.6 : -0.72);
+      m.rotation.set(0.25 + 0.15 * qs, smg ? 0.8 : 0.9, 0.5);
+      m.visible = m === low && this.viewmodel.root.visible;
     }
-    // The support hand stays on the lowered rifle's forend.
+    // The support hand stays on the lowered gun's forend.
     let qdHand = null;
-    if ((QD || DE) && this.deRifle) { this.deRifle.updateMatrix(); qdHand = this.deRifle.userData.gripL.position.clone().applyMatrix4(this.deRifle.matrix).add(new THREE.Vector3(0, -0.02, 0)); }
+    if (low) { low.updateMatrix(); qdHand = low.userData.gripL.position.clone().applyMatrix4(low.matrix).add(new THREE.Vector3(0, -0.02, 0)); }
     this.viewmodel.update(dt, {
       def: DE ? MAGNUM : P.def, scopeT: DE ? 0.35 : P.scopeT, leftHand: qdHand, cant: !DE && !QD && this.settings.pistolCant !== false, irCant: !DE && !QD && !!this.nv, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
       reloadT: DE ? 0 : P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: DE ? DE.switchT : P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
