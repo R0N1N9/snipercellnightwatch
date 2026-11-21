@@ -113,9 +113,16 @@ export function buildSMG() {
   magG.position.set(0, -0.02, -0.1);
   g.add(magG);
   box(0.03, 0.08, 0.03, poly, 0, -0.06, -0.33, -0.25);
-  // Folding stock (folded along the right side) with a buttpad.
-  box(0.012, 0.03, 0.2, metal, 0.034, 0.0, 0.08);
-  box(0.016, 0.075, 0.02, poly, 0.034, -0.02, 0.185);
+  // Collapsible stock, pulled out: a buffer tube off the back of the receiver, twin guide
+  // rods running back to a skeletal butt (top strut, cheek riser, rubber pad).
+  cyl(0.012, 0.07, metal, 0, 0.006, 0.085, 12); // buffer tube
+  box(0.03, 0.026, 0.02, M.dark, 0, 0.004, 0.058); // end plate / latch housing
+  for (const sx of [-1, 1]) cyl(0.0045, 0.2, metal, sx * 0.013, -0.012, 0.15, 8); // guide rods (extended)
+  box(0.012, 0.012, 0.12, poly, 0, 0.026, 0.2); // top strut
+  box(0.024, 0.016, 0.07, poly, 0, 0.032, 0.21); // cheek riser
+  box(0.032, 0.094, 0.026, poly, 0, -0.006, 0.255); // butt
+  box(0.034, 0.1, 0.012, M.dark, 0, -0.006, 0.272); // rubber pad
+  box(0.006, 0.006, 0.02, M.dark, 0, -0.03, 0.12); // adjustment lever
   const slide = new THREE.Group();
   slide.add(new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.014, 0.03), metal));
   slide.position.set(-0.032, 0.03, -0.05);

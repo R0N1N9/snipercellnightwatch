@@ -313,10 +313,10 @@ class Arm {
     }
   }
 
-  pose(shoulder, handPos, handFwd, pole) {
+  pose(shoulder, handPos, handFwd, pole, up = null, back = 0.075) {
     const a = 0.3, b = 0.29;
     // Wrist sits a little behind the grip point along the hand's forward axis.
-    const wrist = handPos.clone().addScaledVector(handFwd, -0.075);
+    const wrist = handPos.clone().addScaledVector(handFwd, -back);
     const elbow = solveElbow(shoulder, wrist, a, b, pole);
     placeSeg(this.upper, shoulder, elbow);
     if (this.drape) placeSeg(this.drape, shoulder, shoulder.clone().lerp(elbow, 0.62));
@@ -325,7 +325,7 @@ class Arm {
     this.cuff.quaternion.setFromUnitVectors(UP, handFwd);
     this.hand.position.copy(wrist);
     // Build a basis: +Z along the hand, knuckles up (fingers curl down around the grip).
-    _m.lookAt(handFwd, ORIGIN, UP);
+    _m.lookAt(handFwd, ORIGIN, up || UP);
     this.hand.quaternion.setFromRotationMatrix(_m);
   }
 }
@@ -414,7 +414,9 @@ export class ViewModel {
     // ---- Base pose (hip / low ready) and ADS for the pistol.
     const ads = pistol ? smoothstep(0, 1, st.scopeT) : 0;
     const base = pistol ? new THREE.Vector3(0.12, -0.14, -0.34) : new THREE.Vector3(0.165, -0.16, -0.3);
-    const adsPos = new THREE.Vector3(0, -(U.sight + 0.004) * 0.82, -0.3);
+    // ADS: the sight on the line of sight. The SMG's red dot sits dead on the crosshair and the
+    // optic comes in closer to the eye, so it fills more of the view.
+    const adsPos = def.key === 'smg' ? new THREE.Vector3(0, -U.sight * 0.82, -0.205) : new THREE.Vector3(0, -(U.sight + 0.004) * 0.82, -0.3);
     // Canted hold (handguns, an option): centre of the screen, tilted, like CoD; aiming down
     // the sights straightens it out.
     // IR (night vision on): handguns and the SMG come up higher and cant over, MW-style, so
@@ -423,9 +425,9 @@ export class ViewModel {
     this.irK = (this.irK || 0) + ((st.irCant && pistol ? 1 : 0) - (this.irK || 0)) * Math.min(1, dt * 6);
     const irK = this.irK * (1 - ads);
     const cantK = pistol && def.key !== 'smg' ? Math.max(st.cant ? 1 - ads : 0, irK) : 0;
-    if (cantK > 0) base.lerp(new THREE.Vector3(0.035, -0.125 + 0.025 * irK, -0.33), cantK);
+    if (cantK > 0) base.lerp(new THREE.Vector3(0.04, -0.158 + 0.01 * irK, -0.34), cantK); // centred, held lower
     const smgIr = def.key === 'smg' ? irK : 0;
-    if (smgIr > 0) base.lerp(new THREE.Vector3(0.07, -0.115, -0.33), smgIr);
+    if (smgIr > 0) base.lerp(new THREE.Vector3(0.07, -0.135, -0.33), smgIr);
     const pos = base.clone().lerp(adsPos, ads);
     const rot = new THREE.Euler(0, 0, 0, 'YXZ');
     if (!pistol) rot.y = 0.04;
@@ -580,12 +582,23 @@ export class ViewModel {
     // A caller can take the support hand elsewhere (Deadeye: it holds the lowered rifle).
     if (st.leftHand) handL = st.leftHand.clone();
     if (rack > 0 && !U.bolt) handL.lerp(toRoot(U.slide || U.gripL).add(new THREE.Vector3(0, 0.02, 0.06)), rack);
-    const fR = fwd.clone().add(new THREE.Vector3(0, -0.25, 0)).normalize();
+    // The hands roll with the gun (a canted pistol takes the grip round with it), so the palm
+    // stays wrapped on the grip.
+    const gunUp = new THREE.Vector3(0, 1, 0).applyEuler(rot);
+    const fR = fwd.clone().addScaledVector(gunUp, -0.25).normalize();
     const fL = pistol ? fwd.clone().add(new THREE.Vector3(0.4, -0.15, 0)).normalize() : fwd.clone().add(new THREE.Vector3(0.15, 0.25, 0)).normalize();
     // Canted: the shoulders sit lower and further back, so the arms come up from below.
     const shR = pistol ? new THREE.Vector3(0.22, -0.46, 0.12).lerp(new THREE.Vector3(0.16, -0.62, 0.02), cantK) : new THREE.Vector3(0.24, -0.3, 0.16);
     const shL = pistol ? new THREE.Vector3(-0.2, -0.46, 0.12).lerp(new THREE.Vector3(-0.12, -0.64, 0.0), cantK) : new THREE.Vector3(-0.1, -0.42, 0.02);
-    this.armR.pose(shR, handR, boltReach > 0 ? fR.lerp(new THREE.Vector3(-0.3, 0, -1).normalize(), boltReach).normalize() : fR, new THREE.Vector3(0.6, -1, 0.1).normalize());
-    this.armL.pose(shL, handL, fL, new THREE.Vector3(-0.8, -1, 0.3).normalize());
+    // Handguns: a full grip. The palm goes flat against the side of the grip (knuckles out to
+    // the side, not on top), the hand centred on it so the fingers wrap round the front; the
+    // support hand cups it from the other side.
+    const hg = pistol && def.key !== 'smg' && !boltReach;
+    const gunRight = new THREE.Vector3(1, 0, 0).applyEuler(rot);
+    if (hg) handR.addScaledVector(gunRight, 0.024).addScaledVector(gunUp, -0.012);
+    const twoHand = hg && !st.leftHand && leftOff < 0.5 && !supReach;
+    if (twoHand) handL.addScaledVector(gunRight, -0.02).addScaledVector(gunUp, -0.02);
+    this.armR.pose(shR, handR, boltReach > 0 ? fR.lerp(new THREE.Vector3(-0.3, 0, -1).normalize(), boltReach).normalize() : hg ? fwd.clone().addScaledVector(gunUp, -0.12).normalize() : fR, new THREE.Vector3(0.6, -1, 0.1).normalize(), hg ? gunRight : gunUp, hg ? 0.052 : 0.075);
+    this.armL.pose(shL, handL, twoHand ? fwd.clone().addScaledVector(gunRight, 0.35).addScaledVector(gunUp, -0.2).normalize() : fL, new THREE.Vector3(-0.8, -1, 0.3).normalize(), st.leftHand ? null : twoHand ? gunRight.clone().negate() : gunUp, twoHand ? 0.05 : 0.075);
   }
 }
