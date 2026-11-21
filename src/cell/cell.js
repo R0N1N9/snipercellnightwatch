@@ -607,7 +607,8 @@ export class CellGame {
     const L = this.loadout;
     if (!P._baseSpare) P._baseSpare = P._spare.bind(P);
     const extra = this.role === 'shooter' && L.shooter.perk === 'mags' ? 2 : 0;
-    P._spare = (d) => P._baseSpare(d) + extra;
+    // A spotter running the SMG carries three magazines in all (the sniper carries five).
+    P._spare = (d) => (this.role === 'spotter' && d.key === 'smg' ? 2 : P._baseSpare(d) + extra);
     const mk = (d, sup) => ({ def: d, mag: d.mag, chamber: 1, reserve: d.mag * P._spare(d), zoomIdx: 0, zero: d.fixedZero || 100, sup, mode: d.modes ? d.modes[0] : null });
     // Everything starts suppressed (B takes it off in game). The spotter's primary is the
     // binoculars (default) or the K9 SMG; the P-9 is their secondary.
@@ -854,6 +855,21 @@ export class CellGame {
       // ISR ping sweep: a circle on the ground; everything inside, flesh or machine, gets marked.
       case 'qmark': this._neuroMark(target.ids || [], !!target.auto); break;
       case 'pdrone': { const d = S.byId(target.id); if (d && d.state !== 'dead') { d.empT = 8; this._toast('Drone shorted out for 8 s.', 'cyan'); } break; }
+      case 'swarm': {
+        // The nano swarm reaches them about a second and a half later: silent kills.
+        const ids = (target.ids || []).slice(0, 3);
+        if (!this.isHost) break;
+        if (by !== this.role) this._swarmFx(ids, target.from || { x: 0, y: 0, z: 0 });
+        setTimeout(() => {
+          for (const id of ids) {
+            const e = S.byId(id);
+            if (!e || e.state === 'dead') continue;
+            S.damage(id, 999, 'swarm', null, 'head');
+            this._killFeed(e, 'swarm', by, true, 0);
+          }
+        }, 1500);
+        break;
+      }
       case 'pcrash': {
         // Hacked out of the sky: rotors cut, it drops (a spotlight heli's wreck makes a crash).
         const d = S.byId(target.id);
@@ -1234,6 +1250,8 @@ export class CellGame {
     this._abInput(dt, I, act, live && !tab && !quad);
     // Spotter's binoculars: X (or BINO) to swap from the P-9; scope raises them.
     if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino')) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
+    // Spotter: fire through the raised binoculars (or the SWARM button) calls the nano swarm.
+    if (this.role === 'spotter' && live && !tab && !quad && ((this.bino.on && this.bino.up && act.fire) || I.pressed('cell-swarm'))) this._swarmCall();
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
     if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
     this._wpnInput(dt, I, act, live && !tab && !quad && !isr && !this.mini.open);
@@ -1632,7 +1650,7 @@ export class CellGame {
       setTimeout(() => this._radio(killer, line), 600);
     }
     const name = by === this.role ? this.name : by === 'ai' ? this.partnerName : this.partnerName;
-    const what = how === 'takedown' ? 'TAKEDOWN' : head ? 'HEADSHOT' : e.incap ? 'DOWN' : 'KILL';
+    const what = how === 'takedown' ? 'TAKEDOWN' : how === 'swarm' ? 'NANO SWARM' : head ? 'HEADSHOT' : e.incap ? 'DOWN' : 'KILL';
     const ev = { k: 'kill', by, what, dist: Math.round(dist || 0), chief: e.chief, name };
     this._onKillEvent(ev);
     this._broadcast(ev);
@@ -2983,7 +3001,7 @@ class CellHud {
       ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
         ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
-        : [['cell-ability', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
+        : [['cell-ability', 'DRONE', 'drone'], ['cell-swarm', 'SWARM', 'swarm'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
     ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
@@ -3018,6 +3036,7 @@ class CellHud {
         if (g.quadCd > 0) { this._qcdMax = Math.max(this._qcdMax || 0, g.quadCd); f = 1 - g.quadCd / this._qcdMax; st = 'cd'; n = Math.ceil(g.quadCd) + 's'; }
         else { this._qcdMax = 0; f = (out && g.quad ? g.quad.bat : g.quadBat ?? 300) / 300; st = out ? 'on' : ''; }
       } else if (b.k === 'isr') { const cd = g.isr.sweepCd || 0; f = 1 - cd / 25; st = g.isr.active ? 'on' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
+      else if (b.k === 'swarm') { const cd = g.swarmCd || 0; f = 1 - cd / 45; st = cd > 0 ? 'cd' : g.ops && g.ops.bw < 35 ? 'cd' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
       else if (b.k === 'hack') { f = g.ops ? g.ops.bw / 100 : 0; st = g.qh && g.qh.on ? 'on' : ''; }
       f = Math.max(0, Math.min(1, f));
       const key = st + '|' + n + '|' + Math.round(f * 50);

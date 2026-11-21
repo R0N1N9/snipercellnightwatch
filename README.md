@@ -331,6 +331,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Recon drone:** G (desktop) tosses it up out of your left hand before the feed cuts in. Hold G to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
 - **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. G takes the sticks; hold G recalls it.
 - **Thermal binoculars (X, or the weapon-swap button on touch):** the spotter picks a primary in staging: the binoculars (default, in hand at the start) or the K9 HUSH SMG; the P-9 is the secondary. With the SMG, the binoculars stay on X (and BINO on the touch wheel). Swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
+- **Nano swarm (binoculars):** look through the raised binoculars and press **fire** (or tap **SWARM** on touch) to send a swarm of nano drones at up to three soft targets in the viewfinder, closest to your aim first: guards, officers and bulwarks (brutes and titans are too heavily armoured). They stream out over about a second and a half and drop them silently, though anyone who sees a body fall can still react. 35 bandwidth, 45 s cooldown.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
@@ -353,7 +354,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **SNIPER POS** on the ping wheel asks the shooter to set up at a spot. It works from first person, the ISR cross or the tablet map. An AI shooter relocates there.
 - The HUD shows both interfaces as small live squares; tap one to open it.
 
-**Staging-area loadout:** the spotter picks a primary (thermal binoculars, the default, or the K9 HUSH SMG) with the P-9 as secondary. There's no suppressor choice: every weapon starts suppressed and comes off in game (B).
+**Staging-area loadout:** the spotter picks a primary (thermal binoculars, the default, or the K9 HUSH SMG) with the P-9 as secondary. A spotter's SMG carries three magazines in all (the sniper's carries five). There's no suppressor choice: every weapon starts suppressed and comes off in game (B).
 
 **Staging-area perks:** fast camo (the default), extra lures or extra magazines for the shooter; bandwidth, logistics (+2 drops) or light armour for the spotter.
 
