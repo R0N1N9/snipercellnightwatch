@@ -30,12 +30,12 @@ export function planArms(rng, soft) {
       defl: rand(rng, 0.25, 0.75) * hand,         // heading off the straight line in
       k0: rand(rng, -0.35, 0.1) * hand,           // the gentle bend of the whole arm
       coil: rand(rng, 0.9, 1.35),                 // how tightly the tip rolls
-      L: isHero ? rand(rng, 2.5, 3.0) : rand(rng, 1.45, 2.3),
-      r0: isHero ? rand(rng, 0.34, 0.42) : rand(rng, 0.13, 0.23),
+      L: isHero ? rand(rng, 2.5, 3.0) : rand(rng, 1.8, 2.6),
+      r0: isHero ? rand(rng, 0.34, 0.42) : rand(rng, 0.16, 0.27),
       rt: isHero ? 0.022 : 0.013,
       zr: isHero ? -rand(rng, 1.15, 1.45) : -rand(rng, 2.2, 3.6),
       zt: -rand(rng, 4.5, 8.5),
-      t0: 0.55 + rand(rng, 0, 0.85) + (isHero ? 0.25 : 0),
+      t0: 0.45 + rand(rng, 0, 0.7) + (isHero ? 0.3 : 0),
       dur: rand(rng, 1.5, 2.0),
       out: rand(rng, 0, 0.18),                    // stagger of the recoil
       wA: rand(rng, 0.35, 0.8), wF: rand(rng, 1.8, 3.0), wPh: rand(rng, 0, TAU),
@@ -143,11 +143,8 @@ export function buildArms(THREE, plan, material, soft) {
     }
   }
 
-  // Screen position (CSS px) of an arm's tip, for sound panning.
-  function tipX(i, t, T) { return list[i] ? reach(list[i].a, t, T) : 0; }
-
   return {
-    group, list, update, tipX,
+    group, list, update,
     dispose() { for (const o of list) o.g.dispose(); },
   };
 }

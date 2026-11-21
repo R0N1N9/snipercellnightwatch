@@ -13,41 +13,45 @@
 //   Nobody is taken. It only wanted a look. (The bookend of PLUNGE, which brings players
 //   down into this world through a white curtain of bubbles: this one leaves through ink.)
 //
-// BEAT SHEET (8.8 s, swap at 4.44 s)
+// BEAT SHEET (8.8 s, swap at 4.50 s)
 //   0.00         the deep's last frame, untouched (the cut in is invisible)
-//   0.05 → 1.60  the light dims: highlights first, a shadow crossing the frame, all of it
-//                colder; the lens creeps towards the one who was shot; a groan starts below
-//   0.10 → 1.95  far below, behind the victim, a vast shape rises out of the murk: mantle,
-//                blue lights, the pale glow of one eye (the victim stays in front of it)
-//   0.55 → 3.00  the arms unroll in from the edges, one of them right across the glass,
+//   0.05 → 1.60  the light dims: its brightest parts first, a shadow crossing the frame, all
+//                of it colder; the lens creeps towards the one who was shot; a groan below
+//   0.10 → 1.90  far below, behind the victim, a vast shape rises out of the murk: mantle,
+//                arms, cold blue lights, one pale eye (the victim stays in front of it)
+//   0.45 → 2.90  the arms unroll in from the edges, one of them right across the glass,
 //                suckers and lights sliding past; the dive computer counts the contact in
-//   1.95 → 3.05  the head comes up out of the deep until the eye fills the frame; it settles
-//   2.72         it finds you: the eye rolls round to the lens, the pupil opens, its lights ripple
-//   3.16 → 3.62  it blinks, slowly (sometimes twice, or once half-way first)
-//   3.60         the pupil snaps to a slit
-//   3.66 → 4.26  INK: a jet from below the eye that billows over everything; the arms whip
-//                back, the eye drops away; a sub-bass groan; black by 4.26
-//   4.44         THE SWAP, in the black (a deep, soft thud)
-//   4.32 → 5.40  specks of blue light wake one by one in the ink and drift
+//   1.90 → 2.95  the head comes up out of the deep until the eye fills the frame; it settles
+//   2.60         it finds you: the eye rolls round to the lens, the pupil opens, lights ripple
+//   3.05 → 3.78  it blinks, slowly and heavily (sometimes twice, or half-way first)
+//   3.80         the pupil snaps to a slit
+//   3.84 → 4.32  INK: a jet from below the eye sheds billow after billow over everything;
+//                the arms whip back, the eye drops away; a sub-bass groan; black by 4.32
+//   4.50         THE SWAP, in the black (a deep, soft thud)
+//   4.42 → 5.40  specks of blue light wake one by one in the ink and drift
 //   4.65 → 5.80  they wind into a slow spiral, a galaxy, centred where the eye will open
-//   5.20 → 6.45  they leave the spiral and settle on the next world's outlines, taking its
-//                colours (the next world, drawn in points of light); two brighter ones, in the
-//                players' colours, circle the core with their names
+//   5.20 → 6.45  they leave the spiral and settle on the next world's outlines (read from its
+//                first frame), taking its colours, over a dust of light along those outlines;
+//                two brighter ones in the players' colours circle the core with their names
 //   4.70 → 6.20  a line in the dark, typed out like the dive computer's
 //   6.30 → 6.90  the eye is there in the dark, closed, its lid lights glowing; the picture
 //                of points pours into where its pupil will be
-//   6.72 → 7.20  it opens: the next world is in the pupil, and lights the iris from inside
+//   6.72 → 7.20  it opens: the next world is in the pupil, small, round and bright, and it
+//                lights the iris from inside
 //   7.10 → 7.95  we fall into the pupil: the eye goes past the edges, the world rushes up
-//   7.75 → 8.35  the ink at the edges tears away like smoke; the new world's name lands
+//   7.70 → 8.40  the eye round it comes apart into ink, and the ink tears away off the edges
+//                like smoke; the new world's name lands (7.70 → 8.66)
 //   8.45 → 8.78  the overlay fades onto the live new world; the last frame is clear
 //
 // AXES OF VARIATION (all from ctx.rng, in create())
 //   1. the arms: from all round, from below, sweeping in from one side or down over the top;
 //      five to seven, which one crosses the glass, each one's curl, timing, depth and writhe
 //   2. the kraken's angle: the roll of its eye, which way its mantle trails, where it rises,
-//      where it looks first, where the eye opens in the dark
-//   3. the eye's colour: amber, gold, copper or bronze, with teal, violet or pale-gold flecks
-//      or none; in the dark it shifts towards the next world's accent
+//      where it looks first, how close it comes and where it settles, where the eye opens in
+//      the dark
+//   3. the eye: amber, gold, copper or bronze, with teal, violet or pale-gold flecks or none
+//      (in the dark it shifts towards the next world's accent); a pupil that opens oval, or
+//      into a cuttlefish's W
 //   4. the blink: one slow blink, a double blink, or a half-close and then the slow one
 //   5. the galaxy: two to four arms, its winding, tilt and turn, and the order the specks
 //      leave it in (from the core out, swept across, rising, or the strongest outlines first)
@@ -78,26 +82,26 @@ import { planArms, buildArms, TN } from './swallowed/arms.js';
 import { makeSpecks } from './swallowed/specks.js';
 
 const DURATION = 8.8;
-const SWAP_AT = 0.505;
+const SWAP_AT = 0.5114;
 const T = {
-  swap: DURATION * SWAP_AT, // 4.444
+  swap: DURATION * SWAP_AT, // 4.50
   dim0: 0.05, dim1: 1.6,
-  rise0: 0.1, near0: 1.95, near1: 3.05,
-  sees: 2.72, blink: 3.16, snap: 3.6,
-  ink0: 3.66, recoil: 3.7, full0: 4.0, full1: 4.26,
-  on0: 4.32, s0: 4.65, s1: 5.45, g0: 5.2, g1: 5.8, p0: 6.4, p1: 6.8,
-  eye0: 6.3, open0: 6.72, open1: 7.2, fall0: 7.1, fall1: 7.95, tear0: 7.75, tear1: 8.35,
+  rise0: 0.1, near0: 1.9, near1: 2.95,
+  sees: 2.6, blink: 3.05, snap: 3.8,
+  ink0: 3.84, recoil: 3.88, full0: 4.1, full1: 4.32,
+  on0: 4.42, s0: 4.65, s1: 5.45, g0: 5.2, g1: 5.8, p0: 6.4, p1: 6.8,
+  eye0: 6.3, open0: 6.72, open1: 7.2, fall0: 7.1, fall1: 7.95, tear0: 7.7, tear1: 8.4,
   exit0: 8.28, exit1: 8.45, fade0: 8.45, fade1: 8.78,
-  line0: 4.7, line1: 6.2, cap0: 7.45, cap1: 8.62,
+  line0: 4.7, line1: 6.2, cap0: 7.7, cap1: 8.66,
 };
 const MONO = "'JetBrains Mono', Menlo, monospace";
 const HEAD = "'Rajdhani', 'Futura', sans-serif";
 const AQUA = '#bff6ee', WARN = '#ff8a6a';
 const IRIS = [
-  [[0.16, 0.05, 0.01], [0.62, 0.36, 0.06], [0.34, 0.15, 0.02]],  // amber
-  [[0.16, 0.08, 0.015], [0.62, 0.46, 0.12], [0.32, 0.22, 0.04]], // gold
-  [[0.16, 0.035, 0.012], [0.6, 0.24, 0.07], [0.3, 0.09, 0.03]],  // copper
-  [[0.12, 0.06, 0.02], [0.5, 0.34, 0.13], [0.24, 0.15, 0.06]],   // bronze
+  [[0.2, 0.035, 0.006], [0.9, 0.3, 0.025], [0.45, 0.11, 0.012]],   // amber
+  [[0.2, 0.06, 0.008], [0.88, 0.42, 0.05], [0.42, 0.17, 0.02]],    // gold
+  [[0.2, 0.025, 0.01], [0.82, 0.2, 0.045], [0.4, 0.07, 0.022]],    // copper
+  [[0.16, 0.045, 0.012], [0.72, 0.3, 0.08], [0.34, 0.12, 0.04]],   // bronze
 ];
 const FLECKS = [[0.2, 0.62, 0.48], [0.45, 0.4, 0.95], [1.0, 0.93, 0.65]];
 const lin = (hex) => { const c = hexToRgb(hex); return [Math.pow(c.r / 255, 2.2), Math.pow(c.g / 255, 2.2), Math.pow(c.b / 255, 2.2)]; };
@@ -136,14 +140,16 @@ export default {
     // ---- decided once --------------------------------------------------------------------
     const armPlan = planArms(rng, soft);
     const side = randSign(rng);
-    const roll1 = rand(rng, -0.28, 0.28), roll2 = rand(rng, -0.3, 0.3);
+    const roll1 = rand(rng, -0.36, 0.36), roll2 = rand(rng, -0.3, 0.3);
     const bodyAng = rand(rng, -0.55, 0.55);
     const riseOff = rand(rng, 0.08, 0.22) * randSign(rng);
-    const endX = rand(rng, -0.05, 0.05), endY = rand(rng, -0.02, 0.05);
+    const endX = rand(rng, -0.12, 0.12) * Math.min(1.6, ASP0), endY = rand(rng, -0.05, 0.07);
+    const idN = 1 / rand(rng, 2.75, 3.5); // how close it comes
     const gaze0 = [rand(rng, 0.12, 0.2) * randSign(rng), rand(rng, -0.14, 0.02)];
     const iris = pick(rng, IRIS);
     const fleck = rng() < 0.75 ? pick(rng, FLECKS) : null;
     const blinkKind = pick(rng, ['slow', 'double', 'half']);
+    const pupW = rng() < 0.4 ? rand(rng, 0.35, 0.55) : 0;
     const inkSide = randSign(rng), inkAng = rand(rng, 0.45, 1.05);
     const C2 = [rand(rng, -0.12, 0.12) * Math.min(1.6, ASP0), rand(rng, -0.04, 0.05)];
     const galaxy = { hand: randSign(rng), arms: pick(rng, [2, 2, 3, 4]), twist: rand(rng, 7, 13), tilt: rand(rng, -0.6, 0.6), incl: rand(rng, 0.5, 0.8), order: pick(rng, ['centre', 'sweep', 'rise', 'edges']), sweepDir: randSign(rng) };
@@ -185,9 +191,9 @@ export default {
       uIrisA: { value: V3(iris[0]) }, uIrisB: { value: V3(iris[1]) }, uIrisC: { value: V3(iris[2]) }, uFleck: { value: V3(fleck || [0, 0, 0]) },
       uInnerCol: { value: V3([0.5, 0.6, 0.7]) }, uEnv: { value: V3(fromAvg.map((v) => v * 0.6)) },
       uEyeA: { value: 0 }, uDist: { value: 40 }, uHole: { value: 1 }, uFocus: { value: V2(clamp01(ctx.focus.x / W0), 1 - clamp01(ctx.focus.y / H0)) },
-      uPhotoArm: { value: 1 }, uBump: { value: 0.55 }, uTorch: { value: 0 },
+      uPhotoArm: { value: 1 }, uBump: { value: 0.55 }, uTorch: { value: 0 }, uAmb: { value: 1 }, uPupW: { value: pupW },
       uInk: { value: 0 }, uInkFull: { value: 0 }, uInkS: { value: V2(0, 0) }, uInkDir: { value: V2(0, 1) },
-      uPic: { value: 0 }, uRho: { value: 0.1 }, uSc: { value: 0.2 }, uTear: { value: 0 }, uExit: { value: 0 }, uAlpha: { value: 1 }, uBright: { value: 1 }, uPicC: { value: V2(C2[0], C2[1]) },
+      uLines: { value: 0 }, uPic: { value: 0 }, uRho: { value: 0.1 }, uSc: { value: 0.2 }, uTear: { value: 0 }, uExit: { value: 0 }, uAlpha: { value: 1 }, uBright: { value: 1 }, uPicC: { value: V2(C2[0], C2[1]) },
     };
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
@@ -205,7 +211,8 @@ export default {
     scene1.add(quad(mBack1, -1));
     const arms = buildArms(THREE, armPlan, mArm, soft);
     scene1.add(arms.group);
-    scene1.add(quad(mInk, 9));
+    const inkQuad = quad(mInk, 9);
+    scene1.add(inkQuad);
     scene2.add(quad(mBack2, -1));
     const specks = makeSpecks(THREE, rng, nSpeck, galaxy);
     scene2.add(specks.points);
@@ -229,12 +236,13 @@ export default {
     // ---- the kraken's state at time t ------------------------------------------------------
     function blinkAt(t) {
       const b = T.blink;
-      let v = ease.inQuad(seg(t, b, b + 0.2)) * (1 - ease.outCubic(seg(t, b + 0.28, b + 0.54)));
+      // heavy: the lids take their time coming down, rest, and drag back up
+      let v = ease.inOutSine(seg(t, b, b + 0.28)) * (1 - ease.inOutSine(seg(t, b + 0.38, b + 0.73)));
       if (blinkKind === 'double') v = Math.max(v, ease.inQuad(seg(t, b - 0.42, b - 0.33)) * (1 - ease.outQuad(seg(t, b - 0.3, b - 0.2))));
       if (blinkKind === 'half') v = Math.max(v, 0.55 * ease.inOutSine(seg(t, b - 0.62, b - 0.4)) * (1 - ease.inOutSine(seg(t, b - 0.3, b - 0.08))));
       return v;
     }
-    const idR = 1 / 31, idN = 1 / 3.1;
+    const idR = 1 / 31;
     const ACT1 = { id: 0, x: 0, y: 0, R: 0 };
     function act1(t) {
       let id = t < T.near0 ? lerp(1 / 46, idR, ease.inOutSine(seg(t, T.rise0, T.near0))) : lerp(idR, idN, ease.inOutCubic(seg(t, T.near0, T.near1)));
@@ -257,7 +265,7 @@ export default {
       const sc0 = (PR0 * R0 * 1.1) / 0.5;
       const k = ease.inOutCubic(seg(t, T.fall0, T.fall1));
       ACT2.sc = lerp(sc0, 1, k);
-      ACT2.rho = Math.max(ACT2.sc * 0.5, PR0 * R) + 0.9 * ease.inQuad(seg(t, T.fall1 - 0.3, T.tear1));
+      ACT2.rho = Math.max(ACT2.sc * 0.5, PR0 * R) + 0.75 * ease.inQuad(seg(t, T.fall1 - 0.15, T.tear1));
       ACT2.pr = pr;
       ACT2.R = ACT2.rho / pr;
       ACT2.cx = C2[0] * (1 - k);
@@ -307,7 +315,7 @@ export default {
       A.tone({ freq: 72, freqEnd: 44, dur: 0.36, gain: 0.24 * g, attack: 0.02 });
     });
     blinkCue(T.blink + 0.02, 1);
-    cue(T.blink + 0.3, () => A.noise({ filter: 'lowpass', freq: 260, freqEnd: 720, q: 0.8, dur: 0.3, gain: 0.12, attack: 0.05 }));
+    cue(T.blink + 0.4, () => A.noise({ filter: 'lowpass', freq: 260, freqEnd: 720, q: 0.8, dur: 0.3, gain: 0.12, attack: 0.05 }));
     if (blinkKind === 'double') blinkCue(T.blink - 0.42, 0.6);
     if (blinkKind === 'half') cue(T.blink - 0.6, () => A.noise({ filter: 'lowpass', freq: 380, freqEnd: 160, dur: 0.4, gain: 0.1, attack: 0.15 }));
     cue(T.snap, () => A.tone({ type: 'sine', freq: 2400, freqEnd: 1700, dur: 0.05, gain: 0.015, attack: 0.002 }));
@@ -346,7 +354,7 @@ export default {
     cue(T.fall1 - 0.03, () => {
       A.sfx('boom', { gain: 0.28, pitch: 0.7 });
       A.noise({ filter: 'lowpass', freq: 3000, freqEnd: 300, dur: 0.9, gain: 0.18, attack: 0.01 });
-      [587.33, 880, 1174.66].forEach((f, i) => A.tone({ type: 'sine', freq: f, dur: 1.6, gain: 0.04, attack: 0.02, delay: i * 0.05, pan: (i - 1) * 0.35 }));
+      [587.33, 880, 1174.66].forEach((f, i) => A.tone({ type: 'sine', freq: f, dur: 0.85, gain: 0.04, attack: 0.02, delay: i * 0.05, pan: (i - 1) * 0.35 }));
     });
     if (ctx.matchPoint) [4.9, 5.7].forEach((t) => cue(t, () => A.sfx('heartbeat', { gain: 0.5, pitch: 0.75 })));
     cues.sort((a, b) => a.t - b.t);
@@ -548,14 +556,16 @@ export default {
           U.uGlow.value = 1;
           U.uInner.value = 0;
           U.uGlint.value = 0.3;
-          U.uTorch.value = 0.55 * (1 - seg(t, T.ink0, T.ink0 + 0.4));
+          U.uAmb.value = 1;
+          U.uTorch.value = 0.42 * (1 - seg(t, T.ink0, T.ink0 + 0.4));
           arms.update(t, asp, T);
           // the ink: from below one side of the eye, across and up at the lens
-          const ik = seg(t, T.ink0, T.ink0 + 0.75);
+          const ik = seg(t, T.ink0, T.ink0 + 0.6);
           U.uInk.value = ik;
           U.uInkFull.value = ease.inOutSine(seg(t, T.full0, T.full1));
           U.uInkS.value.set(k.x + inkSide * 0.3 * Math.min(asp, 1.8) * 0.5, k.y - 0.42);
           U.uInkDir.value.set(-inkSide * Math.cos(inkAng), Math.sin(inkAng));
+          inkQuad.visible = t >= T.ink0; // (no full-screen pass for ink that is not there yet)
           renderer.render(scene1, camera);
         } else {
           // ===== ACT 2: the black, the specks, the eye, the pupil =====================================
@@ -571,13 +581,15 @@ export default {
           U.uBody.value = 0;
           U.uSun.value = 0;
           U.uPhoto.value = ease.inOutSine(seg(t, T.eye0 - 0.3, T.eye0 + 0.3)) * (1 - seg(t, T.fall0, T.fall1));
-          U.uGlow.value = 0.8;
+          U.uGlow.value = 1.5;
+          U.uAmb.value = 0.12;
           U.uGlint.value = 0.9;
           U.uTorch.value = 0;
           U.uDist.value = 3;
           U.uEnv.value.set(0.004, 0.006, 0.01);
           U.uInner.value = texTo ? ease.inOutSine(seg(t, T.open0, T.open0 + 0.4)) : 0;
           U.uPic.value = texTo ? seg(t, T.open0, T.open0 + 0.2) : 0;
+          U.uLines.value = texTo ? ease.inOutSine(seg(t, T.g0 + 0.3, T.g1 + 0.35)) * (1 - ease.inSine(seg(t, T.p0, T.p0 + 0.2))) : 0;
           U.uRho.value = k.rho;
           U.uSc.value = k.sc;
           U.uPicC.value.set(k.cx, k.cy);

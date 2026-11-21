@@ -50,8 +50,8 @@ vec3 frameAt(vec2 uv) {
   vec2 sp = (uv - 0.5) * vec2(uAsp, 1.0);
   float sh = smoothstep(-0.25, 0.25, uShade * 2.4 - 1.2 - dot(sp, uShadeDir));
   float l = dot(c, vec3(0.299, 0.587, 0.114));
-  c = mix(c, vec3(l * 0.5, l * 0.86, l * 1.08), uDim * 0.5);
-  c -= max(c - 0.55, 0.0) * uDim * 0.65;
+  c = mix(c, c * vec3(0.72, 0.94, 1.12), uDim * 0.6);
+  c *= 1.0 - uDim * 0.45 * smoothstep(0.35, 0.95, l);
   c *= 1.0 - uDim * (0.3 + 0.22 * sh) - 0.12 * uDim * smoothstep(0.0, 0.6, uv.y);
   return max(c, 0.0);
 }
@@ -63,7 +63,7 @@ vec3 frameAt(vec2 uv) {
 export const KRAKEN = `
 uniform sampler2D tNoise, tCaustic;
 uniform vec2 uEyeC, uPup, uGaze, uBodyDir;
-uniform float uEyeR, uRoll, uLid, uHood, uBody, uSun, uPhoto, uGlow, uInner, uFleckK, uGlint, uTorch, uDist;
+uniform float uEyeR, uRoll, uLid, uHood, uBody, uSun, uPhoto, uGlow, uInner, uFleckK, uGlint, uTorch, uDist, uAmb, uPupW;
 uniform vec3 uIrisA, uIrisB, uIrisC, uFleck, uInnerCol, uEnv;
 // a noise lookup at a chosen level of detail (the iris is sampled round a seam: no derivatives)
 vec4 nlod(vec2 uv, float texPerPx) { return textureLod(tNoise, uv, log2(max(1.0, texPerPx * 256.0))); }
@@ -94,7 +94,7 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   float bL = -mix(0.9, 0.14, uLid);
   float cL = (bL * bL - ac * ac) / (2.0 * bL);
   float sL = length(p - vec2(0.0, cL)) - (cL - bL);
-  float S = max(sU, sL);
+  float S = max(max(sU, sL), abs(p.x) - ac); // (closed, the two arcs are one circle: end it at the corners)
   inA = 1.0 - smoothstep(-px, px, S);
   float dl = max(S, 0.0), dap = -S;
 
@@ -102,7 +102,7 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   // fins, and the roots of the arms fanning out the other way (towards us: they become the arms)
   vec2 bd = uBodyDir;
   vec4 nz = texture2D(tNoise, p * 0.085 + vec2(0.17, 0.41));
-  vec4 fine = texture2D(tNoise, p * 0.31 + vec2(0.71, 0.29));
+  vec4 fine = texture2D(tNoise, p * 0.9 + vec2(0.71, 0.29));
   float sHead = length(vec2(dot(p, bd) * 0.85, dot(p, vec2(-bd.y, bd.x)))) - 3.1;
   float u = (dot(p, bd) - 1.2) / 11.5;
   float mw = mix(3.0, 0.35, pow(clamp(u, 0.0, 1.0), 1.2)) + 1.7 * exp(-pow((u - 0.8) / 0.11, 2.0));
@@ -125,7 +125,8 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   float h = 0.17 * exp(-pow((dl - 0.13) / 0.11, 2.0)) * (0.75 + 0.5 * fine.r) - 0.045 * exp(-pow((dl - 0.33) / 0.08, 2.0)) * (0.5 + fine.g);
   h *= 1.0 - inA;
   float ra = atan(p.y, p.x + 1e-5);
-  h += min(sqrt(max(0.0, -sAll)), 1.0) * 0.9 + nz.r * 0.3 + fine.r * 0.05;
+  // (the silhouette's rounding only matters while it is far: close up its seams would show)
+  h += min(sqrt(max(0.0, -sAll)), 1.0) * 0.9 * (1.0 - smoothstep(0.06, 0.16, uEyeR)) + nz.r * 0.3 + fine.r * 0.05;
   h += sin(ra * 9.0 + nz.g * 7.0 + r * 1.3) * 0.02 * smoothstep(0.5, 1.2, dl) * (1.0 - smoothstep(1.6, 2.8, dl)) * fine.g;
   vec2 gs = vec2(dFdx(h), dFdy(h)) / px;
   vec3 ns = normalize(vec3(-gs * 0.9, 1.0));
@@ -135,6 +136,8 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   float rr = length(q);
   float ang = atan(q.y, q.x + 1e-5), ca = cos(ang), sa = sin(ang);
   float pr = 1.0 / sqrt(ca * ca / (uPup.x * uPup.x) + sa * sa / (uPup.y * uPup.y));
+  // some open into a W, as a cuttlefish's does: the lid of the pupil dips in the middle
+  pr *= 1.0 - uPupW * exp(-pow((ang - 1.5708) / 0.42, 2.0)) * smoothstep(0.08, 0.26, uPup.y);
   float IR = 0.9;
   float v = clamp((rr - pr) / max(IR - pr, 0.05), 0.0, 1.0);
   float a01 = ang / TAU + 0.5;
@@ -148,31 +151,31 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   float pit = nlod(vec2(a01 * 11.0, v * 0.9 + 0.2), 11.0 * tpp).r;
   vec3 iris = mix(uIrisA, uIrisB, smoothstep(0.04, 0.4, v));
   iris = mix(iris, uIrisC, smoothstep(0.5, 0.95, v));
-  float fib = clamp(fibA * (0.6 + 0.8 * fibB) * (0.75 + 0.5 * fibC), 0.0, 1.6);
-  iris *= 0.18 + 0.85 * fib * fib;
+  float fib = clamp(fibA * (0.6 + 0.8 * fibB) * (0.75 + 0.5 * fibC), 0.0, 1.25);
+  iris *= 0.2 + 0.8 * fib * fib;
   float zz = 0.3 + 0.035 * sin(ang * 23.0 + fibB * 4.0);
   float coll = exp(-pow((v - zz) / 0.04, 2.0));
   iris = mix(iris, uIrisB * 1.15, coll * 0.55);
   iris *= 1.0 - smoothstep(0.6, 0.74, pit) * smoothstep(0.16, 0.34, v) * (1.0 - smoothstep(0.6, 0.8, v)) * 0.75;
-  iris = mix(iris, uFleck * (0.6 + 0.6 * fibB), smoothstep(0.66, 0.84, blot) * uFleckK * smoothstep(0.1, 0.4, v));
+  iris = mix(iris, uFleck * (0.3 + 0.5 * fibB), smoothstep(0.72, 0.86, blot) * smoothstep(0.45, 0.7, fibB) * uFleckK * smoothstep(0.1, 0.4, v));
   iris *= 0.2 + 0.8 * smoothstep(0.0, 0.1, v);
   iris *= 1.0 - smoothstep(0.82, 1.0, v) * 0.85;
   float irisM = 1.0 - smoothstep(IR - 1.5 * px, IR + 1.5 * px, rr);
   pupil = (1.0 - smoothstep(-1.5 * px, 1.5 * px, rr - pr)) * inA;
   // round the iris, no white: skin-dark tissue shot with iridophores, silver-gold-green
   vec3 en = normalize(vec3(Ri * (p * 0.7), 1.0));
-  vec3 irid = mix(vec3(0.22, 0.2, 0.12), vec3(0.1, 0.22, 0.2), 0.5 + 0.5 * sin(en.x * 5.0 + en.y * 3.0 + nz.g * 6.0));
-  vec3 sclera = irid * (0.4 + 0.6 * smoothstep(0.35, 0.75, fine.g)) + vec3(0.06, 0.012, 0.012);
+  vec3 irid = mix(vec3(0.2, 0.15, 0.07), vec3(0.06, 0.14, 0.12), 0.5 + 0.5 * sin(en.x * 5.0 + en.y * 3.0 + nz.g * 6.0));
+  vec3 sclera = irid * (0.25 + 0.5 * smoothstep(0.35, 0.75, fine.g)) + vec3(0.05, 0.01, 0.01);
   vec3 alb = mix(sclera, iris, irisM);
   alb = mix(alb, vec3(0.002, 0.003, 0.003), pupil);
   float occ = smoothstep(0.0, 0.32, -sU) * mix(0.55, 1.0, smoothstep(0.0, 0.18, -sL));
   vec3 eamb = mix(vec3(0.008, 0.04, 0.062), vec3(0.05, 0.2, 0.23), en.y * 0.5 + 0.5) * vec3(0.6, 0.76, 0.81);
-  vec3 eye = alb * (SUN * sun * max(dot(en, L) * 0.7 + 0.3, 0.0) * 0.75 + eamb * (0.6 + 0.4 * sun) + vec3(1.0, 0.95, 0.85) * torch * en.z) * mix(0.12, 1.0, occ);
+  vec3 eye = alb * (SUN * sun * max(dot(en, L) * 0.7 + 0.3, 0.0) * 0.75 + eamb * (0.6 + 0.4 * sun) * uAmb + vec3(1.0, 0.95, 0.85) * torch * en.z) * mix(0.12, 1.0, occ);
   // it glows from within, as the world's eye does: brightest in the fibres
   float notP = 1.0 - pupil;
-  eye += uIrisB * irisM * notP * uGlow * (0.02 + 0.1 * fib * fib * smoothstep(0.05, 0.5, v)) * mix(0.3, 1.0, occ);
+  eye += uIrisB * irisM * notP * uGlow * (0.03 + 0.11 * fib * smoothstep(0.05, 0.5, v)) * mix(0.3, 1.0, occ);
   // the light of whatever is in the pupil, spilling out across the iris
-  eye += uInnerCol * uInner * irisM * notP * (exp(-v * 4.5) * 0.3 + 0.025) * (0.3 + 0.8 * fib) * mix(0.5, 1.0, occ);
+  eye += uInnerCol * uInner * irisM * notP * (exp(-v * 5.0) * 0.28 + 0.015) * (0.3 + 0.7 * fib) * mix(0.5, 1.0, occ);
   // eyeshine: something gold-green, deep in the dark of the pupil
   eye += vec3(0.012, 0.018, 0.005) * pupil * (1.0 - smoothstep(0.0, max(pr, 0.01), rr)) * uGlow;
   // the cornea: the surface's light across the top of it, our torch, a cold glint, the water
@@ -180,16 +183,16 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   float fres = 0.04 + 0.96 * pow(1.0 - max(en.z, 0.0), 5.0);
   float win = smoothstep(0.3, 0.6, Rf.y) * (1.0 - smoothstep(0.5, 0.88, abs(Rf.x + 0.1)));
   float rip = texture2D(tCaustic, Rf.xy * vec2(0.45, 0.3) + vec2(uT * 0.02, uT * 0.013)).r;
-  wet = SUN * win * (0.2 + 0.8 * rip) * 0.35 * sun;
+  wet = SUN * win * (0.45 + 0.55 * rip) * 0.3 * sun;
   wet += vec3(1.0, 0.97, 0.9) * pow(max(dot(Rf, normalize(vec3(-0.38, 0.62, 0.69))), 0.0), 360.0) * (2.2 * sun + uGlint);
-  wet += vec3(1.0, 0.96, 0.88) * pow(max(dot(Rf, normalize(vec3(0.16, 0.14, 0.98))), 0.0), 1400.0) * torch * 5.0;
-  wet += vec3(0.75, 0.9, 1.0) * pow(max(dot(Rf, normalize(vec3(0.5, -0.3, 0.81))), 0.0), 900.0) * (0.4 * sun + 0.5 * uGlint);
-  wet += uEnv * fres * 0.8;
+  wet += vec3(1.0, 0.96, 0.88) * pow(max(dot(Rf, normalize(vec3(0.16, 0.14, 0.98))), 0.0), 1400.0) * torch * 2.2;
+  wet += vec3(0.75, 0.9, 1.0) * pow(max(dot(Rf, normalize(vec3(0.5, -0.3, 0.81))), 0.0), 900.0) * (0.15 * sun + 0.35 * uGlint);
+  wet += uEnv * fres * 0.45;
   wet += vec3(0.55, 0.68, 0.7) * exp(-pow(dap / 0.02, 2.0)) * (0.16 * sun + 0.06 * uPhoto + 0.3 * torch);
   wet *= inA * mix(0.3, 1.0, occ);
 
   // ---- skin: the world's oxblood, mottled, banded out from the eye, the lid rims salmon
-  vec3 skin = mix(vec3(0.12, 0.01, 0.016), vec3(0.5, 0.055, 0.045), smoothstep(0.25, 0.8, nz.r * 0.8 + fine.r * 0.35));
+  vec3 skin = mix(vec3(0.09, 0.008, 0.013), vec3(0.48, 0.05, 0.042), smoothstep(0.3, 0.78, nz.r * 0.85 + texture2D(tNoise, p * 0.3 + 0.5).r * 0.3));
   float band = smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(ra * 6.0 + nz.g * 5.0 + r * 0.8));
   skin *= mix(1.0, mix(0.5, 1.0, band), smoothstep(1.2, 2.0, r));
   skin = mix(skin, vec3(0.42, 0.17, 0.14) * (0.8 + 0.35 * nz.g), exp(-pow((dl - 0.07) / 0.08, 2.0)) * 0.85);
@@ -198,7 +201,7 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   skin *= 0.7 + 0.55 * smoothstep(0.42, 0.68, spk);
   float cau = texture2D(tCaustic, p * 0.16 + vec2(uT * 0.013, uT * 0.008)).r * texture2D(tCaustic, p * 0.21 + vec2(-uT * 0.01, uT * 0.014) + 0.37).r * 3.2;
   vec3 samb = mix(vec3(0.008, 0.04, 0.062), vec3(0.05, 0.2, 0.23), ns.y * 0.5 + 0.5) * vec3(0.6, 0.76, 0.81);
-  vec3 sk = skin * (SUN * sun * 0.75 * max((dot(ns, L) + 0.3) / 1.3, 0.0) * (0.5 + cau * 1.3 * smoothstep(0.0, 0.6, ns.y)) + samb * (0.5 + 0.5 * sun) + vec3(1.0, 0.95, 0.85) * torch * 0.5 * max(ns.z, 0.0));
+  vec3 sk = skin * (SUN * sun * 0.6 * max((dot(ns, L) + 0.3) / 1.3, 0.0) * (0.5 + cau * 1.3 * smoothstep(0.0, 0.6, ns.y)) + samb * (0.5 + 0.5 * sun) * uAmb + vec3(1.0, 0.95, 0.85) * torch * 0.3 * max(ns.z, 0.0));
   sk *= mix(1.0, 0.45, exp(-pow((dl - 0.32) / 0.09, 2.0)));
   vec3 Hs = normalize(L + V);
   sk += SUN * sun * pow(max(dot(ns, Hs), 0.0), 40.0) * 0.12 + vec3(1.0, 0.95, 0.85) * torch * pow(max(ns.z, 0.0), 80.0) * 0.12;
@@ -206,8 +209,9 @@ vec4 kraken(vec2 sp, out vec3 emit, out vec3 wet, out float inA, out float far, 
   sk += uInnerCol * uInner * skin * 0.35 * exp(-dl * 4.0) * (1.0 - smoothstep(0.6, 1.6, r));
 
   // ---- photophores: a ring along each lid, a scatter over the body, pulsing in slow waves
-  float f = fract(atan(p.y * 1.7, p.x + 1e-5) / TAU * 30.0) - 0.5, rd = dl - 0.3;
-  float ring = exp(-(f * f * 70.0 + rd * rd * 1100.0)) * step(0.001, dl);
+  // (spaced along x, the upper lid's lights between the lower's; they fade round the corners)
+  float f = fract(p.x * 3.3 + step(0.0, p.y + 0.1) * 0.5) - 0.5, rd = dl - 0.3;
+  float ring = exp(-(f * f * 70.0 + rd * rd * 1100.0)) * step(0.001, dl) * (1.0 - smoothstep(1.0, 1.3, abs(p.x)));
   vec2 cell = p * 2.6, cf = fract(cell) - 0.5;
   float hs = hash12(floor(cell) + 7.0);
   float spots = (1.0 - smoothstep(0.03, 0.09 + 0.05 * hs, length(cf + (vec2(hash12(floor(cell) + 3.1), hs) - 0.5) * 0.5))) * step(0.66, hs) * smoothstep(0.55, 0.8, dl);
@@ -234,7 +238,7 @@ void main() {
     vec3 emit, wet; float inA, far, pupil;
     vec4 k = kraken(sp, emit, wet, inA, far, pupil);
     // water between us and it: the frame's own colour, more of it for the mantle further back
-    float fog = 1.0 - exp(-(uDist + far * 22.0) * 0.045);
+    float fog = 1.0 - exp(-(uDist + far * 22.0) * 0.038);
     vec3 lit = grade(k.rgb + wet);
     vec3 kc = mix(lit, bg, fog);
     kc += (grade(k.rgb + wet + emit) - lit) * (1.0 - fog * 0.55); // its lights carry further than its shape
@@ -341,23 +345,29 @@ uniform vec2 uInkS, uInkDir;
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 sp = (uv - 0.5) * vec2(uAsp, 1.0);
-  vec2 d = sp - uInkS;
-  float Lj = 2.6 * (1.0 - pow(1.0 - uInk, 2.2));
-  float al = dot(d, uInkDir);
-  vec2 c = d - uInkDir * clamp(al, 0.0, Lj);
-  float u = clamp(al / max(Lj, 1e-3), 0.0, 1.0);
-  float rad = (0.07 + 0.55 * uInk) * (0.4 + 0.9 * u) * (0.6 + 0.4 * uInk) + 1.2 * uInk * uInk * uInk;
+  vec2 perp = vec2(-uInkDir.y, uInkDir.x);
   vec2 drift = uInkDir * uT * 0.12;
   float n1 = texture2D(tNoise, sp * 0.9 - drift).r;
   float n2 = texture2D(tNoise, sp * 2.6 - drift * 1.6 + vec2(0.3, 0.7)).g;
   float n3 = texture2D(tNoise, sp * 6.0 - drift * 2.2 + 0.5).b;
-  float e = rad - length(c) + ((n1 - 0.5) * 0.7 + (n2 - 0.5) * 0.3 + (n3 - 0.5) * 0.1) * (rad + 0.05);
-  float dens = smoothstep(-0.015, 0.1, e) * step(0.001, uInk);
-  float thick = smoothstep(0.02, 0.3, e);
-  vec3 col = mix(vec3(0.17, 0.08, 0.14), vec3(0.014, 0.006, 0.018), thick);
-  col += vec3(0.05, 0.08, 0.085) * smoothstep(0.55, 0.85, n2) * (1.0 - thick) * smoothstep(-0.3, 0.4, sp.y);
+  float wob = (n1 - 0.5) * 0.75 + (n2 - 0.5) * 0.3 + (n3 - 0.5) * 0.1;
+  // the jet leaves a string of billows behind it, each swelling from the moment it is shed
+  float e = -1e3;
+  for (int k = 0; k < 7; k++) {
+    float fk = float(k);
+    float age = max(uInk - fk * 0.065, 0.0);
+    if (age <= 0.0) continue;
+    vec2 c = uInkS + uInkDir * (fk * 0.36 + 0.25 * age) + perp * sin(fk * 2.3) * 0.12 * (1.0 + age);
+    float rad = (0.05 + 1.15 * pow(age, 0.85)) * (0.75 + 0.07 * fk);
+    e = max(e, rad - length(sp - c) + wob * (rad + 0.06));
+  }
+  float dens = smoothstep(-0.015, 0.09, e) * step(0.001, uInk);
+  float thick = smoothstep(0.02, 0.24, e);
+  vec3 col = mix(vec3(0.17, 0.08, 0.14), vec3(0.012, 0.005, 0.016), thick);
+  // the billows' upper sides catch the last of the light
+  col += vec3(0.06, 0.09, 0.095) * smoothstep(0.5, 0.85, n2) * (1.0 - thick * 0.85) * smoothstep(-0.3, 0.45, sp.y);
   float a = max(dens, uInkFull);
-  col = mix(col, vec3(0.014, 0.006, 0.018), uInkFull) * mix(1.0, lensK(uv), 0.6);
+  col = mix(col, vec3(0.012, 0.005, 0.016), uInkFull) * mix(1.0, lensK(uv), 0.6);
   gl_FragColor = vec4(col * a, a);
 }`,
 };
@@ -368,7 +378,7 @@ export const BACK2 = {
   vertexShader: VERT_SCREEN,
   fragmentShader: COMMON + KRAKEN + `
 uniform sampler2D tTo;
-uniform float uEyeA, uPic, uRho, uSc, uTear, uExit, uAlpha, uBright;
+uniform float uEyeA, uPic, uRho, uSc, uTear, uExit, uAlpha, uBright, uLines;
 uniform vec2 uPicC;
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
@@ -376,6 +386,18 @@ void main() {
   vec4 n = texture2D(tNoise, sp * 0.45 + vec2(uT * 0.012, -uT * 0.009));
   vec3 ink = vec3(0.012, 0.006, 0.016) + vec3(0.02, 0.012, 0.03) * smoothstep(0.45, 0.85, n.r);
   vec3 col = ink;
+  // the next world's outlines, as a dust of light the specks are settling on
+  if (uLines > 0.001) {
+    vec2 tx = 1.5 / uRes;
+    float l1 = dot(texture2D(tTo, uv + vec2(tx.x, 0.0)).rgb, vec3(0.3, 0.55, 0.15)), l2 = dot(texture2D(tTo, uv - vec2(tx.x, 0.0)).rgb, vec3(0.3, 0.55, 0.15));
+    float l3 = dot(texture2D(tTo, uv + vec2(0.0, tx.y)).rgb, vec3(0.3, 0.55, 0.15)), l4 = dot(texture2D(tTo, uv - vec2(0.0, tx.y)).rgb, vec3(0.3, 0.55, 0.15));
+    float e = smoothstep(0.06, 0.4, length(vec2(l1 - l2, l3 - l4)));
+    vec3 tint = texture2D(tTo, uv).rgb;
+    tint = tint / max(max(tint.r, tint.g), max(tint.b, 0.05));
+    float dust = smoothstep(0.5, 0.85, texture2D(tNoise, sp * 7.0 + vec2(uT * 0.03, -uT * 0.02)).b);
+    float tw = 0.55 + 0.45 * sin(uT * 5.0 + texture2D(tNoise, sp * 3.0).r * 30.0);
+    col += mix(vec3(0.25, 0.6, 1.0), tint, 0.65) * e * uLines * (0.12 + 0.9 * dust * tw);
+  }
   vec3 wet = vec3(0.0);
   float inA = 0.0;
   if (uEyeA > 0.001) {
@@ -391,7 +413,7 @@ void main() {
     // the pupil's edge: crisp while it is an eye, torn smoke as we fall through it
     float tn = texture2D(tNoise, sp * 1.2 + vec2(0.0, -uT * 0.15)).r * 0.65 + texture2D(tNoise, sp * 3.4 + uT * 0.05).g * 0.35;
     float px = 1.5 / uRes.y;
-    float edge = uRho * (1.0 + (tn - 0.5) * 0.5 * uTear) + uTear * uTear * 0.6;
+    float edge = uRho * (1.0 + (tn - 0.5) * 0.55 * uTear) + uTear * uTear * uTear * 0.5;
     float m = 1.0 - smoothstep(edge - px - uTear * 0.08, edge + px, dl);
     m *= mix(smoothstep(0.0, 0.6, inA), 1.0, uTear);
     // the pupil is a lens: the picture bulges in it while it is small
@@ -401,10 +423,17 @@ void main() {
     vec2 tuv = mix(X / vec2(uAsp, 1.0) + 0.5, uv, uExit);
     vec3 pic = texture2D(tTo, tuv).rgb;
     pic = mix(pic, pic * 1.2 + 0.035, uBright * (1.0 - uExit));
-    // smoke where it tears: a dark rim of ink just outside the edge
-    float smoke = smoothstep(0.0, 0.12, dl - edge) * (1.0 - smoothstep(0.12, 0.4 + uTear * 0.3, dl - edge)) * uTear;
-    col = mix(col, ink, smoke * 0.85 * (1.0 - uExit));
-    col = mix(col, pic, m * uPic);
+    // as we go through, the eye round the pupil comes apart into ink, and the ink tears away
+    // in wisps that stream outwards off the edges of the frame
+    vec2 out2 = d / max(dl, 1e-3);
+    float wisp = texture2D(tNoise, sp * 1.6 - out2 * uT * 0.35 + vec2(0.37, 0.11)).r * 0.7 + texture2D(tNoise, sp * 4.1 - out2 * uT * 0.6).g * 0.3;
+    float smokeK = smoothstep(0.0, 0.3, uTear) * (1.0 - uExit);
+    vec3 smokeCol = ink + vec3(0.07, 0.05, 0.09) * smoothstep(0.45, 0.8, wisp) + pic * 0.1 * smoothstep(0.5, 0.9, wisp);
+    col = mix(col, smokeCol, smokeK);
+    // wisps of it drag across the picture's edge as it tears open
+    float band = 1.0 - smoothstep(0.0, 0.3, edge - dl);
+    float drag = smoothstep(0.52, 0.78, wisp) * band * smokeK * (1.0 - smoothstep(0.6, 1.0, uTear));
+    col = mix(col, mix(pic, smokeCol, drag * 0.9), m * uPic);
   }
   col += (vec3(1.0) - exp(-wet * 1.4)) * 0.85 * (1.0 - uTear);
   col += grain(gl_FragCoord.xy) * 0.03 * (1.0 - uExit);
@@ -458,7 +487,7 @@ void main() {
   vCol = mix(bio, tgt, kC * 0.85) * tw * 1.9;
   vA = on * uFade * (1.0 - kD * 0.35);
   float core = 1.0 + 1.6 * step(0.92, aR.y) * (1.0 - kC);
-  gl_PointSize = (3.6 + 5.0 * aR.x * aR.x) * core * uPx * mix(1.0, 0.8, kC) * mix(1.0, 0.55, kD);
+  gl_PointSize = (5.0 + 7.0 * aR.x * aR.x) * core * uPx * mix(1.0, 0.85, kC) * mix(1.0, 0.55, kD);
 }`,
   fragmentShader: `
 precision highp float;
@@ -467,7 +496,7 @@ varying float vA;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
   float d = length(c) * 2.0;
-  float a = (exp(-d * d * 14.0) + exp(-d * 4.0) * 0.4) * vA * (1.0 - smoothstep(0.8, 1.0, d));
+  float a = (exp(-d * d * 10.0) + exp(-d * 3.5) * 0.45) * vA * (1.0 - smoothstep(0.8, 1.0, d));
   gl_FragColor = vec4(vCol * a, 0.0);
 }`,
 };
