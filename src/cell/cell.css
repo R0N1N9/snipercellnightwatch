@@ -455,3 +455,15 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 #cell-hud .c-pip .c-sq.min { height: auto !important; aspect-ratio: auto !important; }
 #cell-bodycams .bc.min { aspect-ratio: auto; height: 20px; }
 #cell-bodycams .bc.min canvas, #cell-bodycams .bc.min .rec, #cell-bodycams .bc.min s, #cell-bodycams .bc.min::after { display: none; }
+
+/* The grouped touch wheel: commands right, operator toggles left, pings top and bottom. */
+.cell-wheel.laid .cw-ring { background: radial-gradient(ellipse, rgba(0, 10, 14, 0.7) 0 60%, transparent 72%); border: none; transform: scale(1.35, 1.05); }
+.cell-wheel.laid .cw-item { width: 58px; padding: 3px 1px; }
+.cell-wheel.laid .cw-item i { font-size: 13px; }
+.cell-wheel.laid .cw-item b { font-size: 8px; letter-spacing: 0.04em; }
+.cell-wheel .cw-item.cw-tog { color: #cfe6ff; border-color: rgba(160, 200, 255, 0.35); }
+.cell-wheel .cw-item.cw-tog.sel { background: rgba(160, 200, 255, 0.25); border-color: #cfe6ff; }
+.cell-wheel .cw-item.cw-comms { color: #00ffe0; }
+.cell-wheel.laid .cw-centre { top: -14px; }
+/* Phones: the middle strip folds into the wheel; only USE, pause and the context buttons stay. */
+body.cell-compact #touch .cell-tbar .pill:not(.keep) { display: none !important; }

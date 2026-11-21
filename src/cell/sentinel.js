@@ -86,7 +86,7 @@ const HELI_R = 6.5; // the light's pool on the ground
 const EYE = 1.62;
 // The bulwark's hard-light wall, in its local frame (feet at origin, facing -Z, before scale).
 // The sight-port is a notch cut down from the top edge (a Halo-style dip), so it's easy to read.
-export const WALL = { z: -0.55, w: 0.95, y0: 0.3, y1: 1.85, port: { x0: 0.03, x1: 0.33, y0: 1.36, y1: 1.85 } };
+export const WALL = { z: -0.55, w: 0.95, y0: 0.3, y1: 1.85, port: { x0: -0.14, x1: 0.16, y0: 1.42, y1: 1.85 }, hp: 120 };
 
 // ---------------------------------------------------------------------------
 // Models
@@ -135,9 +135,9 @@ function shellMat(color) {
 }
 function wallMat() {
   return new THREE.ShaderMaterial({
-    uniforms: { uT: { value: 0 }, uA: { value: 1 } },
+    uniforms: { uT: { value: 0 }, uA: { value: 1 }, uHp: { value: 1 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform float uT, uA; varying vec2 vUv;
+    fragmentShader: `uniform float uT, uA, uHp; varying vec2 vUv;
       void main(){
         vec2 p = vUv;
         // The sight-port: a notch cut down from the top edge on the weapon side, with a bright
@@ -153,6 +153,10 @@ function wallMat() {
         float scan = 0.5 + 0.5 * sin(p.y * 60.0 - uT * 6.0);
         vec3 c = vec3(0.2, 0.85, 1.0) * (0.12 + edge * 0.9 + grid * 0.25 + scan * 0.05);
         c += vec3(1.0, 0.75, 0.3) * rim * (1.1 + 0.25 * sin(uT * 5.0));
+        // Weakening: cyan bleeds to red, pulsing faster as it nears breaking.
+        float low = 1.0 - smoothstep(0.15, 0.85, uHp);
+        vec3 red = vec3(1.0, 0.18, 0.15) * (0.16 + edge * 0.9 + grid * 0.3 + scan * 0.06) * (1.0 + 0.35 * low * sin(uT * (6.0 + 14.0 * low)));
+        c = mix(c, red + vec3(1.0, 0.75, 0.3) * rim * 0.8, low);
         gl_FragColor = vec4(c * uA, 1.0);
       }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
@@ -281,26 +285,63 @@ export function buildUnit(type = 'guard', chief = false) {
     for (const y of [1.28, 1.46, 1.64]) mk(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10), '#1d1c1a', 0, y, 0.47);
     for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.3, 0.015, 0.01), '#1a1918', 0, 1.3 + i * 0.06, 0.155);
   } else if (type === 'jugg' || type === 'overseer') {
-    // Hulking enforcer: plated, neon seams, heavy cannon on the left, energy blade on the right.
+    // Brute (Halo-style): hunched and broad, a barrel chest under layered curved plates, stacked
+    // dome pauldrons, thick capsule arms with gauntlets, armoured thighs and greaves, a low
+    // heavy head; neon trim along the plate edges. Heavy cannon on the left, blade on the right.
     const boss = type === 'overseer';
-    const C = { suit: boss ? '#2a2236' : '#2c2628', boot: '#121214' };
+    const C = { suit: boss ? '#2a2236' : '#2a2622', boot: '#121214' };
+    const A1 = boss ? '#4a3e66' : '#3d4a6a', A2 = boss ? '#5a4c7a' : '#4e5c80', TRIM = boss ? '#8a7040' : '#262c3a', FUR = '#2e2520';
     legs = rig(body, C, mk);
-    mk(new THREE.BoxGeometry(0.62, 0.66, 0.42), boss ? '#3a3050' : '#3e3434', 0, 1.22, 0);
-    mk(new THREE.BoxGeometry(0.7, 0.36, 0.48), boss ? '#4a3e66' : '#4e4040', 0, 1.36, -0.02);
-    for (const s of [-1, 1]) {
-      mk(new THREE.BoxGeometry(0.3, 0.2, 0.42), boss ? '#4a3e66' : '#4e4040', s * 0.46, 1.52, 0).rotation.z = s * 0.25;
-      glow(new THREE.BoxGeometry(0.02, 0.5, 0.02), neon, s * 0.32, 1.2, -0.22);
+    const sph = (r, sx, sy, sz, col, x, y, z, rx = 0, parent = body, seg) => { const m = mk(seg || new THREE.SphereGeometry(r, 16, 12), col, x, y, z, parent); m.scale.set(sx, sy, sz); m.rotation.x = rx; return m; };
+    const plate = (r, t0, t1, col, y, z, sx = 1, sy = 1, sz = 1) => sph(r, sx, sy, sz, col, 0, y, z, 0.18, body, new THREE.SphereGeometry(r, 18, 8, Math.PI * 1.08, Math.PI * 0.84, Math.PI * t0, Math.PI * (t1 - t0)));
+    // Body mass: barrel chest and gut, hunched forward.
+    sph(0.36, 1.02, 0.95, 0.8, FUR, 0, 1.26, 0.02, 0.22);
+    sph(0.3, 1.0, 0.8, 0.85, FUR, 0, 1.0, 0.0);
+    // Layered chest plates (upper overlaps lower), a belly guard, neon trim on the edges.
+    plate(0.39, 0.22, 0.5, A2, 1.27, 0.0, 1.06, 1.0, 0.86);
+    plate(0.37, 0.44, 0.66, A1, 1.22, 0.01, 1.05, 1.0, 0.86);
+    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.34 - i * 0.04, 0.07, 0.06), A1, 0, 1.02 - i * 0.075, -0.25 + i * 0.01).rotation.x = 0.15;
+    glow(new THREE.BoxGeometry(0.5, 0.012, 0.012), neon, 0, 1.33, -0.33, body, 1.2);
+    glow(new THREE.BoxGeometry(0.44, 0.012, 0.012), neon, 0, 1.15, -0.31, body, 1.2);
+    // Back: spine plates.
+    for (let i = 0; i < 4; i++) sph(0.1, 1.4, 0.5, 0.7, A1, 0, 1.48 - i * 0.14, 0.3 - i * 0.01);
+    // Stacked dome pauldrons and thick arms with gauntlets.
+    for (const sd of [-1, 1]) {
+      for (let i = 0; i < 3; i++) { const d = sph(0.2 - i * 0.025, 1.1, 0.75, 1.0, i ? A1 : A2, sd * (0.42 + i * 0.03), 1.56 - i * 0.075, 0.0, 0, body, new THREE.SphereGeometry(0.2 - i * 0.025, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2)); d.rotation.z = -sd * (0.35 + i * 0.1); }
+      glow(new THREE.BoxGeometry(0.02, 0.02, 0.3), neon, sd * 0.56, 1.5, 0.0, body, 1.0);
+      const up = mk(new THREE.CapsuleGeometry(0.1, 0.24, 6, 10), FUR, sd * 0.46, 1.3, -0.04);
+      up.rotation.z = sd * 0.25;
+      const fa = mk(new THREE.CylinderGeometry(0.11, 0.09, 0.26, 12), A1, sd * 0.5, 1.12, -0.16);
+      fa.rotation.x = 1.2;
+      mk(new THREE.BoxGeometry(0.03, 0.03, 0.2), TRIM, sd * 0.5, 1.2, -0.2).rotation.x = 1.2;
     }
-    mk(new THREE.BoxGeometry(0.3, 0.3, 0.32), '#2a2426', 0, 1.7, -0.02);
-    glow(new THREE.BoxGeometry(0.24, 0.04, 0.02), neon, 0, 1.72, -0.19);
-    if (boss) { glow(new THREE.BoxGeometry(0.06, 0.2, 0.06), neon, 0, 1.92, 0.02); helmet = new THREE.Group(); mk(new THREE.BoxGeometry(0.36, 0.3, 0.38), '#4a3e66', 0, 1.74, -0.02, helmet); glow(new THREE.BoxGeometry(0.28, 0.04, 0.02), neon, 0, 1.74, -0.22, helmet); body.add(helmet); }
+    // Low, heavy head pushed forward, tusks and a glowing visor; overseer wears a crested
+    // helmet that can be shot off.
+    sph(0.15, 1.15, 1.0, 1.15, '#2a2220', 0, 1.62, -0.12);
+    sph(0.12, 1.25, 0.6, 1.1, FUR, 0, 1.53, -0.16);
+    for (const sd of [-1, 1]) mk(new THREE.ConeGeometry(0.02, 0.08, 6), '#c8bca0', sd * 0.07, 1.5, -0.27).rotation.x = -2.6;
+    glow(new THREE.BoxGeometry(0.2, 0.035, 0.02), neon, 0, 1.65, -0.29);
+    if (boss) {
+      helmet = new THREE.Group();
+      sph(0.19, 1.1, 0.85, 1.15, A2, 0, 1.7, -0.1, 0, helmet, new THREE.SphereGeometry(0.19, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.6));
+      mk(new THREE.BoxGeometry(0.04, 0.12, 0.34), '#8a7040', 0, 1.86, -0.08, helmet);
+      glow(new THREE.BoxGeometry(0.22, 0.03, 0.02), neon, 0, 1.68, -0.32, helmet);
+      body.add(helmet);
+      glow(new THREE.BoxGeometry(0.05, 0.16, 0.05), neon, 0, 1.94, 0.02);
+    }
     gun.position.set(-0.32, 1.2, -0.3);
-    mk(new THREE.BoxGeometry(0.16, 0.18, 0.66), '#26232a', 0, 0, -0.1, gun);
+    // Heavy cannon: a fat rounded barrel housing, a blade-like bayonet under it.
+    mk(new THREE.CylinderGeometry(0.1, 0.12, 0.66, 12).rotateX(Math.PI / 2), '#26232a', 0, 0, -0.1, gun);
+    mk(new THREE.BoxGeometry(0.06, 0.1, 0.4), '#3a3440', 0, -0.1, -0.3, gun);
     glow(new THREE.BoxGeometry(0.17, 0.04, 0.4), '#b050ff', 0, 0.1, -0.15, gun);
-    mk(new THREE.BoxGeometry(0.14, 0.14, 0.4), C.suit, 0.32, 1.25, -0.18);
-    for (const L of legs) { mk(new THREE.BoxGeometry(0.22, 0.18, 0.08), boss ? '#4a3e66' : '#4e4040', 0, -0.47, -0.11, L); glow(new THREE.BoxGeometry(0.12, 0.02, 0.02), neon, 0, -0.42, -0.155, L, 1.2); }
-    for (const y of [1.08, 1.2]) mk(new THREE.BoxGeometry(0.64, 0.015, 0.44), '#1a1618', 0, y, 0);
-    belt(mk, '#1a1618', 0.94, 0.6);
+    // Armoured legs: rounded thigh plates, knee caps with a glow line, shin greaves.
+    for (const L of legs) {
+      sph(0.13, 1.0, 1.5, 0.95, A1, 0, -0.24, -0.02, 0, L);
+      sph(0.09, 1.2, 1.0, 0.8, A2, 0, -0.47, -0.1, 0, L);
+      glow(new THREE.BoxGeometry(0.12, 0.015, 0.015), neon, 0, -0.43, -0.175, L, 1.2);
+      mk(new THREE.CylinderGeometry(0.1, 0.085, 0.3, 12), A1, 0, -0.68, -0.02, L);
+    }
+    belt(mk, '#1a1618', 0.86, 0.62);
     blade = glow(new THREE.BoxGeometry(0.03, 0.08, 0.95), '#ff3aa0', 0.36, 1.1, -0.72, body, 3);
     blade.visible = false;
     shell = new THREE.Mesh(new THREE.SphereGeometry(0.62, 18, 12).scale(0.95, 1.55, 0.8), shellMat(neon));
@@ -766,6 +807,7 @@ export class Sentinel {
       route, ri: 0, wait: 0, post, path: null, pathT: 0, aw: 0, target: null, lkp: null,
       reactT: 0, fireT: 0, radioT: 0, searchT: 0, jamT: 0, empT: 0, seenT: 0, tagT: 0, scanT: 0, body: false, found: false, fallT: 0, moving: false,
       badge: chief, quadAw: 0, fleeT: 0, meleeT: 0, burst: 0, lower: 0, aimT: 0, aiming: null, enraged: false, helmet: !!T.helmet, stagger: 0, sync: false,
+      wallHp: T.wall ? WALL.hp : 0, wallPct: T.wall ? 100 : 0,
     };
     if (!post || !post.y) g.y = this.fac.groundAt(g.x, g.z, g.y + 0.5, 0.6);
     if (hunt) { g.state = 'search'; g.lkp = { ...hunt }; g.searchT = 18; }
@@ -938,6 +980,16 @@ export class Sentinel {
   // ---- damage --------------------------------------------------------------------
   // `part` is the hit location; a headshot kills anything outright, with any weapon.
   // Returns { killed, absorbed, popped }.
+  // A shot into a bulwark's hard-light shield (host). It holds about two rifle rounds; at zero it
+  // shatters for good.
+  wallDamage(id, dmg) {
+    const g = this.byId(id);
+    if (!g || g.type !== 'bulwark' || g.wallHp <= 0) return;
+    g.wallHp = Math.max(0, g.wallHp - dmg);
+    g.wallPct = (g.wallHp / WALL.hp) * 100;
+    if (g.wallHp <= 0) { g.wallBroke = true; this.emit({ t: 'toast', m: 'Bulwark shield down.', c: 'cyan' }); }
+  }
+
   damage(id, dmg, how, from, part) {
     const e = this.byId(id);
     const out = { killed: false, absorbed: 0, popped: false };
@@ -1793,7 +1845,7 @@ export class Sentinel {
     return {
       g: this.guards.map((g) => [g.id, r1(g.x), r1(g.y), r1(g.z), r2(g.yaw + g.look), STATES.indexOf(g.state), r2(clamp(g.aw, 0, 1)),
         (g.chief ? 1 : 0) | (g.badge ? 2 : 0) | (g.found ? 4 : 0) | (g.moving ? 8 : 0) | (g.tower ? 16 : 0) | (g.lower > 0 ? 32 : 0) | (g.empT > 0 ? 64 : 0) | (g.helmet ? 128 : 0) | (g.radioT > 0 ? 256 : 0) | (g.sync ? 512 : 0) | (g.stagger > 0 ? 1024 : 0) | (g.incap ? 2048 : 0),
-        Math.ceil(g.tagT), Math.ceil(g.scanT), g.rev ? 1 : 0, TYPE_KEYS.indexOf(g.type), g.maxShield ? Math.round((g.shield / g.maxShield) * 100) : 0, g.aiming ? (g.aiming === 'shooter' ? 1 : 2) : 0]),
+        Math.ceil(g.tagT), Math.ceil(g.scanT), g.rev ? 1 : 0, TYPE_KEYS.indexOf(g.type), g.maxShield ? Math.round((g.shield / g.maxShield) * 100) : 0, g.aiming ? (g.aiming === 'shooter' ? 1 : 2) : 0, g.type === 'bulwark' ? Math.round(g.wallPct) : 0]),
       d: this.drones.map((d) => [d.id, r1(d.x), r1(d.y), r1(d.z), r2(d.yaw), d.state === 'dead' ? 2 : d.state === 'hunt' ? 1 : 0, r2(clamp(d.aw, 0, 1)), d.empT > 0 ? 1 : 0, Math.ceil(d.tagT), d.rev ? 1 : 0, d.heli ? r1(d.sx) : 0, d.heli ? r1(d.sz) : 0, d.lock ? 1 : 0]),
       c: this.cams.map((c) => [c.id, r2(c.yaw), (c.hacked ? 1 : 0) | (c.loopT > 0 ? 2 : 0) | (c.empT > 0 ? 4 : 0), r2(clamp(c.aw, 0, 1))]),
       al: r2(this.alarm), pk: r2(this.alarmPeak), ld: this.lockdown ? 1 : 0, lkp: this.lkpT > 0 && this.lkp ? [r1(this.lkp.x), r1(this.lkp.z)] : null, sp: Math.ceil(this.spoofT), sc: Math.ceil(this.scanT),
@@ -1805,7 +1857,7 @@ export class Sentinel {
   applySnap(s) {
     const seenG = new Set();
     for (const a of s.g) {
-      const [id, x, y, z, yaw, st, aw, fl, tag, scan, rev, ti, sh, aim] = a;
+      const [id, x, y, z, yaw, st, aw, fl, tag, scan, rev, ti, sh, aim, wp] = a;
       seenG.add(id);
       let g = this.guards.find((q) => q.id === id);
       const type = TYPE_KEYS[ti] || 'guard';
@@ -1819,6 +1871,7 @@ export class Sentinel {
       if (ns === 'dead' && g.state !== 'dead') g.fallT = 0;
       if (g.maxShield && sh < (g.shieldPct ?? 100) - 1) g.hitFx = 1;
       g.shieldPct = sh;
+      if (g.type === 'bulwark' && wp !== undefined) { if ((g.wallPct ?? 100) > 0 && wp <= 0) g.wallBroke = true; g.wallPct = wp; }
       g.shield = (sh / 100) * g.maxShield;
       g.state = ns; g.aw = aw; g.chief = !!(fl & 1); g.badge = !!(fl & 2); g.found = !!(fl & 4); g.moving = !!(fl & 8); g.tower = !!(fl & 16);
       g.lower = fl & 32 ? 0.5 : 0; g.empT = fl & 64 ? 1 : 0; g.helmet = !!(fl & 128); g.radioT = fl & 256 ? 1 : 0; g.sync = !!(fl & 512); g.stagger = fl & 1024 ? 1 : 0; g.incap = !!(fl & 2048);
@@ -1844,8 +1897,48 @@ export class Sentinel {
     this.huntSnap = s.hn || {};
   }
 
+  // A shield breaking: a white flash, then glowing shards that burst outward, tumble and fall.
+  _shatter(wall) {
+    const plane = wall.userData.plane;
+    plane.updateWorldMatrix(true, false);
+    this.shards = this.shards || [];
+    const mat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const flash = new THREE.Mesh(new THREE.PlaneGeometry(WALL.w * 1.2, (WALL.y1 - WALL.y0) * 1.1), mat('#e8fbff', 0.9));
+    flash.applyMatrix4(plane.matrixWorld);
+    this.scene.add(flash);
+    this.shards.push({ m: flash, t: 0, life: 0.25, flash: true });
+    const n = new THREE.Vector3(0, 0, -1).transformDirection(plane.matrixWorld);
+    for (let i = 0; i < 18; i++) {
+      const w = 0.08 + Math.random() * 0.16, h = 0.06 + Math.random() * 0.14;
+      const sh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat(Math.random() < 0.6 ? '#ff5a5a' : '#7fe8ff', 0.85));
+      const lx = (Math.random() - 0.5) * WALL.w, ly = (Math.random() - 0.5) * (WALL.y1 - WALL.y0);
+      sh.position.set(lx, ly, 0).applyMatrix4(plane.matrixWorld);
+      sh.quaternion.setFromRotationMatrix(plane.matrixWorld);
+      const v = n.clone().multiplyScalar(1.5 + Math.random() * 2.5).add(new THREE.Vector3((Math.random() - 0.5) * 3, 1 + Math.random() * 2.5, (Math.random() - 0.5) * 3));
+      this.scene.add(sh);
+      this.shards.push({ m: sh, t: 0, life: 0.9 + Math.random() * 0.5, v, spin: new THREE.Vector3(Math.random() * 12 - 6, Math.random() * 12 - 6, Math.random() * 12 - 6) });
+    }
+  }
+  _shardTick(dt) {
+    if (!this.shards || !this.shards.length) return;
+    for (const s of this.shards) {
+      s.t += dt;
+      const k = s.t / s.life;
+      if (s.flash) { s.m.material.opacity = 0.9 * (1 - k); s.m.scale.setScalar(1 + k * 0.4); }
+      else {
+        s.v.y -= 9 * dt;
+        s.m.position.addScaledVector(s.v, dt);
+        s.m.rotation.x += s.spin.x * dt; s.m.rotation.y += s.spin.y * dt; s.m.rotation.z += s.spin.z * dt;
+        s.m.material.opacity = 0.85 * (1 - k * k);
+      }
+      if (k >= 1) { this.scene.remove(s.m); s.m.geometry.dispose(); s.m.material.dispose(); }
+    }
+    this.shards = this.shards.filter((s) => s.t < s.life);
+  }
+
   // ---- visuals (both sides) ------------------------------------------------------
   draw(dt, camPos) {
+    this._shardTick(dt);
     const k = Math.min(1, dt * 12);
     for (const g of this.guards) {
       if (!this.sim && g.tx !== undefined) {
@@ -1868,7 +1961,10 @@ export class Sentinel {
       }
       if (U.wall) {
         const down = g.lower > 0 || g.empT > 0;
-        U.wall.visible = !dead && !(g.empT > 0 && Math.random() < 0.7);
+        const hpK = (g.wallPct ?? 100) / 100;
+        if (g.wallBroke) { g.wallBroke = false; this._shatter(U.wall); }
+        U.wall.userData.plane.material.uniforms.uHp.value = hpK;
+        U.wall.visible = !dead && hpK > 0 && !(g.empT > 0 && Math.random() < 0.7) && !(hpK < 0.35 && Math.random() < 0.12);
         U.wall.rotation.y += ((down ? 1.2 : 0) - U.wall.rotation.y) * Math.min(1, dt * 10);
         U.wall.userData.plane.material.uniforms.uT.value = this.t;
       }
@@ -1987,7 +2083,7 @@ export function guardCapsules(g) {
 // Where the segment a→b meets a bulwark's raised wall (outside its sight-port), as a fraction
 // along the segment, or null when the shot gets past (port, flank, lowered wall, EMP).
 export function wallBlock(g, a, b) {
-  if (g.type !== 'bulwark' || g.state === 'dead' || g.lower > 0 || g.empT > 0) return null;
+  if (g.type !== 'bulwark' || g.state === 'dead' || g.lower > 0 || g.empT > 0 || (g.wallPct ?? 100) <= 0) return null;
   const s = TYPES.bulwark.scale;
   const yaw = g.yaw + (g.look || 0);
   const cs = Math.cos(yaw), sn = Math.sin(yaw);
