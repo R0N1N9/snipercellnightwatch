@@ -65,7 +65,6 @@ uniform sampler2D tNoise, tCaustic;
 uniform vec2 uEyeC, uPup, uGaze, uBodyDir;
 uniform float uEyeR, uRoll, uLid, uHood, uBody, uSun, uPhoto, uGlow, uInner, uFleckK, uGlint, uTorch, uDist;
 uniform vec3 uIrisA, uIrisB, uIrisC, uFleck, uInnerCol, uEnv;
-float lidW(float x) { return pow(max(0.0, 1.0 - x * x / 1.35), 0.55); }
 // a noise lookup at a chosen level of detail (the iris is sampled round a seam: no derivatives)
 vec4 nlod(vec2 uv, float texPerPx) { return textureLod(tNoise, uv, log2(max(1.0, texPerPx * 256.0))); }
 float sdLobe(vec2 p, vec2 o, vec2 d, float len, float w0, float w1) {
