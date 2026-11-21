@@ -379,32 +379,70 @@ export function buildUnit(type = 'guard', chief = false) {
     shell.position.y = 1.05;
     root.add(shell);
   } else if (type === 'titan') {
-    // Walking armour: slab plates, a heavy cannon on each arm, a full helmet that can be shot off.
+    // Titan (walking armour), built to brute detail: a rounded armoured mass under layered
+    // gunmetal plates with orange seams, stacked shoulder domes with angular rims, a back power
+    // pack with vents and glowing coils, armoured capsule arms (an arm cannon and a forearm
+    // shield), thigh plates, knee domes and greaves, and a domed helmet with an angular faceplate
+    // that a headshot knocks off.
     const C = { suit: '#25272b', boot: '#101112' };
+    const G1 = '#3a3d42', G2 = '#55595f', G3 = '#2a2c30', HOT = '#ff8030';
     legs = rig(body, C, mk);
-    for (const L of legs) mk(new THREE.BoxGeometry(0.24, 0.3, 0.26), '#3a3d42', 0, -0.45, -0.04, L);
-    mk(new THREE.BoxGeometry(0.72, 0.72, 0.5), '#3a3d42', 0, 1.22, 0);
-    mk(new THREE.BoxGeometry(0.8, 0.3, 0.56), '#4a4e55', 0, 1.42, -0.02);
-    for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.34, 0.3, 0.5), '#4a4e55', s * 0.52, 1.5, 0); glow(new THREE.BoxGeometry(0.02, 0.4, 0.02), neon, s * 0.36, 1.18, -0.26); }
-    mk(new THREE.BoxGeometry(0.24, 0.24, 0.26), '#1c1d20', 0, 1.7, -0.02);
-    glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), '#ffd040', 0, 1.71, -0.16);
-    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.5, 0.02, 0.02), '#1c1d20', 0, 1.05 + i * 0.12, -0.26);
-    // Rounded over the slabs: stacked shoulder domes, a curved chest plate and belly bands, and
-    // a row of spines down the back.
-    for (const sd of [-1, 1]) for (let i = 0; i < 2; i++) { const d = ball(0.24 - i * 0.04, 1.1, 0.8, 1.0, i ? '#3a3d42' : '#55595f', sd * (0.52 + i * 0.04), 1.62 - i * 0.09, 0, body, true); d.rotation.z = -sd * (0.3 + i * 0.15); }
-    { const p = mk(new THREE.SphereGeometry(0.46, 18, 8, Math.PI * 1.1, Math.PI * 0.8, Math.PI * 0.28, Math.PI * 0.3), '#55595f', 0, 1.25, 0.02); p.scale.set(1.0, 1.0, 0.7); }
-    for (let i = 0; i < 2; i++) mk(new THREE.TorusGeometry(0.33 - i * 0.02, 0.025, 6, 18, Math.PI).rotateY(Math.PI), '#2a2c30', 0, 0.98 - i * 0.08, 0.0).rotation.x = Math.PI / 2;
-    for (let i = 0; i < 5; i++) mk(new THREE.ConeGeometry(0.035, 0.16, 6), '#1c1d20', 0, 1.62 - i * 0.13, 0.29).rotation.x = 0.9;
-    for (const s of [-1, 1]) mk(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 10).rotateZ(Math.PI / 2), '#2a2c30', s * 0.38, 1.52, -0.18);
-    belt(mk, '#1c1d20', 0.94, 0.64);
+    const plate = (r, t0, t1, col, y, z, sx = 1, sy = 1, sz = 1) => { const m = mk(new THREE.SphereGeometry(r, 18, 8, Math.PI * 1.08, Math.PI * 0.84, Math.PI * t0, Math.PI * (t1 - t0)), col, 0, y, z); m.scale.set(sx, sy, sz); m.rotation.x = 0.12; return m; };
+    // Body mass and layered chest plates.
+    ball(0.42, 1.0, 0.92, 0.75, C.suit, 0, 1.24, 0.02);
+    ball(0.32, 1.05, 0.75, 0.8, C.suit, 0, 0.98, 0.0);
+    plate(0.45, 0.2, 0.42, G2, 1.3, 0.0, 1.05, 1.0, 0.82);
+    plate(0.44, 0.36, 0.56, G1, 1.24, 0.01, 1.04, 1.0, 0.82);
+    plate(0.42, 0.5, 0.68, G2, 1.18, 0.02, 1.03, 1.0, 0.82);
+    glow(new THREE.BoxGeometry(0.56, 0.014, 0.014), HOT, 0, 1.38, -0.36, body, 1.4);
+    glow(new THREE.BoxGeometry(0.5, 0.014, 0.014), HOT, 0, 1.22, -0.36, body, 1.2);
+    // Segmented abdomen bands and an angular belly plate.
+    for (let i = 0; i < 3; i++) mk(new THREE.TorusGeometry(0.3 - i * 0.015, 0.03, 6, 18), G3, 0, 1.02 - i * 0.065, 0.0).rotation.x = Math.PI / 2;
+    mk(new THREE.BoxGeometry(0.26, 0.16, 0.06), G1, 0, 0.98, -0.3).rotation.x = 0.1;
+    // Back: a capsule power pack, vents, glowing coils, rounded back plates and spines.
+    cap(0.14, 0.42, G3, 0, 1.36, 0.33, 0, Math.PI / 2);
+    for (let i = 0; i < 4; i++) mk(new THREE.BoxGeometry(0.06, 0.12, 0.02), '#0f1012', -0.16 + i * 0.105, 1.36, 0.47);
+    for (const sd of [-1, 1]) glow(new THREE.TorusGeometry(0.07, 0.012, 6, 14).rotateY(Math.PI / 2), HOT, sd * 0.3, 1.36, 0.33, body, 1.5);
+    for (let i = 0; i < 3; i++) ball(0.12, 1.5, 0.55, 0.7, G1, 0, 1.12 - i * 0.12, 0.27);
+    for (let i = 0; i < 5; i++) mk(new THREE.ConeGeometry(0.035, 0.16, 6), '#1c1d20', 0, 1.66 - i * 0.12, 0.3).rotation.x = 0.9;
+    // Shoulders: three stacked domes with an angular rim plate; armoured arms.
+    for (const sd of [-1, 1]) {
+      for (let i = 0; i < 3; i++) { const d = ball(0.25 - i * 0.03, 1.1, 0.75, 1.0, i % 2 ? G1 : G2, sd * (0.52 + i * 0.035), 1.62 - i * 0.075, 0, body, true); d.rotation.z = -sd * (0.3 + i * 0.12); }
+      mk(new THREE.BoxGeometry(0.3, 0.04, 0.46), G3, sd * 0.56, 1.52, 0).rotation.z = -sd * 0.45;
+      glow(new THREE.BoxGeometry(0.02, 0.02, 0.36), HOT, sd * 0.64, 1.47, 0, body, 1.1);
+      cap(0.11, 0.24, C.suit, sd * 0.5, 1.3, -0.05, 0, sd * 0.25);
+      const fa = mk(new THREE.CylinderGeometry(0.12, 0.1, 0.3, 12), G1, sd * 0.52, 1.14, -0.18); fa.rotation.x = 1.25;
+      ball(0.1, 1.0, 0.9, 1.1, G2, sd * 0.52, 1.08, -0.34);
+      mk(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 10).rotateZ(Math.PI / 2), G3, sd * 0.38, 1.52, -0.18);
+    }
+    // Forearm shield on the right arm.
+    mk(new THREE.BoxGeometry(0.05, 0.3, 0.34), G2, 0.64, 1.14, -0.22).rotation.z = 0.15;
+    glow(new THREE.BoxGeometry(0.012, 0.22, 0.012), HOT, 0.67, 1.14, -0.36, body, 1.2);
+    // Head under the helmet: dark, rounded, one hot eye.
+    ball(0.14, 1.0, 1.0, 1.1, '#1c1d20', 0, 1.7, -0.04);
+    glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), '#ffd040', 0, 1.71, -0.18);
+    // Helmet: a dome with an angular faceplate, visor and crest.
     helmet = new THREE.Group();
-    mk(new THREE.BoxGeometry(0.36, 0.34, 0.38), '#55595f', 0, 1.74, -0.02, helmet);
-    glow(new THREE.BoxGeometry(0.3, 0.04, 0.02), neon, 0, 1.74, -0.22, helmet);
+    ball(0.2, 1.05, 0.95, 1.15, G2, 0, 1.74, -0.03, helmet, true);
+    mk(new THREE.BoxGeometry(0.3, 0.18, 0.06), G1, 0, 1.69, -0.24, helmet).rotation.x = -0.15;
+    for (const sd of [-1, 1]) mk(new THREE.BoxGeometry(0.06, 0.16, 0.2), G1, sd * 0.19, 1.7, -0.1, helmet);
+    mk(new THREE.BoxGeometry(0.04, 0.08, 0.36), G3, 0, 1.94, -0.02, helmet);
+    glow(new THREE.BoxGeometry(0.24, 0.035, 0.02), neon, 0, 1.73, -0.275, helmet);
     body.add(helmet);
+    // Arm cannon: a ribbed rounded barrel with a glowing core and a muzzle collar.
     gun.position.set(-0.36, 1.2, -0.32);
-    mk(new THREE.BoxGeometry(0.18, 0.2, 0.7), '#26282c', 0, 0, -0.1, gun);
-    glow(new THREE.BoxGeometry(0.19, 0.04, 0.44), '#ff8030', 0, 0.11, -0.15, gun);
-    mk(new THREE.BoxGeometry(0.16, 0.16, 0.5), C.suit, 0.36, 1.25, -0.2);
+    mk(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 14).rotateX(Math.PI / 2), '#26282c', 0, 0, -0.1, gun);
+    for (let i = 0; i < 4; i++) mk(new THREE.TorusGeometry(0.115, 0.014, 6, 14), G3, 0, 0, 0.12 - i * 0.12, gun);
+    mk(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 14).rotateX(Math.PI / 2), G2, 0, 0, -0.46, gun);
+    glow(new THREE.BoxGeometry(0.19, 0.04, 0.44), HOT, 0, 0.11, -0.15, gun);
+    // Legs: thigh plates, knee domes with a glow line, greaves.
+    for (const L of legs) {
+      ball(0.14, 1.0, 1.4, 0.95, G1, 0, -0.24, -0.02, L);
+      ball(0.1, 1.2, 1.0, 0.8, G2, 0, -0.46, -0.1, L);
+      glow(new THREE.BoxGeometry(0.12, 0.015, 0.015), HOT, 0, -0.42, -0.175, L, 1.2);
+      mk(new THREE.CylinderGeometry(0.11, 0.09, 0.32, 12), G1, 0, -0.68, -0.02, L);
+    }
+    belt(mk, '#1c1d20', 0.9, 0.66);
   } else if (type === 'bulwark') {
     // Lean, long-necked lookout behind a hard-light wall with a sight-port.
     const C = { suit: '#22282c', boot: '#101214' };
