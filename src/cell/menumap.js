@@ -145,7 +145,7 @@ export function drawCellMap(canvas, sel = 'draw', t = 0) {
     c.restore();
     c.font = '700 11px JetBrains Mono, monospace';
     const left = k === 'ridge' || k === 'east'; // keep clear of the perch labels
-    const dy = D.air ? -14 : 4;
+    const dy = D.air || k === 'ridge' ? -14 : 4;
     c.textAlign = left ? 'right' : 'left';
     c.fillStyle = on ? '#00ffe0' : 'rgba(0,255,224,0.6)';
     c.fillText(`${D.air ? 'HALO' : 'DROP'} · ${D.name}${on ? ' ✓' : ''}`, x + (left ? -14 : 14), y + dy);
