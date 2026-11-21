@@ -371,10 +371,14 @@ export const KitMethods = {
     // Routine pings are voiced only now and then (and never over other radio); the marker and
     // text always show. Orders and requests for help always speak.
     const routine = k === 'look' || k === 'enemy' || k === 'move';
-    const voiced = !routine || (this.radio && this.radio.idle() && Math.random() < 0.35);
-    this.send({ t: 'cm', ...pin, id: enemyId || 0, v: voiced ? 1 : 0 });
-    this.comms(label.charAt(0) + label.slice(1).toLowerCase() + '.', ROLES_COLOR[this.role], this.name);
-    if (voiced) this._voice('me', CALL_LINE[k] || label.toLowerCase());
+    // Every now and then a marked enemy gets its range called, measured from whoever marked it.
+    let rng = null;
+    if (k === 'enemy' && enemyId && (this.t - (this._rngCallT ?? -99) > 8 || Math.random() < 0.4)) { this._rngCallT = this.t; rng = Math.round(Math.hypot(at.x - P.x, at.z - P.z)); }
+    const voiced = !routine || !!rng || (this.radio && this.radio.idle() && Math.random() < 0.35);
+    const line = rng ? `X-ray marked, ${rng} meters.` : null;
+    this.send({ t: 'cm', ...pin, id: enemyId || 0, v: voiced ? 1 : 0, line });
+    this.comms(line || label.charAt(0) + label.slice(1).toLowerCase() + '.', ROLES_COLOR[this.role], this.name);
+    if (voiced) this._voice('me', line || CALL_LINE[k] || label.toLowerCase());
     if (k === 'pickup') return;
     if (this.aiShoot) this._aiShooterCall(k, at, enemyId);
     if (this.aiSpot) this._aiSpotterCall(k, at, enemyId);
@@ -397,8 +401,8 @@ export const KitMethods = {
   _onCall(m) {
     this._addPin({ x: m.x, z: m.z, label: m.label, by: m.by }, true);
     this.lastCm = { k: m.k, label: m.label, t: 10 };
-    this.comms(`${m.label}${m.k === 'enemy' ? ' — marked' : ''}. (Y: roger)`, '#ffd040', this.partnerName);
-    if (m.v !== 0) this._voice('partner', CALL_LINE[m.k] || m.label.toLowerCase());
+    this.comms(m.line ? `${m.line} (Y: roger)` : `${m.label}${m.k === 'enemy' ? ' — marked' : ''}. (Y: roger)`, '#ffd040', this.partnerName);
+    if (m.v !== 0) this._voice('partner', m.line || CALL_LINE[m.k] || m.label.toLowerCase());
     this.sfx.ui(true);
   },
 

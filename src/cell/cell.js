@@ -363,7 +363,6 @@ export class CellGame {
     // Drop point (menu choice; the host's applies to both): the tree-line draw or the ridge.
     this.drop = setInsertion(insert);
     this.dropKind = SPOTS.drop;
-    if (this.operative) role = 'shooter';
     this.net = net || null;
     this.role = role;
     this.partnerRole = role === 'shooter' ? 'spotter' : 'shooter';
@@ -454,7 +453,7 @@ export class CellGame {
     this._resize();
     addEventListener('resize', () => this._resize());
     this.clock = new THREE.Clock();
-    this.comms(this.operative ? 'Lone operative: rifle, camo and the CYBER OPS tablet are all yours (TAB).' : this.role === 'shooter' ? 'Ra in position. Kestrel Ridge below \u2014 lights in the yard, towers manned.' : 'R\u014dnin on the wire. CYBER OPS console synced (TAB).', ROLES[this.role].color, this.name);
+    this.comms(this.operative ? (this.role === 'shooter' ? 'Lone operative: rifle, camo and the CYBER OPS tablet are all yours (TAB).' : 'Lone operative: binoculars, nano drones, hacks and the CYBER OPS tablet are all yours (TAB). No sniper covering you.') : this.role === 'shooter' ? 'Ra in position. Kestrel Ridge below \u2014 lights in the yard, towers manned.' : 'R\u014dnin on the wire. CYBER OPS console synced (TAB).', ROLES[this.role].color, this.name);
     this.comms(this.operative ? 'Q to ping and mark (hold for the wheel); payloads run straight from your tablet.' : this.aiPartner ? (this.role === 'shooter' ? 'R\u014dnin (AI) runs the console. Q to ping and mark; hold Q for pings and requests.' : 'Ra (AI) holds a perch. Mark targets (Q) and Ra fires.') : `${this.partnerName} is the ${ROLES[this.partnerRole].name.toLowerCase()}. Q to ping and mark; hold Q for pings and requests.`, 'dim');
     if (this.mission === 'nightwatch') this.comms('Officers spook when they\u2019re alone. Juggernauts\u2019 shells break \u2014 then they charge. Bulwarks: shoot the port in the wall.', 'dim');
     // The night soundscape (wind, insects, distant sounds; air handling indoors). No hum.
@@ -760,6 +759,7 @@ export class CellGame {
       case 'tp': if (m.role === this.role) this.player.pos.set(m.x, m.y, m.z); break;
       case 'dart': this._addDart(m.d); break;
       case 'chain': if (this.role === 'shooter' || this.operative) this._chainKill(); break;
+      case 'fcall': this._onFireCall(m, false); break;
       case 'vote': if (this.isHost) this._castVote(m.role, m.v); break;
       case 'heal': if (m.role === this.role) this._heal(m.hp); break;
       case 'ammo': if (m.role === this.role) this._ammo(); break;
@@ -1263,6 +1263,7 @@ export class CellGame {
     if (this.role === 'spotter' && live && !tab && !quad && this.nano) {
       if (this.bino.on && this.bino.up && act.fire) { const t = this._nanoAt(innerWidth / 2, innerHeight / 2); if (t) this._nanoMark(t.id); else this.hud.flash('NO TARGET UNDER THE CROSSHAIR', 'dim', 0.6); }
       if (I.pressed('cell-swarm') || (this.bino.on && this.bino.up && I.pressed('KeyE'))) this._nanoSend();
+      if (I.pressed('cell-lase') || (this.bino.on && this.bino.up && I.pressed('KeyR'))) { this._lase(); act.reload = false; }
     }
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
     if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
@@ -2938,7 +2939,7 @@ class CellHud {
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
     if (game.net) { shooterKeys.push(K('M', 'mic'), K('K', 'talk')); spotterKeys.push(K('M', 'mic'), K('K', 'talk')); }
-    this.el.keys.innerHTML = (game.operative ? [...shooterKeys, K('Y', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
+    this.el.keys.innerHTML = (game.operative && game.role === 'shooter' ? [...shooterKeys, K('Y', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
     this.objective(0, OBJECTIVES[0], false);
     // Spotter (and lone operative): picture-in-picture squares for the console and the drone.
     const pipOn = game.role === 'spotter' || game.operative;
@@ -3000,7 +3001,7 @@ class CellHud {
     // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
     const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
-    const pills = g.operative
+    const pills = g.operative && g.role === 'shooter'
       ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
         ? [['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
@@ -3009,11 +3010,11 @@ class CellHud {
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}${KEEP.has(a) ? ' keep' : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill keep" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
     // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
-    const AB = g.operative
+    const AB = g.operative && g.role === 'shooter'
       ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
         ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
-        : [['cell-ability', 'DRONE', 'drone'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm']]), ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
+        : [['cell-ability', 'DRONE', 'drone'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm'], ['cell-lase', 'LASE', 'lase']]), ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
     ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
@@ -3049,6 +3050,7 @@ class CellHud {
         else { this._qcdMax = 0; f = (out && g.quad ? g.quad.bat : g.quadBat ?? 300) / 300; st = out ? 'on' : ''; }
       } else if (b.k === 'isr') { const cd = g.isr.sweepCd || 0; f = 1 - cd / 25; st = g.isr.active ? 'on' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
       else if (b.k === 'swarm' && g.nano) { const N = g.nano; f = N.ch < 3 ? (N.ch + N.rl / 15) / 3 : 1; st = N.marks.length ? 'on' : N.ch ? '' : 'cd'; n = '\u00D7' + N.ch; }
+      else if (b.k === 'lase') { const L = g.bino && g.bino.up && g.bino.lrf; st = L && L.e ? 'on' : g.bino && g.bino.up ? '' : 'cd'; n = L ? Math.round(L.d) + 'm' : ''; }
       else if (b.k === 'hack') { f = g.ops ? g.ops.bw / 100 : 0; st = g.qh && g.qh.on ? 'on' : ''; }
       f = Math.max(0, Math.min(1, f));
       const key = st + '|' + n + '|' + Math.round(f * 50);
@@ -3412,6 +3414,7 @@ class CellHud {
     g._neuroHud(c, proj, W, H);
     g._relayHud(c, proj, W, H);
     g._binoHud(c, proj, W, H);
+    g._fcallHud(c, proj);
     g._devHud(c, W, H);
     this._owHud(c, proj);
     g._syncHud(c, proj);

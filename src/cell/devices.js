@@ -74,6 +74,8 @@ function droneMesh() {
   return g;
 }
 
+function ROLES_COLOR_SAFE(r) { return r === 'shooter' ? '#f2b35b' : '#3fe0d0'; }
+
 export const Devices = {
   // Head-mounted bodycams: both show as small squares in the ISR view; your partner's can be
   // pinned as a small square on your own screen (pause menu: Partner bodycam).
@@ -247,6 +249,95 @@ export const Devices = {
     this._swarmFx(ids, from);
     this.payload('swarm', { ids, from });
   },
+  // ---- laser rangefinder, firing call and weak points (binoculars) ---------------------
+  // What's under the binocular crosshair: an enemy (if one's close to the centre) or the ground.
+  _lrfTarget() {
+    const cam = this.camera, o = cam.getWorldPosition(new THREE.Vector3()), dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const e = this._nanoAt ? this._nanoAt(innerWidth / 2, innerHeight / 2) : null;
+    if (e) return { e, p: new THREE.Vector3(e.x, (e.y || 0) + 1.2, e.z), d: Math.hypot(e.x - o.x, (e.y || 0) + 1.2 - o.y, e.z - o.z) };
+    const h = this.fac.ray(o, o.clone().addScaledVector(dir, 1200), 'shot');
+    return h ? { e: null, p: h.point.clone(), d: h.point.distanceTo(o) } : null;
+  },
+  // R (or LASE on touch) through the binoculars: lase the target and give the sniper a firing
+  // call — the range from the SNIPER's position, lead if it's walking, and "send it". A brute,
+  // titan or the overseer also gets its weak points marked for both of you.
+  _lase() {
+    const B = this.bino;
+    if (!B || !B.up) { this.hud.flash('RAISE THE BINOCULARS TO LASE', 'red', 0.8); return; }
+    const T = this._lrfTarget();
+    if (!T || !T.e) { this.hud.flash(T ? `RANGE ${Math.round(T.d)} m \u00B7 NO TARGET` : 'NO RETURN', 'dim', 0.8); return; }
+    const e = T.e;
+    this.sfx.ui(true);
+    const sh = this.role === 'shooter' ? this.player.pos : this.partner && this.partner.seen ? this.partner.pos : null;
+    const dS = sh ? Math.round(Math.hypot(e.x - sh.x, e.z - sh.z)) : Math.round(T.d);
+    const heavy = e.type === 'jugg' || e.type === 'overseer' || e.type === 'titan';
+    let lead = 'dead on';
+    if (e.moving && sh) {
+      const side = Math.sin(e.yaw) * (e.z - sh.z) - Math.cos(e.yaw) * (e.x - sh.x) > 0 ? 'left' : 'right';
+      lead = `walking ${side}, lead him`;
+    }
+    const name = { guard: 'X-ray', scav: 'officer', bulwark: 'bulwark', jugg: 'brute', overseer: 'overseer', titan: 'titan' }[e.type] || 'X-ray';
+    const line = `Target, ${name}. ${dS} meters. ${lead.charAt(0).toUpperCase() + lead.slice(1)}. Send it.`;
+    this.hud.flash(`LASED ${Math.round(T.d)} m \u00B7 FIRING CALL SENT`, 'cyan', 1.2);
+    this.comms(line, ROLES_COLOR_SAFE(this.role), this.name);
+    this._voice && this._voice('me', line);
+    const call = { id: e.id, d: dS, lead, heavy, line };
+    this._onFireCall(call, true);
+    this._broadcast({ k: 'fcall', ...call });
+    // Solo with AI Ra: lasing it is the same as marking it for him.
+    if (this.aiShoot && this._aiShooterCall) this._aiShooterCall('enemy', { x: e.x, z: e.z }, e.id);
+  },
+  _onFireCall(c, mine) {
+    this.fcalls = this.fcalls || {};
+    this.fcalls[c.id] = { d: c.d, lead: c.lead, t: 15 };
+    if (c.heavy) { this.weak = this.weak || {}; this.weak[c.id] = 20; }
+    if (!mine) {
+      this.comms(c.line, '#ffd040', this.partnerName);
+      this._voice && this._voice('partner', c.line);
+      this.hud.flash(`FIRING CALL \u00B7 ${c.d} m \u00B7 ${c.lead.toUpperCase()}`, 'amber', 1.6);
+    }
+  },
+  _fcallTick(dt) {
+    for (const o of [this.fcalls, this.weak]) if (o) for (const k of Object.keys(o)) { if (o[k].t !== undefined) { o[k].t -= dt; if (o[k].t <= 0) delete o[k]; } else { o[k] -= dt; if (o[k] <= 0) delete o[k]; } }
+  },
+  // Markers for both players: the firing-call target (range + lead) and weak points on heavies.
+  _fcallHud(c, proj) {
+    const S = this.sentinel;
+    c.save();
+    c.font = '600 12px JetBrains Mono, monospace';
+    c.textAlign = 'center';
+    for (const [id, f] of Object.entries(this.fcalls || {})) {
+      const e = S.byId(+id);
+      if (!e || e.state === 'dead') continue;
+      const p = proj(e.x, (e.y || 0) + 1.3, e.z);
+      if (p.behind) continue;
+      c.strokeStyle = '#ffd040'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(p.x - 16, p.y); c.lineTo(p.x - 6, p.y); c.moveTo(p.x + 6, p.y); c.lineTo(p.x + 16, p.y); c.moveTo(p.x, p.y - 16); c.lineTo(p.x, p.y - 6); c.moveTo(p.x, p.y + 6); c.lineTo(p.x, p.y + 16); c.stroke();
+      c.fillStyle = '#ffd040';
+      c.fillText(`${f.d} m \u00B7 ${f.lead.toUpperCase()}`, p.x, p.y - 22);
+    }
+    for (const id of Object.keys(this.weak || {})) {
+      const e = S.byId(+id);
+      if (!e || e.state === 'dead') continue;
+      const sc = (e.obj && e.obj.userData.scale) || 1;
+      const spots = [[0, 1.68, -0.05, 'HEAD']];
+      if (e.type === 'titan') spots.push([0, 1.36, 0.34, 'POWER PACK']);
+      if (e.type === 'jugg' || e.type === 'overseer') spots.push([0, 1.3, 0.3, 'SPINE']);
+      const cs = Math.cos(e.yaw), sn = Math.sin(e.yaw);
+      for (const [lx, ly, lz, lab] of spots) {
+        const wx = e.x + (lx * cs + lz * sn) * sc, wz = e.z + (-lx * sn + lz * cs) * sc;
+        const p = proj(wx, (e.y || 0) + ly * sc, wz);
+        if (p.behind) continue;
+        const pulse = 9 + Math.sin(this.t * 6) * 2;
+        c.strokeStyle = '#ffe14a'; c.lineWidth = 2;
+        c.beginPath(); c.arc(p.x, p.y, pulse, 0, Math.PI * 2); c.stroke();
+        c.fillStyle = 'rgba(255,225,74,0.9)'; c.font = '600 10px JetBrains Mono, monospace';
+        c.fillText(`WEAK \u00B7 ${lab}`, p.x, p.y + pulse + 12);
+      }
+    }
+    c.restore();
+  },
+
   // The swarm itself: a cloud of tiny glints per target that streams out and wraps the head.
   _swarmFx(ids, from) {
     this.swarms = this.swarms || [];
@@ -288,6 +379,7 @@ export const Devices = {
 
   _devTick(dt) {
     this._swarmTick(dt);
+    this._fcallTick(dt);
     this._bcTick(dt);
     const A = this.devAnim, T = this.devTablet, D = this.devDrone;
     T.visible = false; D.visible = false;
@@ -376,7 +468,8 @@ export const Devices = {
   _binoView(dt) {
     const B = this.bino, up = B.on && B.k > 0.9 && !this.tablet.visible && !this.isr.active;
     const cv = this.renderer.domElement;
-    const want = up ? 'grayscale(1) brightness(0.75) contrast(1.35)' : '';
+    // Thermal: a bright grey world (terrain, trees and buildings readable), warm bodies drawn red on top.
+    const want = up ? 'grayscale(1) brightness(2.8) contrast(1.15)' : '';
     if (cv.style.filter !== want) cv.style.filter = want;
     B.up = up;
     if (!up) return;
@@ -425,13 +518,23 @@ export const Devices = {
     mc.beginPath(); mc.arc(W / 2 - dx, H / 2, r, 0, Math.PI * 2); mc.arc(W / 2 + dx, H / 2, r, 0, Math.PI * 2); mc.fill();
     c.drawImage(m, 0, 0, W, H);
     // A rim round each lens so the two-circle shape reads even against the night.
+    // Only the outer edges: the arcs inside the other lens are left out, so no lines cross the middle.
     c.strokeStyle = 'rgba(190,205,220,0.45)'; c.lineWidth = 2;
-    for (const sx of [-1, 1]) { c.beginPath(); c.arc(W / 2 + sx * dx, H / 2, r, 0, Math.PI * 2); c.stroke(); }
+    const a = Math.atan2(Math.sqrt(Math.max(0, r * r - dx * dx)), dx);
+    c.beginPath(); c.arc(W / 2 - dx, H / 2, r, a, Math.PI * 2 - a); c.stroke();
+    c.beginPath(); c.arc(W / 2 + dx, H / 2, r, Math.PI + a, Math.PI - a + Math.PI * 2); c.stroke();
     c.strokeStyle = 'rgba(220,230,240,0.7)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(W / 2 - 40, H / 2); c.lineTo(W / 2 + 40, H / 2); c.moveTo(W / 2, H / 2 - 30); c.lineTo(W / 2, H / 2 + 30); c.stroke();
     for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(W / 2 + i * 14, H / 2 - 4); c.lineTo(W / 2 + i * 14, H / 2 + 4); c.stroke(); }
     c.fillStyle = 'rgba(255,120,90,0.95)'; c.font = '600 12px JetBrains Mono, monospace'; c.textAlign = 'center';
     const mag = Math.round(((this.player.fov ? this.player.fov() : 70) / this.camera.fov) * 10) / 10;
+    // Laser rangefinder: a live range under the crosshair (refreshed a few times a second).
+    B.lrfT = (B.lrfT || 0) - 1 / 60;
+    if (B.lrfT <= 0) { B.lrfT = 0.2; B.lrf = this._lrfTarget(); }
+    const L = B.lrf;
+    c.fillStyle = L && L.e ? '#ffd040' : 'rgba(220,230,240,0.9)';
+    c.fillText(L ? `${L.e ? 'TARGET' : 'RANGE'} ${Math.round(L.d)} m${L.e ? ' \u00B7 R / LASE: FIRING CALL' : ''}` : 'RANGE ---', W / 2, H / 2 + 46);
+    c.fillStyle = 'rgba(255,120,90,0.95)';
     c.fillText(`THERMAL · ${mag}\u00D7 (WHEEL / ZOOM) · ${B.seen ? B.seen.size : 0} MARKED`, W / 2, H / 2 + r * 0.8);
     if (this.role === 'spotter' && this.nano) {
       const N = this.nano;
