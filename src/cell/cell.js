@@ -2911,7 +2911,8 @@ class CellHud {
     if (!t) return;
     const bar = document.createElement('div');
     bar.className = 'cell-tbar';
-    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP'], ['cell-hack', 'HACK']] : [];
+    // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
+    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP', 'z'], ['cell-hack', 'HACK']] : [];
     const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ...(g.role === 'spotter' ? [['cell-bino', 'BINO']] : []), ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
       ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-quad', 'DRONE'], ['cell-recall', 'RECALL'], ...common]
