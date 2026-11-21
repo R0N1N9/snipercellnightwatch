@@ -233,6 +233,36 @@ export class Audio {
     if (head) tick(t + 0.045, 5200, 0.22, 0.03);
   }
 
+  // Taking a hit: a dull, blocky "oof" thump, no ringing — a low square-ish punch that
+  // drops fast, over a short burst of muffled noise.
+  hurt(big = false) {
+    if (!this.ctx) return;
+    const t = this.now, ctx = this.ctx;
+    if (this._hurtT && t - this._hurtT < 0.09) return; // a burst of pellets is one thump
+    this._hurtT = t;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.7;
+    lp.connect(this.master);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square';
+    const f0 = (big ? 150 : 190) * (0.94 + Math.random() * 0.12);
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.45, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(big ? 0.4 : 0.3, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    o.connect(g).connect(lp);
+    o.start(t); o.stop(t + 0.17);
+    this._noiseBurst(this.master, t, 0.06, 'lowpass', 1400, 0.8, big ? 0.5 : 0.35, 0.05);
+  }
+
+  // A drone's zap: a dry electric crackle (it used to be a square-wave beep).
+  zap(pos) {
+    if (!this.ctx) return;
+    const dest = pos ? this._panner(pos, 25) : this.master;
+    this._noiseBurst(dest, this.now, 0.07, 'bandpass', 2400, 1.6, 0.45, 0.05);
+  }
+
   plateHit(pos, delay) {
     if (!this.ctx) return;
     const t = this.now + delay;
