@@ -1125,8 +1125,9 @@ export class CellGame {
     // TAB: the spotter taps it for the tablet (tap again: ISR, again: back to first person)
     // and holds it for quickhacks (phone out). The shooter's TAB is just the map.
     if (this.role === 'spotter' || this.operative) {
+      // TAB toggles the tablet (ISR is a button inside it, or I).
       const cycle = () => {
-        if (this.tablet.visible) { this.tablet.close(); this.isr.enter(); }
+        if (this.tablet.visible) this.tablet.close();
         else if (this.isr.active) this.isr.exit();
         else this._raise('tablet', () => this.tablet.open());
       };
@@ -1142,7 +1143,12 @@ export class CellGame {
         this._tabT = 0;
         if (I.pressed('cell-tab')) cycle();
       }
-      if (I.pressed('cell-hack') || (I.pressed('KeyH') && !this.operative)) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
+      if (I.pressed('cell-hack')) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
+      // Desktop: hold H to have the phone out; let go to put it away.
+      if (!this.operative) {
+        if (I.held('KeyH') && !this.downed) { if (!this.qh.on && !this._hHold) { this._qhEnter(); this._hHold = true; } }
+        else if (this._hHold) { this._hHold = false; if (this.qh.on) this._qhExit(); }
+      }
     } else if (I.pressed('Tab') || I.pressed('cell-tab')) {
       // Shooter: TAB raises the map tablet; in the ISR view it flips back to the tablet.
       if (this.isr.active) { this.isr.exit(); this.tablet.open(); }
@@ -1261,12 +1267,23 @@ export class CellGame {
     // Spotter: through the raised binoculars, fire marks the enemy under the crosshair for the
     // nano drones; SWARM (or E) sends them.
     if (this.role === 'spotter' && live && !tab && !quad && this.nano) {
-      if (this.bino.on && this.bino.up && act.fire) { const t = this._nanoAt(innerWidth / 2, innerHeight / 2); if (t) this._nanoMark(t.id); else this.hud.flash('NO TARGET UNDER THE CROSSHAIR', 'dim', 0.6); }
+      if (this.bino.on && this.bino.up) {
+        // Looking at an enemy for a moment marks it for the swarm; FIRE sends the swarm.
+        const t = this._nanoAt(innerWidth / 2, innerHeight / 2), N = this.nano;
+        if (t && t.id === this._lookId) this._lookT = (this._lookT || 0) + dt; else { this._lookId = t ? t.id : null; this._lookT = 0; }
+        if (t && this._lookT > 0.35 && !N.marks.includes(t.id) && N.marks.length < N.ch) this._nanoMark(t.id);
+        if (act.fire) { this._nanoSend(); act.fire = act.fireHeld = false; }
+      }
       if (I.pressed('cell-swarm') || (this.bino.on && this.bino.up && I.pressed('KeyE'))) this._nanoSend();
       if (I.pressed('cell-lase') || (this.bino.on && this.bino.up && I.pressed('KeyR'))) { this._lase(); act.reload = false; }
     }
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
     if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
+    // No shooting while the phone is up (quickhack mode uses fire to run a hack on its own).
+    if (this.qh && !this.qh.on && (this.qh.vis || 0) > 0.15) { act.fire = act.fireHeld = false; }
+    // In knife reach of an enemy: FIRE becomes a melee takedown.
+    this._tdTarget = live && !tab && !quad && !isr && !(this.bino && this.bino.on) && !this.deSeq ? this._meleeTarget() : null;
+    if (this._tdTarget && act.fire && !(this.qh && this.qh.on)) { this._melee(); act.fire = act.fireHeld = false; }
     this._wpnInput(dt, I, act, live && !tab && !quad && !isr && !this.mini.open);
     const seat = this._seat();
     if (!live || tab || quad) {
@@ -2933,7 +2950,7 @@ class CellHud {
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
     const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('Z', 'rounds menu'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hack phone'), K('TAB', 'tablet · ISR (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
+    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hold: hack phone'), K('TAB', 'tablet (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
@@ -3236,6 +3253,11 @@ class CellHud {
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
     if (this.abBtns) this._abilTick(dt);
+    const fl = g._tdTarget ? 'TAKEDOWN' : g.bino && g.bino.up && g.role === 'spotter' ? 'SWARM' : 'FIRE';
+    if (fl !== this._fireLbl) {
+      this._fireLbl = fl;
+      for (const b of document.querySelectorAll('#touch .tb.fire')) { const s = b.querySelector('span'); if (s) s.textContent = fl; b.classList.toggle('fire-alt', fl !== 'FIRE'); }
+    }
     if (this.useBtn) {
       const pr = g.prompts && g.prompts[g.role];
       const on = !!(pr && pr.label && !/^DOWNED/.test(pr.label)) && !g.tablet.visible && !g.isr.active;

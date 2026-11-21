@@ -492,3 +492,7 @@ body.touch #cell-hud.has-pip .c-partner { top: 14px; }
 #cell-mags .cm.busy { animation: magbusy 0.5s ease-in-out infinite alternate; }
 @keyframes magbusy { to { transform: translateY(-3px); } }
 #touch .cell-usebtn span { font-size: 12px; letter-spacing: 0.1em; font-weight: 700; }
+
+/* FIRE as TAKEDOWN / SWARM. */
+#touch .tb.fire.fire-alt { border-color: #7fe8ff !important; box-shadow: 0 0 14px rgba(127, 232, 255, 0.45); }
+#touch .tb.fire.fire-alt span { color: #7fe8ff; }

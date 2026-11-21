@@ -124,7 +124,7 @@ export const Abilities = {
   // What the partner needs to draw: your overwatch ring, ghillie state, laser.
   _abState() {
     const O = this.ab && this.ab.ow;
-    return { ow: O && O.on && O.at ? [Math.round(O.at.x * 10) / 10, Math.round(O.at.z * 10) / 10] : 0, gh: this.ab && this.ab.ghillie ? 1 : 0, lz: this.laserOn ? 1 : 0 };
+    return { ow: O && O.on && O.at ? [Math.round(O.at.x * 10) / 10, Math.round(O.at.z * 10) / 10] : 0, gh: this.ab && this.ab.ghillie ? 1 : 0, lz: this.laserOn && !this.knifeEq ? 1 : 0 };
   },
 
   // A kill landed on a tagged enemy (the shooter's client): chain it.

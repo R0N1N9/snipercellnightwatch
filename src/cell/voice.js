@@ -12,19 +12,22 @@
 // (narrow band, presence bump, hard compression, grit). A line with a recording plays that;
 // anything else falls back to the browser's speech synthesis. See tools/vo/.
 // Lines queue so nobody talks over anybody, and stale chatter is dropped.
+// Synthesised voices sound most natural near their own pitch: a gentle offset per speaker
+// (and a little per-line rate variation) rather than a deep pitch-down, which reads robotic.
 const SPEAKERS = {
-  shooter: { pitch: 0.5, rate: 1.04, color: '#ffb040', bed: 0.012 },
-  spotter: { pitch: 0.82, rate: 1.1, color: '#4fd8ff', bed: 0.012 },
-  isr: { pitch: 0.72, rate: 1.02, color: '#8dff9e', bed: 0.02 },
+  shooter: { pitch: 0.9, rate: 1.0, color: '#ffb040', bed: 0.016 },
+  spotter: { pitch: 0.98, rate: 1.06, color: '#4fd8ff', bed: 0.016 },
+  isr: { pitch: 0.94, rate: 0.98, color: '#8dff9e', bed: 0.024 },
 };
 // Male voices, best first (natural / enhanced voices on Edge, macOS / iPadOS, Chrome, Windows).
 const MALE = [
+  /\(natural\)|natural.*(male|guy|andrew|brian|christopher|eric|davis|roger|steffan|ryan|thomas)/i,
   /guy online|ryan online|christopher online|eric online|davis online|andrew online|brian online|roger online|steffan online|thomas online/i,
   /\b(aaron|arthur|evan|nathan|tom|reed|rishi|gordon|lee|daniel|oliver)\b.*(enhanced|premium)/i,
   /\b(aaron|arthur|daniel|evan|nathan|tom|gordon|lee|oliver|fred|alex|ralph|reed|rocko|eddy|grandpa)\b/i,
   /google uk english male|microsoft (david|mark|george|james|richard|sean)|\bmale\b/i,
 ];
-const FEMALE = /female|samantha|victoria|karen|zira|susan|moira|tessa|serena|kate|fiona|allison|ava|nicky|sara|jenny|aria|libby|sonia|catherine|martha|shelley|sandy|flo|google us english$|google uk english female/i;
+const FEMALE = /female|michelle|emma|ana online|natasha|clara|jane|nancy|elizabeth|amber|ashley|cora|monica|sonia|maisie|hollie|libby|samantha|victoria|karen|zira|susan|moira|tessa|serena|kate|fiona|allison|ava|nicky|sara|jenny|aria|libby|sonia|catherine|martha|shelley|sandy|flo|google us english$|google uk english female/i;
 
 export function primeVoice() {
   // iOS only lets speech start from a user gesture: say nothing once, from a click.
@@ -175,11 +178,12 @@ export class Radio {
   _speak(item, S, finish) {
     try {
       if (!window.speechSynthesis) throw new Error('no tts');
-      const u = new SpeechSynthesisUtterance(item.text);
+      // Radio-style delivery: no trailing full stop, so clipped calls don't sound read out.
+      const u = new SpeechSynthesisUtterance(item.text.replace(/\.\s*$/, ''));
       const v = this._casting()[item.who] || this._casting().shooter;
       if (v) { u.voice = v; u.lang = v.lang; }
       u.pitch = S.pitch;
-      u.rate = S.rate;
+      u.rate = S.rate * (0.96 + Math.random() * 0.08);
       u.volume = 1;
       u.onend = finish;
       u.onerror = finish;
@@ -212,9 +216,22 @@ export class Radio {
   _keyUp() {
     const A = this.a;
     if (!A || !A.ctx) return;
-    const t = A.now;
+    const t = A.now, ctx = A.ctx;
     this._click(t, 1700, 0.07);
-    A._noiseBurst(A.master, t + 0.01, 0.09, 'bandpass', 2200, 1.4, 0.14, 0.07);
+    // Squelch opening: a short burst of static sweeping up, then settling under the voice.
+    const src = ctx.createBufferSource();
+    src.buffer = A.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(900, t);
+    f.frequency.exponentialRampToValueAtTime(2800, t + 0.12);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.13, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    src.connect(f).connect(g).connect(A.master);
+    src.start(t, Math.random());
+    src.stop(t + 0.17);
   }
 
   // Key-down: a falling squelch tail ("pssht"); Overwatch adds a two-tone talk-permit chirp.
@@ -275,36 +292,45 @@ export class Radio {
       const src = ctx.createBufferSource();
       src.buffer = A.noise;
       src.loop = true;
+      // Narrow-band hiss (a radio passband) with a presence bump.
       const hp = ctx.createBiquadFilter();
       hp.type = 'highpass';
-      hp.frequency.value = 700;
+      hp.frequency.value = 450;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 3600;
+      lp.frequency.value = 3400;
+      const pk = ctx.createBiquadFilter();
+      pk.type = 'peaking'; pk.frequency.value = 1800; pk.Q.value = 0.8; pk.gain.value = 4;
       const g = ctx.createGain();
       g.gain.value = S.bed;
+      // Two wobbles: a fast flutter and a slow fade, like a signal drifting in and out.
       const lfo = ctx.createOscillator();
-      lfo.frequency.value = 9 + Math.random() * 6;
+      lfo.frequency.value = 7 + Math.random() * 5;
       const lg = ctx.createGain();
-      lg.gain.value = S.bed * 0.45;
+      lg.gain.value = S.bed * 0.35;
       lfo.connect(lg).connect(g.gain);
-      src.connect(hp).connect(lp).connect(g).connect(A.master);
+      const slow = ctx.createOscillator();
+      slow.frequency.value = 0.35 + Math.random() * 0.4;
+      const sg = ctx.createGain();
+      sg.gain.value = S.bed * 0.4;
+      slow.connect(sg).connect(g.gain);
+      src.connect(hp).connect(lp).connect(pk).connect(g).connect(A.master);
       src.start(0, Math.random());
-      lfo.start();
-      // Crackle pops and dropouts.
+      lfo.start(); slow.start();
+      // Crackle (short pops of varied pitch), and the odd brief breakup on every link.
       const tick = () => {
         if (!this.bed || this.bed.src !== src) return;
         const t = ctx.currentTime;
-        if (Math.random() < 0.12) A._noiseBurst(A.master, t, 0.01 + Math.random() * 0.015, 'bandpass', 1500 + Math.random() * 2500, 2, S.bed * (1.5 + Math.random() * 2), 0.01);
-        if (who === 'isr' && Math.random() < 0.03) { g.gain.setValueAtTime(S.bed * 0.15, t); g.gain.setValueAtTime(S.bed, t + 0.05 + Math.random() * 0.08); }
-        this.bed.timer = setTimeout(tick, 40 + Math.random() * 160);
+        if (Math.random() < 0.16) A._noiseBurst(A.master, t, 0.006 + Math.random() * 0.018, 'bandpass', 1200 + Math.random() * 2800, 2.5, S.bed * (1.2 + Math.random() * 2.4), 0.006);
+        if (Math.random() < (who === 'isr' ? 0.04 : 0.015)) { const d = 0.04 + Math.random() * 0.09; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(S.bed * 2.2, t); g.gain.setValueAtTime(S.bed * 0.2, t + 0.012); g.gain.setValueAtTime(S.bed, t + d); }
+        this.bed.timer = setTimeout(tick, 35 + Math.random() * 140);
       };
-      this.bed = { src, lfo, g, timer: setTimeout(tick, 60) };
+      this.bed = { src, lfo, slow, g, timer: setTimeout(tick, 60) };
     } else if (!on && this.bed) {
       const b = this.bed;
       this.bed = null;
       clearTimeout(b.timer);
-      try { b.g.gain.setTargetAtTime(0, ctx.currentTime, 0.02); setTimeout(() => { try { b.src.stop(); b.lfo.stop(); } catch {} }, 120); } catch {}
+      try { b.g.gain.setTargetAtTime(0, ctx.currentTime, 0.02); setTimeout(() => { try { b.src.stop(); b.lfo.stop(); b.slow && b.slow.stop(); } catch {} }, 120); } catch {}
     }
   }
 }

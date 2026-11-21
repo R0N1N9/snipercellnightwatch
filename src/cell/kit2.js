@@ -65,9 +65,9 @@ export const Kit2 = {
 
   // V / KNIFE: a knife strike on whoever's in arm's reach in front of you. From behind or on
   // someone who hasn't clocked you, it's a silent takedown; head-on it's a heavy wound.
-  _melee() {
+  // The enemy in knife reach in front of you (or null).
+  _meleeTarget() {
     const P = this.player, S = this.sentinel;
-    if (this.knifeT > 0 || this.downed) return;
     let best = null, bd = 2.3;
     for (const g of S.guards) {
       if (g.state === 'dead' || Math.abs(g.y - P.pos.y) > 1.2) continue;
@@ -76,6 +76,12 @@ export const Kit2 = {
       if (Math.abs(angDiff(Math.atan2(-dx, -dz), P.yaw)) > 1.0) continue;
       best = g; bd = d;
     }
+    return best;
+  },
+  _melee() {
+    const P = this.player;
+    if (this.knifeT > 0 || this.downed) return;
+    const best = this._meleeTarget();
     this._knife();
     if (!best) return;
     this.payload('melee', { id: best.id, x: P.pos.x, z: P.pos.z, yaw: P.yaw, by: this.role });
@@ -149,7 +155,7 @@ export const Kit2 = {
     // Lasers: from your weapon along your aim, and from your partner's.
     const P = this.player;
     const o = P.eyePos(new THREE.Vector3());
-    const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active);
+    const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active) && !this.knifeEq; // no lasers on a knife
     if (live) {
       // From the weapon's muzzle, straight out along the barrel: wherever the gun points (down
       // and across while you run), or along your aim through the scope.
