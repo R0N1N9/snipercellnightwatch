@@ -12,7 +12,7 @@ export const PAYLOADS = [
   { k: 'lights', key: '5', name: 'CUT LIGHTS', bw: 15, cd: 8, cast: 0.7, aim: true, desc: 'Kill the power to that zone for 12 s. Dark = harder to see you.' },
   { k: 'spoof', key: '6', name: 'SPOOF CAMS', bw: 25, cd: 14, cast: 1.7, aim: false, desc: 'Loop every camera for 10 s.' },
   { k: 'decoy', key: '7', name: 'DECOY PING', bw: 12, cd: 7, cast: 0.5, aim: true, r: 25, desc: 'A loud noise at the point. Guards go and look.' },
-  { k: 'quad', key: '8', name: 'RECON QUAD', bw: 0, cd: 25, cast: 0, aim: false, desc: 'Fly the quadcopter (Q). Anything it sees is revealed; F tags.' },
+  { k: 'quad', key: '8', name: 'RECON DRONE', bw: 0, cd: 25, cast: 0, aim: false, desc: 'Fly the recon drone (Q). Anything it sees is marked; F tags.' },
   { k: 'medevac', key: '9', name: 'MEDEVAC DRONE', bw: 30, cd: 22, cast: 0, aim: false, desc: 'Flies to a downed agent and gets them back up at 55 %.' },
 ];
 // What SENTINEL's ICE knocks out with the console (physical kit still works).
@@ -54,7 +54,7 @@ export class Ops {
     if (this.bw < p.bw) return 'NOT ENOUGH BANDWIDTH';
     if (k === 'supply' && G.obj.drops <= 0) return 'NO DROPS LEFT';
     if (k === 'supply' && target && G.fac.insideBuilding(target.x, target.z)) return 'CAN\u2019T DROP THROUGH A ROOF';
-    if (k === 'quad' && !G.canQuad()) return 'QUAD UNAVAILABLE';
+    if (k === 'quad' && !G.canQuad()) return 'DRONE UNAVAILABLE';
     if (k === 'medevac') {
       const v = G.downedAgent();
       if (!v) return 'NOBODY IS DOWN';

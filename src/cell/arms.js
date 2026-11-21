@@ -144,7 +144,11 @@ export function buildKnife() {
 // shooter adds a chest rig and the urban-digital poncho; the spotter wears the plate carrier
 // with a quad on the pack.
 export function cellLook(role) {
+  // Uniforms multicam black; carrier, rig, belts and straps a dark, muted flat dark earth; IR
+  // markers. The shooter wears a clear coiled earpiece under the hood and carries the KR-50; the
+  // spotter wears a ball cap and an FDE headset with a boom mic.
+  const common = { outfit: 'wraith', theme: 'mcblack', gear: '#5f533e', irMark: true, eyes: 'goggles' };
   return role === 'shooter'
-    ? { outfit: 'wraith', theme: 'mcblack', vest: 'rig', poncho: true, ponchoTheme: 'urbandark', hat: 'none', eyes: 'goggles', kit: { stealth: 'suppressor' } }
-    : { outfit: 'wraith', theme: 'mcblack', vest: 'plate', poncho: false, hat: 'cap', eyes: 'goggles', kit: { scout: 'drone' } };
+    ? { ...common, vest: 'rig', poncho: true, ponchoTheme: 'urbandark', hat: 'none', earpiece: true, rifle: 'kr50', kit: { stealth: 'suppressor' } }
+    : { ...common, vest: 'plate', poncho: false, hat: 'cap', headset: true, kit: { scout: 'drone' } };
 }

@@ -227,10 +227,10 @@ export class Input {
     // Right thumb: FIRE at rest, inner ring for aiming controls, outer ring for rifle setup.
     const fx = W - safe.r - 128 * s, fy = H - safe.b - 108 * s;
     place('.fire-r', fx, fy);
-    place('.tb.scope', ...arc(fx, fy, 100, 186));
+    place('.tb.scope', ...arc(fx, fy, 104, 84)); // scope above FIRE (bigger), reload to its left
     place('.tb.zin', ...arc(fx, fy, 104, 118));
     place('.tb.zout', ...arc(fx, fy, 104, 147));
-    place('.tb.reload', ...arc(fx, fy, 100, 84));
+    place('.tb.reload', ...arc(fx, fy, 100, 186));
     place('.tb.jump', ...arc(fx, fy, 96, 46));
     place('.tb.zdn', ...arc(fx, fy, 176, 176));
     place('.tb.zup', ...arc(fx, fy, 176, 153));

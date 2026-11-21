@@ -53,7 +53,7 @@ export class Tablet {
     $('.ct-x').onclick = () => this.close();
     this.floor = 0;
     el.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { this.floor = +b.dataset.f; this._floorBtns(); }));
-    $('.ct-isr').style.display = game.role === 'spotter' || game.operative ? '' : 'none';
+    $('.ct-isr').style.display = ''; // both roles can flip to the ISR feed
     $('.ct-isr').onclick = () => { this.close(); game.isr.enter(); };
     el.querySelectorAll('[data-z]').forEach((b) => (b.onclick = () => {
       const z = +b.dataset.z;
@@ -278,6 +278,7 @@ export class Tablet {
     for (const e of S.drones) if (e.state !== 'dead' && e.rev && near(e.x, e.z)) return { kind: 'drone', e };
     for (const d of g.fac.devices) if (this._onFloor(d.y) && near(d.x, d.z, 12)) return { kind: 'iot', e: d };
     for (const c of S.cams) if (this._onFloor(c.y - 1.5) === true && near(c.x, c.z, 12)) return { kind: 'cam', e: c };
+    for (const d of g.darts || []) if (near(d.x, d.z, 12)) return { kind: 'dart', e: d };
     for (const d of Object.values(g.fac.doors)) if (this._onFloor((d.y || 0) + 0.5) && near(d.x, d.z, 12)) return { kind: 'door', e: d };
     if (g.aiShoot) SPOTS.perches.forEach((p, i) => { if (!this._ph && near(p.x, p.z, 14)) this._ph = { kind: 'perch', i }; });
     const ph = this._ph;
@@ -319,6 +320,7 @@ export class Tablet {
       if (g.aiShoot) g.comms('Ra: tracking.', 'amber', g.partnerName);
       return;
     }
+    if (h.kind === 'dart') { this.feedSrc = 'dart:' + h.e.id; this._say(`FEED \u00B7 CAMERA DART ${h.e.id}`, true); return; }
     if (!spot) { if (h.kind === 'cam' && h.e.hacked) this.feedSrc = h.e.id; return; }
     if (h.kind === 'iot') {
       const why = g.ops.hack('iot', h.e.id);
@@ -377,7 +379,7 @@ export class Tablet {
       const P = PAYLOAD[d.k];
       if (!P) return;
       // The recon quad flies itself to where you drop it (and holds there, marking).
-      if (d.k === 'quad') { const why = this.g._quadTo(p); this._say(why ? `RECON QUAD: ${why}` : 'QUAD \u2192 EN ROUTE', !why); return; }
+      if (d.k === 'quad') { const why = this.g._quadTo(p); this._say(why ? `RECON DRONE: ${why}` : 'DRONE \u2192 EN ROUTE', !why); return; }
       if (!P.aim) { this._pick(d.k); return; }
       this.selected = d.k;
       this._click(p, px, py);
@@ -416,7 +418,13 @@ export class Tablet {
     cam.aspect = r.width / r.height;
     let label;
     const c = typeof this.feedSrc === 'number' && g.sentinel.cams.find((q) => q.id === this.feedSrc);
-    if (c && c.hacked) {
+    const dart = typeof this.feedSrc === 'string' && this.feedSrc.startsWith('dart:') && (g.darts || []).find((d) => 'dart:' + d.id === this.feedSrc);
+    if (dart) {
+      cam.position.set(dart.x, dart.y, dart.z);
+      cam.rotation.set(-0.05, dart.yaw, 0);
+      cam.fov = this._fzFov(70);
+      label = `DART-${dart.id} // ${dart.by === 'shooter' ? 'RA' : 'R\u014CNIN'}`;
+    } else if (c && c.hacked) {
       cam.position.set(c.x, c.y - 0.2, c.z);
       cam.rotation.set(-0.35, c.yaw, 0);
       cam.fov = this._fzFov(62);
@@ -719,7 +727,8 @@ export class Tablet {
     if (Q.seen && !Q.kia && !(Q.ai && Q.avatarHidden)) agent(Q.pos, Q.yaw || 0, Q.role === 'shooter' ? '#f2b35b' : '#40d8e8', Q.name, Q.downed);
     agent(g.player.pos, g.player.yaw, g.role === 'shooter' ? '#f2b35b' : '#40d8e8', g.name + ' (YOU)', g.downed);
     const qd = g.quad && g.quad.active ? g.quad : Q.quad ? { x: Q.quad[0], z: Q.quad[2], yaw: Q.quad[3] } : null;
-    if (qd) { const a = T(qd.x, qd.z); c.strokeStyle = '#40d8e8'; c.strokeRect(a.x - 4, a.y - 4, 8, 8); c.fillStyle = '#40d8e8'; c.fillText('QUAD', a.x, a.y - 8); }
+    for (const d of g.darts || []) { const a = T(d.x, d.z); c.fillStyle = this.feedSrc === 'dart:' + d.id ? '#30ff90' : 'rgba(48,255,144,0.7)'; c.fillRect(a.x - 3, a.y - 3, 6, 6); c.fillText('DART', a.x, a.y - 7); }
+    if (qd) { const a = T(qd.x, qd.z); c.strokeStyle = '#40d8e8'; c.strokeRect(a.x - 4, a.y - 4, 8, 8); c.fillStyle = '#40d8e8'; c.fillText('DRONE', a.x, a.y - 8); }
     if (g.medevac) { const a = T(g.medevac.x, g.medevac.z); c.fillStyle = '#40ffb0'; c.fillText('+MEDEVAC', a.x, a.y); }
     // Aimed payload preview.
     // Dragging a payload over the map: the same preview, at your finger.

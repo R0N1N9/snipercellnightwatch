@@ -61,15 +61,15 @@ export function blinkStrobes(list, t, phase = 0) {
 }
 
 // An IR laser: a thin bright line plus a dot where it lands.
+// color / ir: a visible laser sight uses the same line on the normal layer, in red.
 export class IRLaser {
-  constructor(scene) {
+  constructor(scene, color = '#ffffff', ir = true) {
     const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
-    this.line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: ir ? 0.55 : 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.line.frustumCulled = false;
-    this.line.layers.set(IR_LAYER);
-    this.dot = new THREE.Sprite(strobeMat());
-    this.dot.scale.setScalar(0.18);
-    this.dot.layers.set(IR_LAYER);
+    this.dot = ir ? new THREE.Sprite(strobeMat()) : new THREE.Sprite(new THREE.SpriteMaterial({ color, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.dot.scale.setScalar(ir ? 0.18 : 0.07);
+    if (ir) { this.line.layers.set(IR_LAYER); this.dot.layers.set(IR_LAYER); }
     scene.add(this.line, this.dot);
   }
   set(a, b, on = true) {

@@ -85,6 +85,8 @@ export const Kit2 = {
   _irInit() {
     this.strobes = { partner: addStrobes(this.partner.avatar), self: addStrobes(this.selfAvatar) };
     this.irLasers = { me: new IRLaser(this.scene), partner: new IRLaser(this.scene) };
+    // Visible red laser sights (K toggles yours).
+    this.visLasers = { me: new IRLaser(this.scene, '#ff2a2a', false), partner: new IRLaser(this.scene, '#ff2a2a', false) };
     this.ghosts = {};
     for (const r of ['shooter', 'spotter']) this.ghosts[r] = ghostAvatar(this._look(r), this.scene);
     // Partner's drive, strapped to their back.
@@ -122,7 +124,8 @@ export const Kit2 = {
       const end = from.clone().addScaledVector(dir, 220);
       const h = this.fac.ray(from, end, 'shot');
       this.irLasers.me.set(from, h ? h.point : end, true);
-    } else this.irLasers.me.set(o, o, false);
+      this.visLasers.me.set(from, h ? h.point : end, !!this.laserOn && !this.cine.active && !(this.bino && this.bino.on));
+    } else { this.irLasers.me.set(o, o, false); this.visLasers.me.set(o, o, false); }
     const Q = this.partner;
     if (Q.seen && !Q.kia && !Q.downed && !Q.seated && !(Q.ai && Q.avatarHidden)) {
       // Your partner's: from the muzzle of the rifle / pistol on their model, along its barrel.
@@ -139,7 +142,8 @@ export const Kit2 = {
       const end = a.clone().addScaledVector(d, 220);
       const h = this.fac.ray(a.clone().addScaledVector(d, 0.05), end, 'shot');
       this.irLasers.partner.set(a, h ? h.point : end, true);
-    } else this.irLasers.partner.set(o, o, false);
+      this.visLasers.partner.set(a, h ? h.point : end, !!(Q.ex ? Q.ex.lz : Q.ai) && !this.cine.active);
+    } else { this.irLasers.partner.set(o, o, false); this.visLasers.partner.set(o, o, false); }
     // Hunt ghosts: where SENTINEL last saw each operator, while they hunt.
     for (const role of ['shooter', 'spotter']) {
       const G = this.ghosts[role], H = this._huntInfo(role);

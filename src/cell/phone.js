@@ -31,7 +31,7 @@ export const SHOOTER_REQ = [
   { k: 'emp', name: 'EMP' },
   { k: 'decoy', name: 'DECOY' },
   { k: 'lights', name: 'LIGHTS' },
-  { k: 'drone', name: 'QUAD' },
+  { k: 'drone', name: 'DRONE' },
 ];
 // Console commands at the crosshair, in the tablet's order (so the number keys match).
 export const CMDS = [
@@ -42,7 +42,7 @@ export const CMDS = [
   { k: 'lights', name: 'CUT LIGHTS', p: 'lights' },
   { k: 'spoof', name: 'SPOOF CAMS', p: 'spoof' },
   { k: 'decoy', name: 'DECOY PING', p: 'decoy' },
-  { k: 'drone', name: 'RECON QUAD', p: 'quad' },
+  { k: 'drone', name: 'RECON DRONE', p: 'quad' },
   { k: 'medevac', name: 'MEDEVAC DRONE', p: 'medevac' },
   { k: 'sweep', name: 'ISR SWEEP', p: null, bw: 0 }, // key 0: the Predator sweeps the spot
 ];
@@ -232,7 +232,7 @@ export const Phone = {
     if (!this.input) return;
     const spot = this.role === 'spotter' || this.operative;
     const ICON = { scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
-    const SHORT = { 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON QUAD': 'QUAD' };
+    const SHORT = { 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON DRONE': 'DRONE' };
     // Spotter: console commands. Shooter: requests to the spotter, landing on your crosshair.
     const list = spot ? CMDS : SHOOTER_REQ;
     const W = (this.cmdWheel = new Wheel(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
@@ -276,6 +276,7 @@ export const Phone = {
   _cmdKeys(I) {
     this._cmdWheelInit();
     if (this.cmdWheel && this.cmdWheel.open && !this._cmdWheelOk()) this.cmdWheel.cancel();
+    if (this.xr && this.xr.menu) return; // the rounds menu has the number keys
     if (this.role === 'shooter' && !this.operative) {
       // Shooter: keys 3–8 request that support at the crosshair (1 / 2 are your weapons).
       if (this.tablet.visible || this.downed || this.kia || this.paused || (this._voteOpen && this._voteOpen())) return;

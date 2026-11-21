@@ -137,8 +137,8 @@ export const Halo = {
     const from = new THREE.Vector3(D.from[0], 0, D.from[1]).normalize();
     this.air = { from, travel: from.clone().negate(), side: new THREE.Vector3(-from.z, 0, from.x) };
     const L0 = g.drop.insert[0];
-    const ly = terrainHeight(L0.x, L0.z);
-    this.air.L = this.actors.map((A, i) => { const q = g.drop.insert[Math.min(i, g.drop.insert.length - 1)]; return new THREE.Vector3(q.x, terrainHeight(q.x, q.z), q.z); });
+    const ly = g.fac.groundAt(L0.x, L0.z, 200, 0.5);
+    this.air.L = this.actors.map((A, i) => { const q = g.drop.insert[Math.min(i, g.drop.insert.length - 1)]; return new THREE.Vector3(q.x, g.fac.groundAt(q.x, q.z, 200, 0.5), q.z); });
     this.air.J = new THREE.Vector3(L0.x, ly + 290, L0.z).addScaledVector(from, 260);
     this.plane = buildPlane();
     g.scene.add(this.plane);
@@ -182,12 +182,12 @@ export const Halo = {
       const Dp = L.clone().addScaledVector(A.from, 150).addScaledVector(A.side, i ? -9 : 9);
       const p = new THREE.Vector3(lerp(Dp.x, L.x, e), lerp(L.y + 120, L.y, Math.pow(u, 0.9)), lerp(Dp.z, L.z, e));
       p.addScaledVector(A.side, Math.sin(u * Math.PI * 2) * 10 * (1 - u));
-      p.y = Math.max(p.y, terrainHeight(p.x, p.z));
+      p.y = Math.max(p.y, this.g.fac.groundAt(p.x, p.z, p.y + 0.5, 0.5));
       return { p, mode: 'canopy', u };
     }
     const u = clamp01((t - tl) / 1.2);
     const p = L.clone().addScaledVector(A.travel, -ease(u) * 3);
-    p.y = terrainHeight(p.x, p.z);
+    p.y = this.g.fac.groundAt(p.x, p.z, L.y + 1, 0.6);
     return { p, mode: 'ground', u, moving: u < 0.9 };
   },
 
@@ -284,7 +284,7 @@ export const Halo = {
       cam.fov = 72;
       cam.updateMatrixWorld(true);
       this.hands.forEach((h, k) => {
-        h.visible = true;
+        h.visible = false; // (the toggles read as floating blocks at this angle: hands stay out of shot)
         h.position.copy(cam.localToWorld(new THREE.Vector3(k ? 0.32 : -0.32, 0.16 + Math.sin(t * 2 + k) * 0.02, -0.7)));
         h.quaternion.copy(cam.quaternion);
         h.rotateX(0.5);
@@ -294,7 +294,7 @@ export const Halo = {
       // On the knoll: they flare in and land.
       const L = A.L[0];
       cam.position.copy(L).addScaledVector(A.travel, 14).addScaledVector(A.side, 6);
-      cam.position.y = terrainHeight(cam.position.x, cam.position.z) + 1.7;
+      cam.position.y = Math.max(this.g.fac.groundAt(cam.position.x, cam.position.z, L.y + 2, 0.6), L.y) + 1.7;
       const mid = J.reduce((m, j) => m.add(j.p), new THREE.Vector3()).divideScalar(J.length);
       cam.lookAt(mid.x, mid.y + 1.6, mid.z);
       cam.fov = 48;
