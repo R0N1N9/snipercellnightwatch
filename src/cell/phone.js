@@ -24,6 +24,15 @@ const OPTS = {
 const EXEC = 0.6;
 // Commands at the spot under your crosshair (when nothing hackable is targeted): the console's
 // payloads, sent from the phone. Same costs and cooldowns as the tablet.
+// What the shooter can request at the crosshair (keys 3–8, or press-and-hold on touch).
+export const SHOOTER_REQ = [
+  { k: 'supply', name: 'SUPPLY' },
+  { k: 'scan', name: 'SCAN' },
+  { k: 'emp', name: 'EMP' },
+  { k: 'decoy', name: 'DECOY' },
+  { k: 'lights', name: 'LIGHTS' },
+  { k: 'drone', name: 'QUAD' },
+];
 // Console commands at the crosshair, in the tablet's order (so the number keys match).
 export const CMDS = [
   { k: 'scan', name: 'PULSE SCAN', p: 'scan' },
@@ -220,10 +229,13 @@ export const Phone = {
   _cmdWheelInit() {
     if (this.cmdWheel !== undefined) return;
     this.cmdWheel = null;
-    if (!(this.role === 'spotter' || this.operative) || !this.input) return;
+    if (!this.input) return;
+    const spot = this.role === 'spotter' || this.operative;
     const ICON = { scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
     const SHORT = { 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON QUAD': 'QUAD' };
-    const W = (this.cmdWheel = new Wheel(CMDS.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: 'cmd', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: 'COMMAND', fallback: null }));
+    // Spotter: console commands. Shooter: requests to the spotter, landing on your crosshair.
+    const list = spot ? CMDS : SHOOTER_REQ;
+    const W = (this.cmdWheel = new Wheel(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
     let hold = null;
     this.input.onLookTouch = (type, t) => {
       if (type === 'start') {
@@ -232,7 +244,7 @@ export const Phone = {
         h.timer = setTimeout(() => {
           if (hold !== h || !this._cmdWheelOk()) return;
           h.open = true;
-          W.show(h.x, h.y, 'DROPS ON YOUR CROSSHAIR');
+          W.show(h.x, h.y, spot ? 'DROPS ON YOUR CROSSHAIR' : 'REQUEST \u2192 YOUR CROSSHAIR');
           this._phonePulse && this._phonePulse();
           navigator.vibrate && navigator.vibrate(12);
         }, 450);
@@ -250,8 +262,8 @@ export const Phone = {
       hold = null;
       if (!was) return false;
       const k = W.close();
-      const o = k && CMDS.find((c) => c.k === k);
-      if (o && this._cmdWheelOk()) this._pointCmd(o);
+      const o = k && list.find((c) => c.k === k);
+      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.k, this._aimPoint()); }
       return true;
     };
   },
@@ -264,6 +276,12 @@ export const Phone = {
   _cmdKeys(I) {
     this._cmdWheelInit();
     if (this.cmdWheel && this.cmdWheel.open && !this._cmdWheelOk()) this.cmdWheel.cancel();
+    if (this.role === 'shooter' && !this.operative) {
+      // Shooter: keys 3–8 request that support at the crosshair (1 / 2 are your weapons).
+      if (this.tablet.visible || this.downed || this.kia || this.paused || (this._voteOpen && this._voteOpen())) return;
+      for (let i = 0; i < SHOOTER_REQ.length; i++) if (I.pressed('Digit' + (i + 3))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
+      return;
+    }
     if (!(this.role === 'spotter' || this.operative) || !this.ops) return;
     if ((this.qh && this.qh.on) || this.tablet.visible || this.isr.active || this.mini.open || this.downed || this.kia || this.paused) return;
     if (this._voteOpen && this._voteOpen()) return;

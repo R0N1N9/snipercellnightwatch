@@ -14,8 +14,8 @@ export const SMG = {
 };
 export const MAGNUM = {
   key: 'mag50', name: 'M50 MAGNUM', short: 'M50', caliber: '12.7 mm', slot: 'pistol', kind: 'semi',
-  mag: 7, spareMags: 4, muzzle: 460, damage: { head: 300, torso: 115, legs: 65 }, cycle: 0.36, reload: 1.8, reloadEmpty: 2.2,
-  zooms: [1], scope: false, adsFov: 42, fixedZero: 25, glint: 0, recoil: 0.065, sway: 0, spread: 0.012,
+  mag: 7, spareMags: 4, muzzle: 460, damage: { head: 300, torso: 130, legs: 70 }, cycle: 0.62, reload: 1.8, reloadEmpty: 2.2,
+  zooms: [1], scope: false, adsFov: 42, fixedZero: 25, glint: 0, recoil: 0.085, sway: 0, spread: 0.075, adsSpread: 0.006, kick: 0.07, heavy: true,
 };
 export const P9 = {
   key: 'm18', name: 'P-9', short: 'P-9', caliber: '9 mm', slot: 'pistol', kind: 'semi',
@@ -28,7 +28,7 @@ export const PERKS = {
   spotter: { bandwidth: { name: 'BANDWIDTH', desc: 'Console bandwidth regenerates 40% faster.' }, drops: { name: 'LOGISTICS', desc: '+2 supply drops for the team.' }, armor: { name: 'LIGHT ARMOR', desc: 'Take 20% less damage.' } },
 };
 export const DEFAULT_LOADOUT = {
-  shooter: { secondary: 'smg', secSup: true, perk: 'lures' },
+  shooter: { secondary: 'smg', secSup: true, perk: 'lures', bolt: 'standard' },
   spotter: { pistolSup: true, perk: 'bandwidth' },
 };
 export function normLoadout(lo) {
@@ -37,6 +37,7 @@ export function normLoadout(lo) {
     if (['smg', 'mag50'].includes(lo.shooter.secondary)) L.shooter.secondary = lo.shooter.secondary;
     if (typeof lo.shooter.secSup === 'boolean') L.shooter.secSup = lo.shooter.secSup;
     if (PERKS.shooter[lo.shooter.perk]) L.shooter.perk = lo.shooter.perk;
+    if (['standard', 'straight'].includes(lo.shooter.bolt)) L.shooter.bolt = lo.shooter.bolt;
   }
   if (lo && lo.spotter) {
     if (typeof lo.spotter.pistolSup === 'boolean') L.spotter.pistolSup = lo.spotter.pistolSup;

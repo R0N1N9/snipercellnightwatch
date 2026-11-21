@@ -21,6 +21,8 @@ OP = [
     'Moving to the cliff.',
     'Setting up on the ridge.',
     "Draw's clear.",
+    'Canopy good.',
+    'On the ground.',
     'Copy.',
     'Copy. On its way.',
     'Negative.',
@@ -200,9 +202,11 @@ OP = [
 ]
 
 ISR = [
+    'Green light. Jump.',
     'Pickets in the draw. Drop them quiet.',
     'Sniper Cell, Overwatch. ISR on station.',
-    'Target: archive server. Two floors, six rack rooms.',
+    'Target: archive server. Data floor, up top.',
+    'Checkpoint in the lobby. Go round it.',
     'Relay in electrical. Keycards in the office drawers.',
     'Find the amber beacon. Upload clean, pull the drive.',
     'Botch it and ICE puts them on the walls.',

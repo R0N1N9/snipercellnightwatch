@@ -76,6 +76,7 @@ export const KitMethods = {
       if (I.pressed('KeyH') || I.pressed('cell-deadeye')) this._deadeye();
       if (I.pressed('KeyX') || I.pressed('cell-lure')) this._throwLure();
       if (I.pressed('KeyT') || I.pressed('cell-exec')) this._execute();
+      if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._xrSwap();
     }
     // Downed: V / PING / HELP calls for a pickup on your position.
     this._helpCd = Math.max(0, (this._helpCd || 0) - dt);
@@ -263,7 +264,13 @@ export const KitMethods = {
   _smartPing() {
     const e = this._crosshairEnemy();
     if (e) this._wheelPick('enemy', { x: e.x, z: e.z }, e.id);
-    else this._wheelPick('look', this.quad && this.quad.active ? { x: this.quad.x, z: this.quad.z } : this._aimPoint(), null);
+    else {
+      // Nothing under the crosshair: a plain PING marker (F on open ground is "look here").
+      const at = this.quad && this.quad.active ? { x: this.quad.x, z: this.quad.z } : this._aimPoint();
+      const pin = { x: at.x, z: at.z, label: 'PING', by: this.role };
+      this._addPin(pin);
+      this.send({ t: 'pin', ...pin });
+    }
   },
 
   // A wheel choice at a world point (from the crosshair or the tablet map).

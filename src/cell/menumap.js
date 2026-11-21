@@ -120,6 +120,19 @@ export function drawCellMap(canvas, sel = 'draw', t = 0) {
   drawRoute.push([2, 146], [2, SPOTS.perches[0].z + 2]);
   route(drawRoute, sel === 'draw');
   route([[6, DROPS.ridge.insert[0].z], [2, SPOTS.perches[0].z + 2]], sel === 'ridge');
+  // HALO drops: the transport's run-in, from off the map onto the knoll.
+  for (const [k, D] of Object.entries(DROPS)) {
+    if (!D.air) continue;
+    const L = D.insert[0], f = Math.hypot(D.from[0], D.from[1]);
+    const fx = D.from[0] / f, fz = D.from[1] / f;
+    route([[L.x + fx * 120, L.z + fz * 120], [L.x, L.z]], sel === k);
+    c.save();
+    c.translate(mx(L.x + fx * 40), my(L.z + fz * 40));
+    c.rotate(Math.atan2(-fz, -fx));
+    c.fillStyle = sel === k ? 'rgba(0,255,224,0.9)' : 'rgba(0,255,224,0.35)';
+    c.beginPath(); c.moveTo(8, 0); c.lineTo(-6, -6); c.lineTo(-3, 0); c.lineTo(-6, 6); c.closePath(); c.fill();
+    c.restore();
+  }
   // Drop points.
   const hits = [];
   for (const [k, D] of Object.entries(DROPS)) {
@@ -131,10 +144,11 @@ export function drawCellMap(canvas, sel = 'draw', t = 0) {
     c.fillRect(-r / 1.4, -r / 1.4, (r / 1.4) * 2, (r / 1.4) * 2); c.strokeRect(-r / 1.4, -r / 1.4, (r / 1.4) * 2, (r / 1.4) * 2);
     c.restore();
     c.font = '700 11px JetBrains Mono, monospace';
-    const left = k === 'ridge'; // keep clear of the SOUTH CLIFF perch label
+    const left = k === 'ridge' || k === 'east'; // keep clear of the perch labels
+    const dy = D.air ? -14 : 4;
     c.textAlign = left ? 'right' : 'left';
     c.fillStyle = on ? '#00ffe0' : 'rgba(0,255,224,0.6)';
-    c.fillText(`DROP · ${D.name}${on ? ' ✓' : ''}`, x + (left ? -14 : 14), y + 4);
+    c.fillText(`${D.air ? 'HALO' : 'DROP'} · ${D.name}${on ? ' ✓' : ''}`, x + (left ? -14 : 14), y + dy);
     hits.push({ k, x, y });
   }
   // North arrow and scale.

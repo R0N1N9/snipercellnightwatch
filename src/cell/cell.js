@@ -28,7 +28,7 @@ import { Input } from '../input.js';
 import { WEAPON, PLAYER } from '../config.js';
 import { RULES, applyRules } from '../rules.js';
 import { clamp, segSegClosest } from '../util.js';
-import { Facility, SPOTS, DROPS, setInsertion, FENCE, BUILDING, ROOMS, CARDS, terrainHeight, lam, glowMat } from './facility.js';
+import { Facility, SPOTS, DROPS, setInsertion, SHAFT, CHECKPOINT, FENCE, BUILDING, ROOMS, CARDS, terrainHeight, lam, glowMat } from './facility.js';
 import { Sentinel, DIFFS, guardCapsules, buildDrone, angDiff } from './sentinel.js';
 import { Ops, AiSpotter, PAYLOAD, HACK } from './ops.js';
 import { Tablet } from './tablet.js';
@@ -42,6 +42,7 @@ import { installNVG } from './nvg.js';
 import { Ambience } from './ambient.js';
 import { installSpatial } from './spatial.js';
 import { installPhone } from './phone.js';
+import { installXRounds, XR } from './xrounds.js';
 import { wallBlock } from './sentinel.js';
 import { Cinema } from './cinema.js';
 import { Radio, setVoiceSetting } from './voice.js';
@@ -74,7 +75,7 @@ export const OBJECTIVES = [
   { k: 'perimeter', title: 'BREACH THE PERIMETER', hint: 'Get inside the fence — the cut on the west side or the south gate.' },
   { k: 'relay', title: 'TAP THE NETWORK', hint: 'Plant a relay in the Electrical Room (SE corner). Opens the data floor to Overwatch.' },
   { k: 'card', title: 'FIND A KEYCARD', hint: 'Search the office desk drawers (E). Each rack-room door takes its own colour-tagged keycard. The Site Chief carries a master badge.' },
-  { k: 'find', title: 'FIND THE ARCHIVE SERVER', hint: 'Swipe into the rack rooms on both floors. Look for the cabinet with the slow amber beacon.' },
+  { k: 'find', title: 'FIND THE ARCHIVE SERVER', hint: 'Take the elevator or the stair tower up to the data floor and swipe into its rack rooms. Look for the cabinet with the slow amber beacon.' },
   { k: 'upload', title: 'UPLOAD THE MALWARE', hint: 'Spotter: jack in at the lit rack (E), lock the signal, then hold the rack while it uploads. Shooter: cover them.' },
   { k: 'drive', title: 'EXTRACT THE DRIVE', hint: 'Release the drive at the rack (E). A clean upload means SENTINEL never knows.' },
   { k: 'exfil', title: 'EXFILTRATE', hint: 'Get the drive out the loading dock to the van east of the fence. Spotter drives, shooter rides shotgun.' },
@@ -86,7 +87,8 @@ const BRIEF = {
   nightwatch: [
     'Sniper Cell, Overwatch. ISR on station.',
     'Pickets in the draw. Drop them quiet.',
-    'Target: archive server. Two floors, six rack rooms.',
+    'Target: archive server. Data floor, up top.',
+    'Checkpoint in the lobby. Go round it.',
     'Relay in electrical. Keycards in the office drawers.',
     'Find the amber beacon. Upload clean, pull the drive.',
     'Botch it and ICE puts them on the walls.',
@@ -96,7 +98,8 @@ const BRIEF = {
   infiltration: [
     'Sniper Cell, Overwatch. ISR on station.',
     'Pickets in the draw. Drop them quiet.',
-    'Target: archive server. Two floors, six rack rooms.',
+    'Target: archive server. Data floor, up top.',
+    'Checkpoint in the lobby. Go round it.',
     'Relay in electrical. Keycards in the office drawers.',
     'Find the amber beacon. Upload clean, pull the drive.',
     'Botch it and ICE puts them on the walls.',
@@ -326,7 +329,7 @@ function buildSky(scene) {
 
 // ---------------------------------------------------------------------------
 export class CellGame {
-  constructor({ mode, net, role, diff = 'operative', seed = 7, quality = 'medium', settings, audio, name, partnerName, mission = 'nightwatch', look = 'inked', insert = 'draw' }) {
+  constructor({ mode, net, role, diff = 'operative', seed = 7, quality = 'medium', settings, audio, name, partnerName, mission = 'nightwatch', look = 'inked', insert = 'draw', layout = 'standard' }) {
     // 'solo' (AI partner) | 'operative' (one operator, both roles) | 'host' | 'guest'
     this.mode = mode;
     this.isHost = mode !== 'guest';
@@ -367,7 +370,7 @@ export class CellGame {
     this.scene.add(this.camera);
     this._lights();
     buildSky(this.scene);
-    this.fac = new Facility(this.scene, quality, seed);
+    this.fac = new Facility(this.scene, quality, seed, { layout });
     this.sentinel = new Sentinel(this, { diff, seed, sim: this.isHost, mission: this.mission, pickets: this.drop.approach });
     this.sfx = new Sfx(audio);
     this.effects = new Effects(this.scene);
@@ -378,7 +381,7 @@ export class CellGame {
     for (const k of ['touchSensR', 'touchSensL', 'gyroMode', 'gyroSens', 'gyroInvertY']) if (this.settings[k] !== undefined) this.input[k] = this.settings[k];
 
     // Mission state (host-authoritative; mirrored on the guest).
-    this.obj = { perimeter: false, relay: false, badge: false, found: false, aligned: false, upload: 0, uploading: false, trace: 0, traced: false, drive: null, driveAt: null, exfil: false, access: 1, drops: this.D.drops, canCrack: false, crack: 0, step: 0, cards: [], searched: [], used: {}, commsDown: false, cctv: false, quiet: null, ice: false, ifak: { shooter: 1, spotter: 1 }, barracks: 'ok', barracksT: 0, bay: 'ok', c4: [] };
+    this.obj = { perimeter: false, relay: false, badge: false, found: false, aligned: false, upload: 0, uploading: false, trace: 0, traced: false, drive: null, driveAt: null, exfil: false, access: 1, drops: this.D.drops, canCrack: false, crack: 0, step: 0, cards: [], searched: [], used: {}, commsDown: false, cctv: false, quiet: null, ice: false, ifak: { shooter: 1, spotter: 1 }, barracks: 'ok', barracksT: 0, bay: 'ok', c4: [], lift: { y: 0, to: 0 } };
     this.crates = [];
     this.crateId = 1;
     this.prompts = {}; // role -> { label, p }
@@ -392,12 +395,13 @@ export class CellGame {
 
     this.loadout = normLoadout(this.settings.cellLoadout);
     this._setupPlayer();
+    this._xrInit();
     this._setupPartner();
     this.ops = this.role === 'spotter' ? new Ops(this) : this.solo ? new Ops(this) : null;
     if (this.ops && this.loadout.spotter.perk === 'bandwidth' && (this.role === 'spotter' || this.operative)) this.ops.bwMul = 1.4;
     if ((this.role === 'spotter' || this.operative) && this.loadout.spotter.perk === 'drops') this.obj.drops += 2;
     this.aiSpot = this.aiPartner && this.role === 'shooter' ? new AiSpotter(this, this.ops) : null;
-    this.aiShoot = this.aiPartner && this.role === 'spotter' ? { perch: 0, cool: 3, aim: null, aimT: 0, moveT: 0, sayT: 0, holdT: 0, coverT: 0 } : null;
+    this.aiShoot = this.aiPartner && this.role === 'spotter' ? { perch: this.drop.perch || 0, cool: 3, aim: null, aimT: 0, moveT: 0, sayT: 0, holdT: 0, coverT: 0 } : null;
     // The approach: until you're over the crest an AI partner walks the draw with you.
     this.approach = this.drop.approach;
     this.quad = null;
@@ -509,8 +513,11 @@ export class CellGame {
     P.reset(new THREE.Vector3(sx, terrainHeight(sx, sz), sz), 0);
     this._arm();
     P.autoBipod = false;
-    P.autoCycle = false;
-    P.straightPull = true; // Halo-feel: the bolt runs while you stay on the glass
+    // KR-50 bolt: standard by default (like multiplayer: tap fire and you come off the glass to
+    // work the bolt; keep fire held to stay scoped). The straight-pull bolt (loadout) cycles while
+    // you stay on target.
+    P.autoCycle = true;
+    P.straightPull = this.loadout.shooter.bolt === 'straight';
     P.hp = this.D.hp;
     this.hp = this.D.hp;
     this.maxHp = this.D.hp;
@@ -704,6 +711,8 @@ export class CellGame {
       case 'boom': this._boom(m); break;
       case 'blasthurt': if (m.role === this.role) this._damage(m.dmg, { x: m.x, z: m.z }); break;
       case 'sweepfx': this.isr.sweepFx = { x: m.x, z: m.z, r: m.r, t: 0 }; break;
+      case 'xc': this._xrRemote(m.c); break;
+      case 'chk': this._checkpointFx(); break;
       case 'vote': if (this.isHost) this._castVote(m.role, m.v); break;
       case 'heal': if (m.role === this.role) this._heal(m.hp); break;
       case 'ammo': if (m.role === this.role) this._ammo(); break;
@@ -1015,6 +1024,11 @@ export class CellGame {
       this.camera.fov = C.cam.fov;
       this.camera.updateProjectionMatrix();
       this.viewmodel.visible = false;
+      // Only the cut-scene's own two operators: hide the gameplay models waiting at the drop.
+      this.partner.avatar.setVisible(false);
+      this.selfAvatar.setVisible(false);
+      if (this.irLasers) { this.irLasers.partner.set(this.camera.position, this.camera.position, false); this.irLasers.me.set(this.camera.position, this.camera.position, false); }
+      if (this.strobes) for (const k of ['partner', 'self']) for (const st of this.strobes[k] || []) st.visible = false;
     }
     this.audio.setListener(C.active === 'outro' ? C.cam : this.camera);
     if (!C.render(this.renderer)) this._render(dt);
@@ -1217,7 +1231,11 @@ export class CellGame {
       this.camera.fov = WEAPON.baseFov;
     } else {
       P.eyePos(this.camera.position);
-      this.camera.rotation.set(P.pitch, P.yaw, 0);
+      // Recoil kick on top of your aim, settling back over ~0.25 s.
+      const k = this.camKick || 0, ky = this.camKickYaw || 0;
+      this.camera.rotation.set(P.pitch + k, P.yaw + ky, -ky * 0.6);
+      this.camKick = k * Math.exp(-dt * 11);
+      this.camKickYaw = ky * Math.exp(-dt * 11);
       this.camera.fov = P.fov();
     }
     this.camera.updateProjectionMatrix();
@@ -1261,21 +1279,43 @@ export class CellGame {
   }
 
   // ---- shooting ----------------------------------------------------------------------
+  // Current cone (radians, full width) for the weapon in hand.
+  _spreadNow() {
+    const P = this.player, def = P.def, ads = P.scopeT > 0.5;
+    let sp;
+    if (def.slot === 'rifle') sp = ads ? 0 : 0.075;
+    else sp = ads ? (def.adsSpread ?? (def.spread || 0.03) * 0.35) : (def.spread || 0.03);
+    if (P.moving) sp *= 1.5;
+    if (P.stance === 1) sp *= 0.85;
+    return sp;
+  }
+
   _fire() {
     const P = this.player, def = P.def;
     const rifle = def.slot === 'rifle';
     const sup = rifle || !!P.w.sup;
     const o = P.eyePos(new THREE.Vector3());
     const dir = P.aimDir(new THREE.Vector3());
-    // Hipfire spread on the pistol; the rifle is dead-on (Halo).
-    if (!rifle) { const sp = (def.spread || 0.03) * (P.scopeT > 0.5 ? 0.35 : 1) * (P.moving ? 1.5 : 1); dir.x += (Math.random() - 0.5) * sp; dir.y += (Math.random() - 0.5) * sp; dir.z += (Math.random() - 0.5) * sp; dir.normalize(); }
-    if (rifle && P.scopeT < 0.5) { dir.x += (Math.random() - 0.5) * 0.02; dir.y += (Math.random() - 0.5) * 0.02; dir.normalize(); }
+    // Spread: dead-on through the scope / sights, wide from the hip (the crosshair shows it).
+    {
+      const sp = this._spreadNow();
+      if (sp > 0) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * sp / 2;
+        const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(right, dir);
+        dir.addScaledVector(right, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).normalize();
+      }
+    }
     // A sync shot is a locked shot: straight to the head you were holding.
     if (this._syncShotId) { const sg = this.sentinel.byId(this._syncShotId); this._syncShotId = 0; if (sg && sg.state !== 'dead') dir.copy(guardCapsules(sg)[0].a).sub(o).normalize(); }
     if (this.syncReady) this._syncFire();
     P.fireKick();
-    this.viewmodel.fired();
-    this.audio.shotLocal(sup, !rifle);
+    this.viewmodel.fired(def.heavy ? 1.9 : rifle ? 1.3 : 1);
+    // Felt recoil: the view kicks up (and a little sideways) and settles, leaving some climb.
+    const kick = def.kick || (rifle ? 0.05 : def.key === 'smg' ? 0.008 : 0.018);
+    this.camKick = (this.camKick || 0) + kick;
+    this.camKickYaw = (this.camKickYaw || 0) + (Math.random() - 0.5) * kick * 0.5;
+    P.pitch += kick * (rifle ? 0.25 : 0.35);
+    this.audio.shotLocal(sup, !rifle, def.heavy);
     this.stats.shots++;
     if (!sup) this.effects.muzzle(this.viewmodel.muzzleWorld(), dir);
     // Firing breaks the camo for a moment (it shimmers into view).
@@ -1343,6 +1383,11 @@ export class CellGame {
       this._noise(hitP, 7, false);
     }
     if (res && res.quadHit) this._quadDamage(100);
+    // Explosive mag: the round sticks where it hit and blows a second later.
+    if (rifle && P.w.xr) {
+      if (res && !res.quadHit) this._xrStick(hitP, res.enemy || res.blocked || null);
+      if (P.w.mag + P.w.chamber <= 0) { P.w.xr = false; this.hud.flash('EXPLOSIVE MAG EMPTY', 'amber', 1); }
+    }
   }
 
   // Instant hit: world boxes + terrain, every guard's capsules, drones.
@@ -1560,6 +1605,7 @@ export class CellGame {
 
   _resupply() {
     this.player.refill();
+    this._xrResupply();
     this.hp = Math.min(this.maxHp, this.hp + 35);
     this.audio.click();
     this.hud.flash('RESUPPLIED +35 HP', 'cyan');
@@ -1604,11 +1650,8 @@ export class CellGame {
       this.audio.ping && this.audio.ping();
       this.hud.flash(best.kind === 'd' ? 'DRONE TAGGED' : best.chief ? 'SITE CHIEF TAGGED' : 'TAGGED');
     } else {
-      // Nothing there: drop a ping on the spot instead.
-      const at = this._aimPoint();
-      const pin = { x: at.x, z: at.z, label: 'PING', by: this.role };
-      this._addPin(pin);
-      this.send({ t: 'pin', ...pin });
+      // Nothing there: call "look here" on the spot (V on open ground drops a plain PING).
+      this._wheelPick('look', this._aimPoint(), null);
     }
   }
 
@@ -1736,6 +1779,25 @@ export class CellGame {
   // ---- host: objectives, interactions, doors, crates, AI shooter --------------------
   _hostTick(dt) {
     const S = this.sentinel, ob = this.obj;
+    // Elevator car: run toward the floor it's been sent to.
+    { const L = ob.lift, want = L.to * BUILDING.f1, d = want - L.y; if (Math.abs(d) > 0.001) L.y += Math.sign(d) * Math.min(Math.abs(d), SHAFT.speed * dt); }
+    // Lobby checkpoint: walking through the detector sets it off (unless the CCTV desk is ours).
+    this._ckPrev = this._ckPrev || {};
+    for (const a of this.agents()) {
+      if (!a.alive) continue;
+      const prev = this._ckPrev[a.role], C = CHECKPOINT;
+      this._ckPrev[a.role] = { z: a.pos.z, x: a.pos.x };
+      if (!prev || ob.cctv || a.pos.y > 1.2) continue;
+      const crossed = (prev.z - C.z) * (a.pos.z - C.z) <= 0 && prev.z !== a.pos.z;
+      if (crossed && a.pos.x > C.x0 && a.pos.x < C.x1 && this.t - (this._ckT || -99) > 6) {
+        this._ckT = this.t;
+        S.noise({ x: 0, y: 1, z: C.z }, 28, true);
+        S.raise(0.35, 'SENTINEL: checkpoint alarm in the lobby.');
+        this._toast('Checkpoint alarm! The detector went off \u2014 step round the barriers next time.', 'red');
+        this._broadcast({ k: 'chk' });
+        this._checkpointFx();
+      }
+    }
     // Remote quad position feeds SENTINEL (guards shoot support drones).
     if (!this.solo && this.partner.quad) { const q = this.partner.quad; S.quad = { alive: true, x: q[0], y: q[1], z: q[2] }; }
     else if (!this._quadOut()) S.quad = null;
@@ -1809,7 +1871,7 @@ export class CellGame {
     const m = this.medevac;
     if (!m) return;
     const tgt = this.agentPos(m.role);
-    const goal = { x: tgt.x, y: Math.max(tgt.y + 1.2, this.fac.insideBuilding(tgt.x, tgt.z) ? 1.6 : tgt.y + 1.2), z: tgt.z };
+    const goal = { x: tgt.x, y: tgt.y + 1.2, z: tgt.z };
     const cruise = this.fac.insideBuilding(tgt.x, tgt.z) ? 0 : 14;
     const dx = goal.x - m.x, dz = goal.z - m.z, d = Math.hypot(dx, dz);
     const sp = 18 * dt;
@@ -2055,6 +2117,17 @@ export class CellGame {
       else if (ob.badge) opt('swipe', `Hold E — swipe the master badge (${rn})`, 0.8, () => { d.unlocked = true; this._toast(`Master badge accepted — ${rn}.`, 'dim'); });
       else opt('badgex', `${rn} — needs the ${cd.name} keycard (search the office drawers)`, 0, null);
       break;
+    }
+    // The elevator: ride it from inside the car, or call it from a landing.
+    {
+      const L = ob.lift, F = BUILDING.f1, moving = Math.abs(L.y - L.to * F) > 0.01;
+      const dx = (SHAFT.door[0] + SHAFT.door[1]) / 2, dz = SHAFT.z1 + 0.8;
+      if (!moving && this.fac.inLift(p.x, p.z, p.y)) opt('lift', L.to ? 'E — elevator \u25BC LOBBY' : 'E — elevator \u25B2 DATA FLOOR', 0, () => { L.to = L.to ? 0 : 1; });
+      else if (Math.hypot(p.x - dx, p.z - dz) < 2 && Math.abs(p.y - (p.y > F - 1 ? F : 0)) < 1.6) {
+        const lv = p.y > F - 1 ? 1 : 0;
+        if (moving) opt('liftx', 'Elevator on its way\u2026', 0, null);
+        else if (L.to !== lv) opt('lift', 'E — call the elevator', 0, () => { L.to = lv; });
+      }
     }
     this._stationOpt(a, opt);
     // The archive server: jack in (signal lock), then extract (drive release). Minigames run
@@ -2368,8 +2441,34 @@ export class CellGame {
     if (showSelf) this.selfAvatar.update(dt, { p: this.player.pos, yaw: this.player.yaw, pitch: 0, st: this.downed ? 2 : 1, moving: false, w: true });
   }
 
+  // The detector going off: buzzer and a red strobe on its arch.
+  _checkpointFx() {
+    this.audio.buzzer && this.audio.buzzer(new THREE.Vector3(0, 2.2, CHECKPOINT.z));
+    this._ckFx = 3;
+  }
+  _liftVisuals(dt) {
+    const L = this.obj.lift, F = this.fac;
+    if (!L) return;
+    const was = F.lift.y;
+    F.setLift(L.y);
+    const moving = Math.abs(L.y - was) > 1e-4;
+    const pos = new THREE.Vector3((SHAFT.x0 + SHAFT.x1) / 2, L.y + 1.4, (SHAFT.z0 + SHAFT.z1) / 2);
+    if (moving && !this._liftMoving) this.audio.startLoop('lift', pos, 'lift', 0.18);
+    if (moving) this.audio.updateLoop('lift', pos);
+    if (!moving && this._liftMoving) { this.audio.stopLoop('lift'); this.audio.chime && this.audio.chime(pos); }
+    this._liftMoving = moving;
+    // Checkpoint arch light: green armed, dark once the CCTV is ours, red while it's alarming.
+    const C = F.checkpoint;
+    if (C) {
+      this._ckFx = Math.max(0, (this._ckFx || 0) - dt);
+      C.led.material.color.set(this._ckFx > 0 ? ((this.t * 8) % 1 < 0.5 ? '#ff2020' : '#400000') : this.obj.cctv ? '#202428' : '#30ff70');
+    }
+  }
+
   _visuals(dt) {
     this._iceClient(dt);
+    this._liftVisuals(dt);
+    this._xrTick(dt);
     this._neuroTick(dt);
     this._eyesTick(dt);
     this._nvgTick(dt);
@@ -2608,7 +2707,7 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const shooterKeys = [K('Esc', 'pause'), K('3–8', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'explosive rounds'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
     const spotterKeys = [K('Esc', 'pause'), K('1–0', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'quad'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
@@ -2656,9 +2755,9 @@ class CellHud {
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP'], ['cell-hack', 'HACK']] : [];
     const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-tag', 'TAG'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
-      ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-quad', 'QUAD'], ['cell-recall', 'RECALL'], ...common]
+      ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'EXPL'], ['cell-quad', 'QUAD'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-tab', 'MAP'], ...common]
+        ? [['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'EXPL'], ['cell-tab', 'MAP'], ...common]
         : [['cell-tab', 'TABLET'], ['cell-ability', 'QUAD'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
@@ -2810,7 +2909,7 @@ class CellHud {
     this.el.amR.textContent = '/ ' + w.reserve;
     this.el.amW.textContent = P.def.name + (P.def.slot === 'rifle' ? ' · SUPPRESSED' : '');
     const sec = P.def.slot === 'pistol';
-    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 NIGHT VISION` : '';
+    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 NIGHT VISION${w.xr ? ' \u00B7 EXPLOSIVE' : ''}` : w.xr ? 'EXPLOSIVE ROUNDS (Z: standard)' : '';
     this.el.amS.classList.toggle('loud', sec && !w.sup);
     // Prompt.
     let pr = g.prompts[g.role];
@@ -2854,7 +2953,7 @@ class CellHud {
     // Ability chips.
     if (g.role === 'shooter') {
       const K = g.kit;
-      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${K.execs ? 'on' : 'cd'}">T EXECUTE \u00D7${K.execs}</i>`;
+      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${K.execs ? 'on' : 'cd'}">T EXECUTE \u00D7${K.execs}</i><i class="${(P.arms.find((q) => q.xr) ? 'on' : g.xr && g.xr.rounds ? '' : 'cd')}">Z EXPLOSIVE ${P.arms.find((q) => q.xr) ? 'LOADED' : '\u00D7' + (g.xr ? g.xr.rounds : 0)}</i>`;
       if (kh !== this._kh) { this._kh = kh; this.el.kit.innerHTML = kh; }
     }
     // Incoming request / call card.
@@ -2976,15 +3075,23 @@ class CellHud {
     else if (!g.downed && !g.kia) {
       c.strokeStyle = g._reticleHot() ? 'rgba(255,50,60,0.95)' : 'rgba(220,240,255,0.75)';
       c.lineWidth = 1.5;
-      const s = P.def.slot === 'pistol' && P.scopeT > 0.5 ? 3 : 6;
-      c.beginPath(); c.moveTo(W / 2 - s - 4, H / 2); c.lineTo(W / 2 - 4, H / 2); c.moveTo(W / 2 + 4, H / 2); c.lineTo(W / 2 + s + 4, H / 2); c.moveTo(W / 2, H / 2 + 4); c.lineTo(W / 2, H / 2 + s + 4); c.stroke();
+      // The gap opens with the weapon's spread: tight on the sights, wide from the hip.
+      const sp = g._spreadNow();
+      const gap = Math.max(4, Math.min(H * 0.3, (Math.tan(sp / 2) / Math.tan(THREE.MathUtils.degToRad(g.camera.fov / 2))) * H / 2));
+      this._xg = this._xg === undefined ? gap : this._xg + (gap - this._xg) * 0.25;
+      const s = P.def.slot === 'pistol' && P.scopeT > 0.5 ? 4 : 7, q = this._xg;
+      c.beginPath();
+      c.moveTo(W / 2 - s - q, H / 2); c.lineTo(W / 2 - q, H / 2); c.moveTo(W / 2 + q, H / 2); c.lineTo(W / 2 + s + q, H / 2);
+      c.moveTo(W / 2, H / 2 + q); c.lineTo(W / 2, H / 2 + s + q); c.moveTo(W / 2, H / 2 - q); c.lineTo(W / 2, H / 2 - s - q);
+      c.stroke();
+      c.fillStyle = c.strokeStyle; c.fillRect(W / 2 - 1, H / 2 - 1, 2, 2);
     }
   }
 
   _objPoint() {
     const g = this.g, ob = g.obj;
     switch (ob.step) {
-      case 0: return { x: -80, y: 2, z: 11, label: 'FENCE GAP' };
+      case 0: return { x: -80, y: 2, z: this.g.fac.cutZ, label: 'FENCE GAP' };
       case 1: return { x: SPOTS.relay.x, y: 1.5, z: SPOTS.relay.z, label: 'RELAY' };
       case 2: { const c = g.sentinel.guards.find((q) => q.chief && q.state === 'dead' && q.badge); return c ? { x: c.x, y: c.y + 2.6, z: c.z, label: 'MASTER BADGE' } : null; }
       case 3: return null; // search: no marker until someone finds the beacon
@@ -3114,3 +3221,4 @@ installNeuro(CellGame);
 installNVG(CellGame);
 installSpatial(CellGame);
 installPhone(CellGame);
+installXRounds(CellGame);
