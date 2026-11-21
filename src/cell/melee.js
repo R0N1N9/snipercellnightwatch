@@ -23,13 +23,13 @@ export const Melee = {
 
   _wpnList() {
     const P = this.player;
-    if (this.role === 'spotter' && !this.operative) return [this._spotBino() ? { k: 'p', label: 'BINOCULARS', icon: '◎' } : { k: 'p', label: 'K9', icon: '═' }, { k: 's', label: 'P-9', icon: '⌐' }, { k: 'k', label: 'KNIFE', icon: '⟋' }];
+    if (this.role === 'spotter') return [this._spotBino() ? { k: 'p', label: 'BINOCULARS', icon: '◎' } : { k: 'p', label: 'K9', icon: '═' }, { k: 's', label: 'P-9', icon: '⌐' }, { k: 'k', label: 'KNIFE', icon: '⟋' }];
     const sec = P.arms[1] ? P.arms[1].def.short || P.arms[1].def.name : 'SIDEARM';
     return [{ k: 'p', label: (P.arms[0] && P.arms[0].def.short) || 'RIFLE', icon: '═' }, ...(P.arms[1] ? [{ k: 's', label: sec, icon: '⌐' }] : []), { k: 'k', label: 'KNIFE', icon: '⟋' }];
   },
   // Spotter with the binoculars as primary (the default) rather than the SMG.
   _spotBino() {
-    return this.role === 'spotter' && !this.operative && !(this.loadout && this.loadout.spotter.primary === 'smg');
+    return this.role === 'spotter' && !(this.loadout && this.loadout.spotter.primary === 'smg');
   },
   _wpnCur() {
     if (this.knifeEq) return 'k';
@@ -63,7 +63,7 @@ export const Melee = {
   // Per frame, after the other input handling and before the player update: weapon keys, the
   // mouse wheel, the touch swap button (tap / hold for the wheel), and the knife's fire.
   _wpnInput(dt, I, act, ok) {
-    const P = this.player, spot = this.role === 'spotter' && !this.operative;
+    const P = this.player, spot = this.role === 'spotter';
     const H = this._swHold;
     if (!ok) {
       if (H) { if (this.wpnWheel && this.wpnWheel.open) this.wpnWheel.cancel(); this._swHold = null; }

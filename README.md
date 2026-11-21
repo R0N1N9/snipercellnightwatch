@@ -137,7 +137,7 @@ Headshots kill anything except a helmet's first hit.
 ### How to play
 
 - **Solo · AI partner:** the AI plays the other role.
-- **Solo · lone operative:** one sniper carrying both kits.
+- **Solo · lone operative:** no partner; you play the role you picked (shooter or spotter) and carry the other role's console kit too.
 - **Co-op:** the host picks a role and the friend who joins gets the other.
 
 ### Mission
@@ -331,7 +331,9 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Recon drone:** G (desktop) tosses it up out of your left hand before the feed cuts in. Hold G to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
 - **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. G takes the sticks; hold G recalls it.
 - **Thermal binoculars (X, or the weapon-swap button on touch):** the spotter picks a primary in staging: the binoculars (default, in hand at the start) or the K9 HUSH SMG; the P-9 is the secondary. With the SMG there are no binoculars at all. Swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
-- **Binocular view:** two big overlapping lenses (a Venn-diagram viewfinder) that fill most of the screen. Zoom through four steps with the mouse wheel, + / −, or the touch ZOOM buttons; the readout shows the magnification.
+- **Binocular view:** two big overlapping lenses (a Venn-diagram viewfinder, rimmed only on the outside) that fill most of the screen, with a bright grey thermal picture of the world and warm bodies in red. Zoom through four steps with the mouse wheel, + / −, or the touch ZOOM buttons; the readout shows the magnification.
+- **Laser rangefinder:** the binoculars show a live range under the crosshair (TARGET when it's on an enemy). Press **R** (or **LASE** on touch) to lase the target and send the sniper a **firing call**: the range from the sniper's position, a lead call if the target is walking, and "send it" (the KR-50 is hitscan, so there's no holdover). The target gets a yellow bracket with the range and lead on both players' screens for 15 s. Lasing a brute, titan or the overseer also marks its **weak points** (head; a titan's power pack, a brute's spine) for 20 s. With AI Ra, lasing a target marks it for him.
+- **Range callouts:** now and then, marking an enemy calls out its range from whoever marked it ("Rōnin: X-ray marked, 50 meters.").
 - **Nano drones (thermal binoculars):** you carry three nano drones; each one used reloads on its own 15 s timer. With the binoculars raised, **tap enemies** on screen (or **fire** on the one under the crosshair) to mark up to as many targets as you have drones; marked targets get a cyan ring and a numbered diamond. **SWARM** (touch ability button) or **E** sends them: the swarm streams out and each marked target drops silently about 1.5 s later, any enemy type. Anyone who sees a body fall can still react.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**

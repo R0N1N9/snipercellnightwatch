@@ -760,7 +760,8 @@ async function startCell(mode, opts = {}) {
   const { CellGame } = await import('./cell/cell.js');
   const c = opts.cell || { role: cellSet.role, diff: cellSet.diff, mission: cellSet.mission, insert: cellSet.insert, layout: cellSet.layout, seed: (Math.random() * 1e6) | 0 };
   // The guest plays whichever role the host didn't take.
-  const role = mode === 'operative' ? 'shooter' : mode === 'guest' ? (c.role === 'shooter' ? 'spotter' : 'shooter') : c.role;
+  // Lone operative plays whichever role you picked (with the other role's console kit).
+  const role = mode === 'guest' ? (c.role === 'shooter' ? 'spotter' : 'shooter') : c.role;
   game = new CellGame({ mode, net: opts.net || null, role, diff: c.diff, seed: c.seed, mission: c.mission || 'nightwatch', insert: ['north', 'west', 'east', 'roof'].includes(c.insert) ? c.insert : 'draw', layout: c.layout === 'random' ? 'random' : 'standard', look: c.look === 'og' || c.look === 'inked' ? c.look : settings.rules.look, quality, settings: { ...settings, cellLoadout }, audio, name: cellName(role), partnerName: opts.partnerName || CELL_CALL[role === 'shooter' ? 'spotter' : 'shooter'] });
   if (opts.hello) game.hello = opts.hello;
   window.__game = game;
