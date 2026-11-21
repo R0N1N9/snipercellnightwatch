@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 
 export const NEURO = { range: 45, every: 0.25, hold: 1.2, noise: 10 };
+// The spotter's own eyes: range (×1.6 scoped) and how often the crosshair re-tags one enemy.
+export const EYES = { range: 40, retag: 10 };
 
 export const Neuro = {
   _neuroInit() {
@@ -50,9 +52,58 @@ export const Neuro = {
     else this.send({ t: 'ab', k: 'qmark', target: { ids: seen } });
   },
 
-  _neuroMark(ids) {
+  // The spotter's own eyes work like the quad's link: any enemy in your field of view, in the
+  // clear and within EYES.range, stays marked for the team while you can see it. Putting your
+  // crosshair on one tags it outright (with a ping), once per EYES.retag seconds each.
+  _eyesTick(dt) {
+    this._eyesT = (this._eyesT || 0) - dt;
+    const live = (this.role === 'spotter' || this.operative) && !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active) && !this.tablet.visible && !(this.cine && this.cine.active);
+    this.eyesSet = this.eyesSet || new Set();
+    if (!live) { this.eyesSet.clear(); return; }
+    // Crosshair: an instant tag and a ping.
+    this._autoTag = this._autoTag || new Map();
+    const x = this._crosshairEnemy && this._crosshairEnemy();
+    if (x && this.t - (this._autoTag.get(x.id) ?? -99) > EYES.retag) {
+      this._autoTag.set(x.id, this.t);
+      this.payload('tag', { id: x.id, by: this.role, auto: true });
+      if (this.isHost) x.tagT = Math.max(x.tagT || 0, 12);
+      this.audio.ping && this.audio.ping();
+      this.neuroFx.push({ id: x.id, t: 0, eyes: true });
+    }
+    if (this._eyesT > 0) return;
+    this._eyesT = NEURO.every;
+    const S = this.sentinel, cam = this.camera;
+    const o = cam.position, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const half = THREE.MathUtils.degToRad(cam.fov / 2) * 1.15, halfW = Math.atan(Math.tan(half) * cam.aspect);
+    const range = EYES.range * (this.player.scoped ? 1.6 : 1);
+    const seen = [];
+    const v = new THREE.Vector3();
+    for (const e of [...S.guards, ...S.drones]) {
+      if (e.state === 'dead' || e.hp <= 0) continue;
+      v.set(e.x, (e.y || 0) + (e.kind === 'd' ? 0 : 1.3), e.z).sub(o);
+      const d = v.length();
+      if (d > range) continue;
+      v.normalize();
+      if (v.angleTo(dir) > Math.max(half, halfW)) continue;
+      if (!this.fac.los(o, { x: e.x, y: (e.y || 0) + (e.kind === 'd' ? 0 : 1.3), z: e.z })) continue;
+      seen.push(e.id);
+    }
+    for (const id of seen) if (!this.eyesSet.has(id)) this.neuroFx.push({ id, t: 0, eyes: true });
+    this.eyesSet = new Set(seen);
+    if (!seen.length) return;
+    if (this.isHost) this._neuroMark(seen, true);
+    else this.send({ t: 'ab', k: 'qmark', target: { ids: seen, auto: true } });
+  },
+
+  // auto: a sight mark (the spotter's eyes): it shows them, but isn't a call to shoot.
+  _neuroMark(ids, auto = false) {
     const S = this.sentinel;
-    for (const id of ids) { const e = S.byId(id); if (e && e.state !== 'dead') e.tagT = Math.max(e.tagT || 0, NEURO.hold); }
+    for (const id of ids) {
+      const e = S.byId(id);
+      if (!e || e.state === 'dead') continue;
+      if (auto && !(e.tagT > 0 && !e.autoTag)) e.autoTag = true;
+      e.tagT = Math.max(e.tagT || 0, NEURO.hold);
+    }
   },
 
   // HUD: lock-on brackets for fresh links; in the quad view, the link status and a noise warning.
@@ -76,7 +127,7 @@ export const Neuro = {
         c.fillStyle = `rgba(255,90,110,${a.toFixed(3)})`;
         c.font = '600 11px JetBrains Mono, monospace';
         c.textAlign = 'center';
-        c.fillText('NEUROLINK', p.x, p.y - size / 2 - 6);
+        c.fillText(f.eyes ? 'MARKED' : 'NEUROLINK', p.x, p.y - size / 2 - 6);
       }
     }
     if (!(this.quad && this.quad.active)) return;

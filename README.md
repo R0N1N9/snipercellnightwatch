@@ -240,6 +240,8 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
   1. Look at an enemy and **hold F** (or tap SYNC on touch) to mark it for your teammate: a pulsing circle sits over its head. The wheel's SYNC option works too.
   2. Put your own crosshair on another enemy's head. You don't need to aim down sights. Your teammate holds theirs on the marked one, or an AI Ra takes it.
   3. When both crosshairs are on heads that die to one shot (no helmet), a solid **FIRE** block locks on, both weapons fire on their own, and both enemies go down.
+  4. With an AI partner and two marks, the AI takes the **first** one you marked and you take the **second** (the tags read SYNC 1 · ALLY and SYNC 2 · YOU). An AI Ra fires from his rifle at any range; an AI Rōnin takes his with the pistol out to about 75 m.
+- **Firing:** hold the trigger and every weapon keeps firing at its own rate (semi-autos and the bolt gun as fast as they cycle; burst mode repeats bursts).
 - **Downed but alive:** a body-shot kill leaves an enemy down but alive. It's out of the fight, but the reticle still goes red over it. Headshot it on the ground to finish it, and your character calls "X-ray down".
 - **Radio chatter:**
   - Operators call fresh contacts in their field of view: "Contact, north-east, 60 meters".
@@ -267,6 +269,8 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
 **Spotter** (default callsign **Rōnin**):
 
 - P-9 pistol (2 magazines) with a removable suppressor (**B**: animated twist off / on).
+- **Eyes on:** anything in your field of view, in the clear and within about 40 m (60 m aimed), is marked for the team while you can see it, like the quad's neurolink. Your crosshair on an enemy tags it at once with a ping. Sight marks don't send an AI Ra after them; tag with F or ping ENEMY for that.
+- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon quad, medevac) at the spot you're aiming at, with the phone animation. On touch, hold TAB / HACK and aim at open ground for the same Commands menu.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
   - **Hold** for **quickhacks**: your left hand brings up your phone and the HUD switches to scan mode (time slows in solo). Everything hackable in view gets tagged.
