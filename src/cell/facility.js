@@ -149,7 +149,7 @@ export function glowMat(color, opacity = 0.35) {
 }
 
 // Merge many transformed box geometries that share one material into a single mesh.
-function mergeBoxes(list, material) {
+export function mergeBoxes(list, material) {
   let n = 0;
   const geos = list.map(({ geo, m }) => { const g = geo.index ? geo.toNonIndexed() : geo; g.applyMatrix4(m); n += g.attributes.position.count; return g; });
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
