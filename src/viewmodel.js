@@ -391,8 +391,9 @@ export class ViewModel {
     return g.userData.muzzle.getWorldPosition(out);
   }
 
-  fired() {
+  fired(strength = 1) {
     this.kick = 1;
+    this.kickS = strength;
   }
 
   // st: { def, scopeT, speed, sprint, bobPhase, cycleT, reloadT, reloadDur, reloadEmpty, switchT, slot }
@@ -439,7 +440,7 @@ export class ViewModel {
     rot.z += 0.25 * sk;
 
     // Recoil.
-    const k = this.kick * this.kick;
+    const k = this.kick * this.kick * (this.kickS || 1);
     pos.z += k * (pistol ? 0.04 : 0.07);
     rot.x += k * (pistol ? 0.22 : 0.09);
 

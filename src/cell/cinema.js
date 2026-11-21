@@ -10,6 +10,7 @@ import { hazeUniforms } from '../atmosphere.js';
 import { terrainHeight, lam } from './facility.js';
 import { buildVan, setVanLights } from './van.js';
 import { VanSound } from './vansound.js';
+import { installHalo } from './halo.js';
 
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -67,6 +68,11 @@ export class Cinema {
       g.scene.add(av.root);
       return { role, av, p: new THREE.Vector3(), yaw: 0, moving: false };
     });
+    this.title.textContent = '';
+    this._voiced = new Set();
+    this._titled = false;
+    // Knoll drops come in by air (HALO); the others by van.
+    if (g.drop.air) { this._startAir(); this._fadeTo(1); return; }
     this.van = buildVan();
     g.scene.add(this.van);
     // The chosen drop point: down the draw, or up onto the ridge (the walk-out ends at SPOTS.insert).
@@ -190,8 +196,9 @@ export class Cinema {
     if (this.active !== 'intro') return;
     this.active = null;
     for (const A of this.actors) g.scene.remove(A.av.root);
-    g.scene.remove(this.van);
+    if (this.van) g.scene.remove(this.van);
     if (this.vs) this.vs.stop();
+    if (this.air) this._endAir();
     this._show(false);
     this._say('');
     this.title.classList.remove('on');
@@ -332,7 +339,7 @@ export class Cinema {
   update(dt) {
     if (!this.active) return;
     this.t += dt;
-    if (this.active === 'intro') this._updateIntro(dt);
+    if (this.active === 'intro') { if (this.air) this._updateAir(dt); else this._updateIntro(dt); }
     else this._updateOutro(dt);
   }
 
@@ -344,3 +351,4 @@ export class Cinema {
     return true;
   }
 }
+installHalo(Cinema);

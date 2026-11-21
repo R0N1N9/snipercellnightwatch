@@ -17,10 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <!-- ?v= tags make browsers fetch fresh copies after an update (GitHub Pages caches files for 10 min). -->
-  <link rel="stylesheet" href="style.css?v=20261123d" />
-  <link rel="stylesheet" href="src/multiverse/multiverse.css?v=20261123d" />
-  <link rel="stylesheet" href="src/multiverse/input.css?v=20261123d" />
-  <link rel="stylesheet" href="src/cell/cell.css?v=20261123d" />
+  <link rel="stylesheet" href="style.css?v=20261124a" />
+  <link rel="stylesheet" href="src/multiverse/multiverse.css?v=20261124a" />
+  <link rel="stylesheet" href="src/multiverse/input.css?v=20261124a" />
+  <link rel="stylesheet" href="src/cell/cell.css?v=20261124a" />
   <script type="importmap">
     { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
   </script>
@@ -115,6 +115,7 @@
           </div>
           <label class="field"><span>Callsign for this role</span><input id="in-cell-name" maxlength="14" autocomplete="off" /></label>
           <div class="seg" id="cell-diff"><button data-d="recruit">Recruit</button><button data-d="operative">Operative</button><button data-d="ghost">Ghost</button></div>
+          <div class="seg" id="cell-layout" title="Compound layout: the host's applies to both"><button data-lay="standard">Standard layout</button><button data-lay="random">Random layout</button></div>
           <div class="seg" id="cell-look" title="Graphics: the host's look applies to both"><button data-look="inked">Inked</button><button data-look="og">OG graphics</button></div>
           <button id="btn-cell-stage">Staging area · loadout</button>
           <button id="btn-cell-voice">Radio voices: ON</button>
@@ -339,6 +340,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/main.js?v=20261123d"></script>
+  <script type="module" src="src/main.js?v=20261124a"></script>
 </body>
 </html>

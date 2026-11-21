@@ -387,3 +387,5 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 .stage-prev { background: radial-gradient(ellipse at 50% 75%, #1b2030 0%, #0d0e17 70%); }
 .stage-prev canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .stage-desc { font-size: 12px; color: var(--ink-dim); margin: 8px 0 0; line-height: 1.4; }
+#cell-cine .cc-alt { position: absolute; right: 6vw; top: 18vh; font-family: var(--mono); font-size: clamp(14px, 2vw, 22px); letter-spacing: 0.14em; color: #9dffb0; text-shadow: 0 0 8px rgba(80, 255, 140, 0.6); opacity: 0; transition: opacity 0.2s; }
+#cell-cine .cc-alt.on { opacity: 1; }

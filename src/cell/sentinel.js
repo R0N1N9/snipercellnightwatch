@@ -21,7 +21,7 @@
 // Headshots kill anything, whatever the weapon. Infiltration keeps its plain security guards.
 // Reinforcements always come from OUTSIDE the building: the barracks door and the south gate.
 import * as THREE from 'three';
-import { lam, glowMat, SPOTS, ROOMS, drawX } from './facility.js';
+import { lam, glowMat, SPOTS, ROOMS, drawX, BUILDING } from './facility.js';
 import { clamp, mulberry32 } from '../util.js';
 
 export const DIFFS = {
@@ -394,10 +394,10 @@ export class Sentinel {
     if (keep()) this.spawnGuard({ post: { x: 35, z: -31, face: -Math.PI / 2, sweep: 0.8 } });
     // Upstairs.
     const U = Sentinel.upper();
-    this.spawnGuard({ route: U.corridor, y: 3.8 });
-    this.spawnGuard({ route: U.offices, y: 3.8 });
-    this.spawnGuard({ post: { x: 11, z: -30, y: 3.8, face: Math.PI / 2, sweep: 0.8 } });
-    if (keep()) this.spawnGuard({ post: { x: 0, z: -9, y: 3.8, face: Math.PI, sweep: 1 } });
+    this.spawnGuard({ route: U.corridor, y: BUILDING.f1 });
+    this.spawnGuard({ route: U.offices, y: BUILDING.f1 });
+    this.spawnGuard({ post: { x: 11, z: -30, y: BUILDING.f1, face: Math.PI / 2, sweep: 0.8 } });
+    if (keep()) this.spawnGuard({ post: { x: 0, z: -9, y: BUILDING.f1, face: Math.PI, sweep: 1 } });
     this._securityPosts(false);
     this._spread(28);
     this._drones();
@@ -446,15 +446,15 @@ export class Sentinel {
     this.spawnGuard({ type: 'titan', post: { x: -2, z: 14, face: Math.PI, sweep: 0.6 } });
     // Upstairs: a titan walks the corridor; offices, break room, comms and the rack rooms are manned.
     const U = Sentinel.upper();
-    this.spawnGuard({ type: 'titan', route: U.corridor, y: 3.8 });
-    this.spawnGuard({ type: 'scav', route: U.offices, y: 3.8 });
-    this.spawnGuard({ type: 'scav', post: { x: 0, z: -9, y: 3.8, face: Math.PI, sweep: 1 } });
-    if (keep()) this.spawnGuard({ type: 'scav', post: { x: 3, z: -12, y: 3.8, face: -Math.PI / 2, sweep: 1 } });
-    this.spawnGuard({ type: 'bulwark', post: { x: 15, z: -9, y: 3.8, face: 0, sweep: 0.9 } });
-    if (keep()) this.spawnGuard({ type: 'scav', post: { x: 33, z: -6, y: 3.8, face: Math.PI / 2, sweep: 1 } });
-    this.spawnGuard({ type: 'jugg', route: U.dhb, y: 3.8 });
-    this.spawnGuard({ type: 'bulwark', post: { x: 11, z: -30, y: 3.8, face: Math.PI / 2, sweep: 0.8 } });
-    this.spawnGuard({ type: 'titan', post: { x: 24, z: -31, y: 3.8, face: 0, sweep: 0.9 } });
+    this.spawnGuard({ type: 'titan', route: U.corridor, y: BUILDING.f1 });
+    this.spawnGuard({ type: 'scav', route: U.offices, y: BUILDING.f1 });
+    this.spawnGuard({ type: 'scav', post: { x: 0, z: -9, y: BUILDING.f1, face: Math.PI, sweep: 1 } });
+    if (keep()) this.spawnGuard({ type: 'scav', post: { x: 3, z: -12, y: BUILDING.f1, face: -Math.PI / 2, sweep: 1 } });
+    this.spawnGuard({ type: 'bulwark', post: { x: 15, z: -9, y: BUILDING.f1, face: 0, sweep: 0.9 } });
+    if (keep()) this.spawnGuard({ type: 'scav', post: { x: 33, z: -6, y: BUILDING.f1, face: Math.PI / 2, sweep: 1 } });
+    this.spawnGuard({ type: 'jugg', route: U.dhb, y: BUILDING.f1 });
+    this.spawnGuard({ type: 'bulwark', post: { x: 11, z: -30, y: BUILDING.f1, face: Math.PI / 2, sweep: 0.8 } });
+    this.spawnGuard({ type: 'titan', post: { x: 24, z: -31, y: BUILDING.f1, face: 0, sweep: 0.9 } });
     this._securityPosts(true);
     this._spread(34);
     this._drones();
@@ -489,7 +489,7 @@ export class Sentinel {
   _securityPosts(nw) {
     const R = this.rng, keep = (p) => R() < this.D.count || p;
     const T = (a, b) => (nw ? a : 'guard') || b;
-    const up = 3.8;
+    const up = BUILDING.f1;
     // Door sentries (outside, facing out).
     this.spawnGuard({ type: T('bulwark'), post: { x: -3.6, z: 2.6, face: Math.PI, sweep: 0.7 } }); // front
     if (keep()) this.spawnGuard({ type: T('scav'), post: { x: 3.6, z: 2.8, face: Math.PI + 0.3, sweep: 0.7 } });
@@ -498,6 +498,10 @@ export class Sentinel {
     if (keep()) this.spawnGuard({ type: T('scav'), post: { x: -38.6, z: -6.8, face: Math.PI / 2, sweep: 0.8 } }); // maintenance
     // CCTV operator watching the monitor wall (security office, ground floor).
     this.spawnGuard({ type: T('scav'), post: { x: 15, z: -11.2, face: 0, sweep: 0.35 } });
+    // The lobby checkpoint: an officer at the desk beside the metal detector, watching the doors,
+    // and one by the elevator.
+    this.spawnGuard({ type: T('scav'), post: { x: 3.5, z: -5.7, face: Math.PI - 0.2, sweep: 0.6 } }).vital = true;
+    this.spawnGuard({ type: T('scav'), post: { x: -5.6, z: -12.4, face: Math.PI * 0.85, sweep: 0.7 } }).vital = true;
     // On break, by the coffee machine upstairs.
     this.spawnGuard({ type: T('scav'), post: { x: 3.6, z: -15.2, y: up, face: 0.4, sweep: 0.5 } });
     // Corridor sentries outside the rack-room doors.
@@ -521,14 +525,14 @@ export class Sentinel {
     const near = (a, b, r) => Math.abs((a.y || 0) - (b.y || 0)) < 2 && Math.hypot(a.x - b.x, a.z - b.z) < r;
     const drop = (g) => { this.scene.remove(g.obj); g.dropped = true; };
     for (const g of this.guards) {
-      const vital = g.chief || g.tower;
+      const vital = g.chief || g.tower || g.vital;
       const follower = g.leader && keep.some((k) => k.id === g.leader);
       if (!vital && !follower && keep.some((k) => near(k, g, 9))) { drop(g); continue; }
       if (follower && keep.some((k) => k.id !== g.leader && !(k.leader === g.leader) && near(k, g, 3))) { drop(g); continue; }
       keep.push(g);
     }
     // Over the cap: thin out the least important (not chief / towers / pack leaders) at random.
-    const spare = () => keep.filter((g) => !g.chief && !g.tower && !keep.some((k) => k.leader === g.id));
+    const spare = () => keep.filter((g) => !g.chief && !g.tower && !g.vital && !keep.some((k) => k.leader === g.id));
     while (keep.length > cap) {
       const pool = spare();
       if (!pool.length) break;
@@ -541,7 +545,7 @@ export class Sentinel {
   }
 
   static upper() {
-    const P = (pts) => pts.map(([x, z]) => ({ x, z, y: 3.8 }));
+    const P = (pts) => pts.map(([x, z]) => ({ x, z, y: BUILDING.f1 }));
     return {
       corridor: P([[-33, -20], [34, -20]]),
       offices: P([[-30, -9], [-20, -9], [-24, -13]]),
@@ -571,7 +575,8 @@ export class Sentinel {
       [11.5, 3, -39.5, Math.PI + 0.6, 3, 18], [35.5, 3, -22.5, -Math.PI * 0.75, 3, 22],
     ];
     // Upstairs.
-    cams.push([-35.5, 6.8, -21.5, -Math.PI / 2, 2, 30], [7.5, 6.6, -0.6, Math.PI / 2 + 0.6, 2, 18], [-6.5, 6.6, -39.5, Math.PI * 1.2, 3, 22], [35.5, 6.6, -22.5, -Math.PI * 0.75, 3, 22]);
+    const F = BUILDING.f1;
+    cams.push([-35.5, F + 3.0, -21.5, -Math.PI / 2, 2, 30], [7.5, F + 2.8, -0.6, Math.PI / 2 + 0.6, 2, 18], [-6.5, F + 2.8, -39.5, Math.PI * 1.2, 3, 22], [35.5, F + 2.8, -22.5, -Math.PI * 0.75, 3, 22]);
     for (const [x, y, z, yaw, tier, range] of cams) this.spawnCam({ x, y, z, yaw, tier, range });
   }
 
@@ -876,7 +881,7 @@ export class Sentinel {
   // After the operators call it (quiet or loud), the ring starts piling into the building:
   // squads pulled off the cordon clear it room by room, ground floor first, then upstairs.
   sweepStart(plan) {
-    const order = ['lobby', 'security', 'staging', 'electrical', 'corridor', 'dha', 'noc', 'vault', 'corridor2', 'offices', 'break', 'comms', 'storage', 'dhb', 'srv', 'arch'];
+    const order = ['lobby', 'security', 'staging', 'electrical', 'corridor', 'mail', 'guard', 'plant', 'corridor2', 'offices', 'break', 'comms', 'storage', 'dhb', 'srv', 'arch'];
     this.sweep = { plan, t: 0, next: plan === 'loud' ? 4 : 8, squads: 0, rooms: order.map((id) => ROOMS.find((r) => r.id === id)).filter(Boolean) };
     // The cordon holds while they clear.
     for (const g of this.guards) if (g.icePost && g.state === 'search') g.searchT = 600;

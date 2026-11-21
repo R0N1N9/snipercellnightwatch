@@ -33,7 +33,7 @@ export class Tablet {
       <div class="ct-bezel">
         <div class="ct-top"><b>CYBER OPS // CS-7</b><span class="ct-link"></span><button class="ct-isr" title="ISR drone view (I)">ISR ▸</button><span class="ct-clock"></span><button class="ct-x" title="Close (TAB)">✕</button></div>
         <div class="ct-body">
-          <div class="ct-mapwrap"><canvas class="ct-map"></canvas><div class="ct-mapbtns"><button data-z="1">＋</button><button data-z="-1">－</button><button data-z="0">◎</button><button data-f="0" class="ct-fl">GROUND</button><button data-f="1" class="ct-fl">UPPER</button></div><div class="ct-hint"></div></div>
+          <div class="ct-mapwrap"><canvas class="ct-map"></canvas><div class="ct-mapbtns"><button data-z="1">＋</button><button data-z="-1">－</button><button data-z="0">◎</button><button data-f="0" class="ct-fl">LOBBY</button><button data-f="1" class="ct-fl">DATA FLOOR</button></div><div class="ct-hint"></div></div>
           <div class="ct-side">
             <div class="ct-sec ct-obj"></div>
             <div class="ct-sec ct-reqs"></div>

@@ -6,7 +6,7 @@
 
 A 1v1 long-range sniper duel that runs in the browser on desktop, phones and tablets. (Formerly *Draxxed Sklounst*; the old name still turns up as an easter egg.) No install, no server: one player hosts, the other opens the invite link, and the two connect peer-to-peer over WebRTC.
 
-It also has **[NightWatch](#nightwatch-co-op)**, a co-op (or solo) night stealth mode: a shooter and a spotter infiltrate a guarded two-storey data center, steal intel from a hidden server and get out in a van.
+It also has **[NightWatch](#nightwatch-co-op)**, a co-op (or solo) night stealth mode: a shooter and a spotter infiltrate a guarded data-center tower, steal intel from a hidden server and get out in a van.
 
 ![The practice range: looking out over the valley from the ridge with the Mk22 MRAD](docs/screenshots/practice-range.png)
 
@@ -207,7 +207,20 @@ The data center has **two storeys** with two stairwells. Guards, cameras and pat
 
 **Inside the building:** patrols on both floors.
 
-**Drop point:** the NightWatch menu shows a briefing map of Kestrel Ridge. Pick where the van drops you, on the map or with the buttons under it: **Tree line** (the default, described below) or **Ridge** (straight onto the plateau above the cliff, no approach). When you host, your pick applies to both of you.
+**Drop point:** the NightWatch menu shows a briefing map of Kestrel Ridge. Pick where you go in, on the map or with the buttons under it. When you host, your pick applies to both of you.
+
+- **Tree line** (the default, described below): the van drops you in the woods south of the ridge.
+- **Ridge**: the van takes you straight onto the plateau above the cliff, with no approach.
+- **West knoll** / **East knoll**: a HALO jump. The intro shows a transport droning in with the ramp down, the jump light going green, freefall (with a point-of-view shot and an altimeter), canopies opening, a point-of-view shot under canopy, and the landing on the knoll. You hear the engines, the wind in freefall, the canopy snap and flutter, and the landing.
+
+**Layout:** **Standard layout** is the map as built. **Random layout** scatters the yard's cover (containers, trucks, HVAC, generators, sandbags, crates), the light poles and the west fence cut from the game's seed, so both players get the same compound. Roads, doors, guard routes, the towers, the barracks and the drone bay stay clear.
+
+**The building** is a tower. The lobby floor is at ground level and the data floor is about 24 m up, with empty storeys of dark office glass between them.
+
+- **Getting up:** take the **elevator** (stand in the car and press E, or press E at a landing to call it) or climb the **stair tower** (eight switchback flights).
+- **Lobby:** a **security checkpoint** sits just inside the front doors. Walking through the metal detector sets it off: a buzzer, a noise the guards come to, and a jump in SENTINEL's alert. Step round the ends of the rope barriers instead. Hacking the CCTV desk switches it off. An officer works the checkpoint desk and another watches the elevator.
+- **Ground floor:** security / CCTV, electrical (relay), the mailroom, the guard room and the plant room.
+- **Data floor:** the three rack rooms (keycard doors), offices, the break room, comms and storage. The archive server is always up there.
 
 **The approach:** the van drops you in a wooded draw south of the ridge. Walk north up the draw, using the tree line as cover (tree crowns block sight), over the crest and out to the cliff that overlooks the compound. Four or five **pickets** hold the draw: a sentry at a sandbagged observation post, two walkers on the valley floor, a lookout below the crest and sometimes one on the tree line. Each one that spots you radios it in, so take them quietly. The objective board counts the ones left until you're over the crest. An AI partner walks the draw with you (crouching when you do) and moves to its post once you crest the hill.
 
@@ -261,13 +274,18 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 **Shooter** (default callsign **Ra**):
 
 - KR-50 Nightjar: bolt-action, integrally suppressed, with Halo-style hitscan and a night-vision scope.
-- Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi) or the **M50 Magnum** (7 rounds and a heavy hit, like Halo's magnum). Its suppressor is fitted by default and removable: your support hand comes up to the muzzle and twists the can off and pockets it (or threads it back on). You can't fire mid-gesture.
+  - Dead-on through the scope, wide from the hip (the crosshair opens to show it), with a real kick.
+  - **Standard bolt** (default): tap fire and you come off the glass to work the bolt; keep fire held to stay scoped. The **straight-pull bolt** (Staging area) cycles while you stay on target.
+  - **Z: explosive rounds.** Swap in a marked magazine (a full reload animation). Each round sticks where it hits, blinks for a second and blows: it kills a juggernaut or titan it's stuck to and catches anything within about 5 m. It's loud. Z again swaps back to standard, and supply crates restock a magazine.
+- Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi) or the **M50 Magnum** (7 rounds, slow and heavy: a deep boom, a big kick and a wide hip spread, so aim down sights or get close). Its suppressor is fitted by default and removable: your support hand comes up to the muzzle and twists the can off and pockets it (or threads it back on). You can't fire mid-gesture.
 - **Stealth kit:**
   - **G** active camo. **Firing breaks it.**
   - **H** Deadeye.
   - **X** lures.
   - **T** Mark & Execute.
   - **E** knife takedown.
+- **Requests at the crosshair:** keys **3–8** request supply, scan, EMP, decoy, lights or the quad on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
+- **Pings:** V (or PING) on open ground drops a plain PING marker. F (or TAG) on open ground calls "look here".
   - The shooter can't unlock doors, only walk through ones that are already open.
 
 **Spotter** (default callsign **Rōnin**):
