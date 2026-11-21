@@ -151,9 +151,12 @@ export const Kit2 = {
     const o = P.eyePos(new THREE.Vector3());
     const live = !this.downed && !this.kia && !this.isr.active && !(this.quad && this.quad.active);
     if (live) {
-      // From the weapon's muzzle, straight out along the barrel (parallel to your aim).
-      const dir = P.aimDir(new THREE.Vector3());
+      // From the weapon's muzzle, straight out along the barrel: wherever the gun points (down
+      // and across while you run), or along your aim through the scope.
       const vm = this.viewmodel;
+      let dir = P.aimDir(new THREE.Vector3());
+      const gm = vm.root.visible && vm.current && vm.models[vm.current];
+      if (gm) { gm.updateWorldMatrix(true, false); dir = new THREE.Vector3(0, 0, -1).applyQuaternion(gm.getWorldQuaternion(new THREE.Quaternion())).normalize(); }
       const from = vm.root.visible && vm.current ? vm.muzzleWorld(new THREE.Vector3()) : o.clone().add(new THREE.Vector3(0, -0.07, -0.45).applyEuler(this.camera.rotation));
       const end = from.clone().addScaledVector(dir, 220);
       const h = this.fac.ray(from, end, 'shot');

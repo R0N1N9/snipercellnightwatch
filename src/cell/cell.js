@@ -532,6 +532,7 @@ export class CellGame {
     this.bleed = BLEED;
     this.cloak = { on: false, bat: 100, flick: 0, regenT: 0 };
     this.nv = false;
+    this.scopeNV = true;
     this.viewmodel = new ViewModel(this.camera);
     // The P-9 replaces the valley's sidearm model (same key, so everything else follows it).
     this.viewmodel.holder.remove(this.viewmodel.models.m18);
@@ -1102,7 +1103,12 @@ export class CellGame {
       else this._raise('tablet', () => this.tablet.open());
     }
     if ((I.pressed('KeyL') || I.pressed('cell-light')) && !tab) this._wlToggle();
-    if (I.pressed('KeyN') || I.pressed('cell-nv')) this._nvgToggle();
+    // N: on the KR-50's scope it flips the optic between night vision and plain glass;
+    // otherwise it's the goggles.
+    if (I.pressed('KeyN') || I.pressed('cell-nv')) {
+      if (P.def.scope && P.scopeT > 0.6) { this.scopeNV = !this.scopeNV; this.audio.click(); this.hud.flash(this.scopeNV ? 'SCOPE: NIGHT VISION' : 'SCOPE: PLAIN', 'dim', 0.7); }
+      else this._nvgToggle();
+    }
     // Objective board: O shows / hides it, P expands / compacts it (P is the sweep in the ISR view).
     if (I.pressed('KeyO')) this.hud.objToggle();
     if (I.pressed('KeyP') && !this.isr.active) this.hud.objExpand();
@@ -2563,7 +2569,7 @@ export class CellGame {
     const av = Q.avatar;
     av.setVisible(Q.seen && !Q.avatarHidden && !Q.kia);
     if (!Q.seen) return;
-    av.update(dt, { p: Q.pos, yaw: Q.yaw, pitch: Q.pitch || 0, st: Q.downed ? 2 : Q.st, moving: Q.moving, w: Q.w });
+    av.update(dt, { p: Q.pos, yaw: Q.yaw, pitch: Q.pitch || 0, st: Q.downed ? 2 : Q.st, moving: Q.moving, w: Q.w, sprint: !!Q.sprinting && Q.moving });
     // Cloaked shooter: shimmer instead of the kit.
     const ck = Q.cloak;
     if (ck !== Q._ck) {
@@ -2737,7 +2743,7 @@ export class CellGame {
     const P = this.player;
     const quad = this.quad && this.quad.active;
     const isr = this.isr.active;
-    const scopeNV = !isr && P.def.scope && P.scopeT > 0.6;
+    const scopeNV = !isr && P.def.scope && P.scopeT > 0.6 && this.scopeNV !== false;
     const nv = isr || quad || scopeNV || this.nv;
     u.uNV.value += ((nv ? 1 : 0) - u.uNV.value) * Math.min(1, dt * 10);
     u.uMode.value = isr ? (this.isr.mode === 'IR' ? 3 : 2) : quad ? 2 : scopeNV ? 1 : 0;
@@ -3060,7 +3066,7 @@ class CellHud {
     this.el.amR.textContent = '/ ' + w.reserve;
     this.el.amW.textContent = P.def.name + (P.def.slot === 'rifle' ? ' · SUPPRESSED' : '');
     const sec = P.def.slot === 'pistol';
-    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 NIGHT VISION${w.ammo && w.ammo !== 'std' ? ' \u00B7 ' + AMMO_NAME[w.ammo] : ''}` : w.ammo && w.ammo !== 'std' ? `${AMMO_NAME[w.ammo]} ROUNDS (Z: rounds menu)` : '';
+    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 ${this.g.scopeNV === false ? 'PLAIN' : 'NIGHT VISION'}${w.ammo && w.ammo !== 'std' ? ' \u00B7 ' + AMMO_NAME[w.ammo] : ''}` : w.ammo && w.ammo !== 'std' ? `${AMMO_NAME[w.ammo]} ROUNDS (Z: rounds menu)` : '';
     this.el.amS.classList.toggle('loud', sec && !w.sup);
     // Prompt.
     let pr = g.prompts[g.role];
@@ -3296,7 +3302,7 @@ class CellHud {
     c.fillText(this._range ? `${this._range.toFixed(1)} m` : '--- m', W / 2 + R * 0.18, H / 2 - R * 0.06);
     c.textAlign = 'center';
     if (this._onTarget) { c.strokeStyle = 'rgba(255,60,80,0.95)'; c.beginPath(); c.arc(W / 2, H / 2, R * 0.12, 0, Math.PI * 2); c.stroke(); }
-    c.fillText('NIGHT VISION', W / 2, H / 2 + R * 0.86);
+    c.fillText(g.scopeNV === false ? 'PLAIN \u00B7 N: NIGHT VISION' : 'NIGHT VISION \u00B7 N: PLAIN', W / 2, H / 2 + R * 0.86);
     // Wind: speed and direction across your shot, and a hold-off dot for this range.
     if (P.def.slot === 'rifle') {
       const cw = g._crosswind(P.yaw), drift = g._windDrift(P.yaw, this._range || 300);

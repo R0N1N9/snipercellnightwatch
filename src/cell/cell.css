@@ -9,7 +9,7 @@
 .cell-btn em { font-style: normal; color: #ffffff; font-size: 0.8em; margin-left: 6px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
 /* Main-menu button: the mode's name, with a small caption underneath. */
 #btn-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-#btn-cell em { margin-left: 0; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(0, 255, 224, 0.75); }
+#btn-cell em { margin-left: 0; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #ffffff; text-shadow: none; }
 #panel-cell .cell-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 8px; }
 #panel-cell .cell-role { text-transform: none; letter-spacing: normal; font-weight: 500; line-height: 1.2; text-align: left; padding: 10px; border: 1px solid var(--line); background: rgba(8, 9, 15, 0.55); color: var(--ink); cursor: pointer; border-radius: 3px; min-height: 96px; }
 #panel-cell .cell-role b { display: block; font-size: 17px; letter-spacing: 0.1em; }
