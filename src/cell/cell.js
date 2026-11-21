@@ -850,6 +850,12 @@ export class CellGame {
       // ISR ping sweep: a circle on the ground; everything inside, flesh or machine, gets marked.
       case 'qmark': this._neuroMark(target.ids || [], !!target.auto); break;
       case 'pdrone': { const d = S.byId(target.id); if (d && d.state !== 'dead') { d.empT = 8; this._toast('Drone shorted out for 8 s.', 'cyan'); } break; }
+      case 'pcrash': {
+        // Hacked out of the sky: rotors cut, it drops (a spotlight heli's wreck makes a crash).
+        const d = S.byId(target.id);
+        if (d && d.state !== 'dead') { d.state = 'dead'; d.hp = 0; d.fallV = 0; d.lock = null; S.emit({ t: 'kill', id: d.id, how: 'hack', drone: true }); this._toast(d.heli ? 'Spotlight drone hacked: it\u2019s coming down.' : 'Drone hacked out of the sky.', 'cyan'); }
+        break;
+      }
       case 'blind': { const e = S.byId(target.id); if (e && e.state !== 'dead') { e.blindT = 6; e.aw = 0; if (e.state === 'alert' || e.state === 'berserk') { e.state = 'search'; e.searchT = 6; e.target = null; } this._toast('Optics rebooted: he\u2019s blind for 6 s.', 'cyan'); } break; }
       case 'plight': this.fac.lightsOff((L) => L.id === target.id, 20); this._toast('Light cut for 20 s.', 'dim'); break;
       case 'isrsweep': {
@@ -1115,7 +1121,7 @@ export class CellGame {
         this._tabT = 0;
         if (I.pressed('cell-tab')) cycle();
       }
-      if (I.pressed('cell-hack')) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
+      if (I.pressed('cell-hack') || (I.pressed('KeyH') && !this.operative)) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
     } else if (I.pressed('Tab') || I.pressed('cell-tab')) {
       // Shooter: TAB raises the map tablet; in the ISR view it flips back to the tablet.
       if (this.isr.active) { this.isr.exit(); this.tablet.open(); }
@@ -2893,7 +2899,7 @@ class CellHud {
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
     const shooterKeys = [K('Esc', 'pause'), K('4–9', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('0', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('1/2/3', 'rifle/sidearm/knife'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
+    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('H', 'hack phone'), K('TAB', 'tablet · ISR (hold: hack)'), K('Q', 'recon drone'), K('Q', 'ping / mark (hold: wheel)'), K('F', 'sync'), K('E', 'use'), K('V', 'knife'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('`', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
@@ -2973,7 +2979,7 @@ class CellHud {
       ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
         ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
-        : [['cell-ability', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']];
+        : [['cell-ability', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
     ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
