@@ -15,7 +15,7 @@ import { Wheel } from './wheel.js';
 const RANGE = 45;
 const OPTS = {
   cam: [{ k: 'cam', name: 'LOOP CAMERA', bw: 6 }],
-  drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }],
+  drone: [{ k: 'pdrone', name: 'SHORT CIRCUIT', bw: 8 }, { k: 'pcrash', name: 'CRASH IT', bw: 18 }],
   iot: [{ k: 'iot', name: 'DISTRACT', bw: 6 }],
   door: [{ k: 'door', name: 'OPEN DOOR', bw: 6 }],
   light: [{ k: 'plight', name: 'CUT LIGHT', bw: 4 }],
@@ -142,7 +142,7 @@ export const Phone = {
     let best = null, bs = lim;
     const consider = (kind, id, x, y, z, name) => {
       const v = new THREE.Vector3(x, y, z).sub(o), d = v.length();
-      if (d > RANGE) return;
+      if (d > (kind === 'drone' ? RANGE * 1.6 : RANGE)) return;
       const n = v.clone().normalize();
       const a = n.angleTo(dir);
       if (a > half) return;
@@ -153,7 +153,8 @@ export const Phone = {
       if (a < bs) { bs = a; best = e; }
     };
     for (const c of S.cams) if (!c.hacked) consider('cam', c.id, c.x, c.y, c.z, 'CAMERA');
-    for (const d of S.drones) if (d.state !== 'dead' && !(d.empT > 0)) consider('drone', d.id, d.x, d.y, d.z, 'PATROL DRONE');
+    // Drones (patrol and spotlight) can be hacked out of the sky; the big spotlight helis from a little further.
+    for (const d of S.drones) if (d.state !== 'dead') consider('drone', d.id, d.x, d.y, d.z, d.heli ? 'SPOTLIGHT DRONE' : 'PATROL DRONE');
     for (const D of F.devices) consider('iot', D.id, D.x, D.y, D.z, D.kind.toUpperCase());
     for (const d of Object.values(F.doors)) if ((d.kind === 'elec' || d.kind === 'dock') && !d.open && !d.sealed && !d.unlocked) consider('door', d.id, d.x, (d.y || 0) + 1.2, d.z, 'E-LOCK DOOR');
     for (const L of F.lightSources || []) if (!L.broken && !(L.offT > 0)) consider('light', L.id, L.x, L.y, L.z, L.kind === 'panel' ? 'CEILING PANEL' : 'LAMP');
@@ -244,7 +245,7 @@ export const Phone = {
     });
     const cmdItems = cols(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), 1);
     const TOG = spot
-      ? [['cell-tab', 'TABLET', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])]
+      ? [['cell-hack', 'HACK', '📱'], ['cell-tab', 'TABLET', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])]
       : [['cell-xr', 'ROUNDS', '⁂'], ['cell-breath', 'BREATH', '≋'], ['cell-tab', 'MAP', '▤'], ['cell-light', 'LIGHT', '☀'], ['cell-laser', 'LASER', '⟋'], ['cell-nv', 'NV', '◐'], ['cell-sup', 'SUPP', '▮'], ['cell-knife', 'STAB', '✕'], ['cell-chat', 'CHAT', '✉'], ...(this.net ? [['cell-mic', 'MIC', '🎙']] : [])];
     const togItems = cols(TOG.map(([a, l, ic]) => ({ k: 't:' + a, label: l, group: 'tog', icon: ic })), -1);
     const PINGS = [['look', 'LOOK', '◎'], ['enemy', 'ENEMY', '◆'], ['move', 'MOVE', '➤'], ['hold', 'HOLD', '✋'], ['regroup', 'ON ME', '⬤'], ['cover', 'COVER', '⛨'], ['sync', 'SYNC', '⦿'], ['perch', 'SNIPER POS', '⌖']];
@@ -427,7 +428,7 @@ export const Phone = {
     c.textAlign = 'center';
     c.font = '600 12px JetBrains Mono, monospace';
     c.fillStyle = 'rgba(200,240,235,0.85)';
-    c.fillText(this.input.touch ? 'TAP AN OPTION  \u00B7  HACK \u2014 PUT AWAY' : 'CLICK / E \u2014 RUN  \u00B7  WHEEL / NUMBER \u2014 CHOOSE  \u00B7  RELEASE TAB \u2014 PUT AWAY', W / 2, H - 140);
+    c.fillText(this.input.touch ? 'TAP AN OPTION  \u00B7  HACK \u2014 PUT AWAY' : 'CLICK / E \u2014 RUN  \u00B7  WHEEL / NUMBER \u2014 CHOOSE  \u00B7  H or release TAB \u2014 PUT AWAY', W / 2, H - 140);
     c.restore();
   },
 };
