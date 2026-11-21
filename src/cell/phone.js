@@ -280,13 +280,42 @@ export const Phone = {
       const was = hold.open;
       hold = null;
       if (!was) return false;
-      const k = W.close();
-      if (k && k.startsWith('t:')) { this.input.pressedSet.add(k.slice(2)); return true; } // a toggle: as if its button was tapped
-      if (k && k.startsWith('p:')) { if (this._cmdWheelOk()) this._wheelPick(k.slice(2), this._cwAt || this._aimPoint(), this._cwEnemy); return true; }
-      const o = k && list.find((c) => c.k === k);
-      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.req || o.k, o.me ? this._myPoint() : this._aimPoint()); }
+      run(W.close());
       return true;
     };
+    // What a wheel choice does (from the hold-and-drag or the MENU button).
+    const run = (k) => {
+      if (!k) return;
+      if (k.startsWith('t:')) { this.input.pressedSet.add(k.slice(2)); return; } // a toggle: as if its button was tapped
+      if (k.startsWith('p:')) { if (this._cmdWheelOk()) this._wheelPick(k.slice(2), this._cwAt || this._aimPoint(), this._cwEnemy); return; }
+      const o = list.find((c) => c.k === k);
+      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.req || o.k, o.me ? this._myPoint() : this._aimPoint()); }
+    };
+    // MENU button: opens the same wheel mid-screen; tap an option to run it, tap outside to close.
+    this._cwMenuOpen = () => {
+      if (W.open) { W.cancel(); this._cwMenu = false; return; }
+      if (!this._cmdWheelOk()) return;
+      const e = this._crosshairEnemy && this._crosshairEnemy();
+      this._cwAt = this._aimPoint();
+      this._cwEnemy = e ? e.id : null;
+      const L = this._wheelLabels ? this._wheelLabels() : {};
+      W.show(innerWidth / 2, innerHeight / 2, 'TAP AN OPTION \u00B7 TAP OUTSIDE TO CLOSE', L.enemy ? { 'p:enemy': L.enemy } : {});
+      this._cwMenu = true;
+      this.sfx && this.sfx.ui(true);
+    };
+    const menuTap = (e) => {
+      if (!this._cwMenu || !W.open) return;
+      const pt = e.changedTouches ? e.changedTouches[0] : e;
+      if (!pt) return;
+      if (e.target.closest && e.target.closest('[data-act="cell-menu"]')) return; // the MENU button toggles it itself
+      e.preventDefault(); e.stopPropagation();
+      const hit = W.items.findIndex((it) => { const r = it.getBoundingClientRect(); return pt.clientX >= r.left && pt.clientX <= r.right && pt.clientY >= r.top && pt.clientY <= r.bottom; });
+      W.cancel();
+      this._cwMenu = false;
+      if (hit >= 0) run(W.list[hit].k);
+    };
+    addEventListener('touchstart', menuTap, { capture: true, passive: false });
+    addEventListener('mousedown', menuTap, { capture: true });
   },
   // A couple of metres in front of you (where you're facing), for a drop "on me".
   _myPoint() {
