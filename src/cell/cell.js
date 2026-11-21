@@ -1330,6 +1330,7 @@ export class CellGame {
       reloadT: DE ? 0 : P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: DE ? DE.switchT : P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
       empty: !DE && P.w.chamber === 0 && P.def.kind === 'semi', boltPending: false,
       supU: SA ? supU : 0, supTo: SA ? SA.to : false, supCan: SA ? canOf(SA.w) : null,
+      leftOff: this.qh ? Math.min(1, (this.qh.vis || 0) * 1.6) : 0,
     });
     this._cloakViewmodel(C.on);
     this.input.isScoped = P.scoped;

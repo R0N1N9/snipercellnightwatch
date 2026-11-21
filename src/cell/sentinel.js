@@ -216,6 +216,9 @@ export function buildUnit(type = 'guard', chief = false) {
   root.add(body);
   const mk = (geo, col, x, y, z, parent = body, opts) => { const m = new THREE.Mesh(geo, lam(col, opts)); m.position.set(x, y, z); parent.add(m); return m; };
   const glow = (geo, col, x, y, z, parent = body, k = 1.8) => mk(geo, col, x, y, z, parent, { emissive: col, emissiveIntensity: k });
+  // Rounded parts: a scaled sphere (or a dome when `dome`), and a capsule between two heights.
+  const ball = (r, sx, sy, sz, col, x, y, z, parent = body, dome = false) => { const m = mk(dome ? new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2) : new THREE.SphereGeometry(r, 14, 10), col, x, y, z, parent); m.scale.set(sx, sy, sz); return m; };
+  const cap = (r, len, col, x, y, z, rx = 0, rz = 0, parent = body) => { const m = mk(new THREE.CapsuleGeometry(r, len, 5, 10), col, x, y, z, parent); m.rotation.set(rx, 0, rz); return m; };
   const gun = new THREE.Group();
   body.add(gun);
   let legs, shell = null, wall = null, blade = null, helmet = null;
@@ -258,6 +261,15 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.BoxGeometry(0.14, 0.12, 0.1), kitC, -0.12, 0.88, 0.17);
     for (const L of legs) { mk(new THREE.BoxGeometry(0.17, 0.03, 0.3), '#0b0c0d', 0, -0.94, -0.04, L); mk(new THREE.BoxGeometry(0.16, 0.05, 0.06), '#202226', 0, -0.88, -0.17, L); }
     glow(new THREE.BoxGeometry(0.05, 0.03, 0.005), chief ? '#c070ff' : '#ff4050', -0.28, 1.47, -0.08, body, 0.9);
+    // Rounded against the angular kit: domed shoulder pads, capsule forearms, knee domes, a
+    // rounded pack top and a chin strap.
+    for (const sd of [-1, 1]) {
+      const d = ball(0.11, 1.1, 0.8, 1.2, kitC, sd * 0.27, 1.47, 0.0, body, true); d.rotation.z = -sd * 0.4;
+      cap(0.045, 0.2, C.suit, sd * 0.2, 1.24, -0.3, 1.45, 0);
+    }
+    for (const L of legs) ball(0.07, 1.1, 0.9, 0.6, padC, 0, -0.47, -0.12, L);
+    mk(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 14, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), kitC, 0, 1.44, 0.19);
+    mk(new THREE.TorusGeometry(0.11, 0.008, 6, 14, Math.PI), '#111214', 0, 1.58, -0.02).rotation.set(0, 0, Math.PI);
   } else if (type === 'scav') {
     // Hunched little conscript: coolant pack on its back, slit visor, twitchy.
     const C = { suit: '#2b2a2f', boot: '#121214' };
@@ -271,7 +283,6 @@ export function buildUnit(type = 'guard', chief = false) {
     glow(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 10), neon, 0, 1.46, 0.47, body, 1.6);
     glow(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), neon, 0.18, 1.55, 0.2, body, 1.2).rotation.x = 1.0;
     // Head: rebreather mask with a wide slit visor.
-    mk(new THREE.BoxGeometry(0.3, 0.26, 0.3), '#2a2826', 0, 1.5, -0.12);
     glow(new THREE.BoxGeometry(0.26, 0.05, 0.02), '#ffe040', 0, 1.53, -0.28);
     mk(new THREE.CylinderGeometry(0.06, 0.08, 0.12, 8).rotateX(Math.PI / 2), '#1a1918', 0, 1.42, -0.3);
     gun.position.set(0.18, 1.12, -0.32);
@@ -283,6 +294,13 @@ export function buildUnit(type = 'guard', chief = false) {
     belt(mk, '#1d1c1a', 0.94, 0.46);
     kneePads(legs, mk, '#1d1c1a');
     for (const y of [1.28, 1.46, 1.64]) mk(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10), '#1d1c1a', 0, y, 0.47);
+    // Rounded: a capsule methane tank with domed caps, a rounded mask with a rebreather snout, and
+    // rounded shoulders over the boxy harness.
+    cap(0.13, 0.36, '#4a4238', 0, 1.46, 0.36);
+    for (const y of [1.18, 1.74]) mk(new THREE.TorusGeometry(0.13, 0.015, 6, 16).rotateX(Math.PI / 2), '#1d1c1a', 0, y, 0.36);
+    ball(0.17, 1.0, 0.85, 0.95, '#2e2b28', 0, 1.5, -0.14);
+    ball(0.07, 1.0, 1.0, 1.3, '#1a1918', 0, 1.41, -0.3);
+    for (const sd of [-1, 1]) ball(0.12, 1.1, 0.8, 1.1, '#4a3f30', sd * 0.3, 1.38, 0.0, body, true);
     for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.3, 0.015, 0.01), '#1a1918', 0, 1.3 + i * 0.06, 0.155);
   } else if (type === 'jugg' || type === 'overseer') {
     // Brute (Halo-style): hunched and broad, a barrel chest under layered curved plates, stacked
@@ -342,7 +360,20 @@ export function buildUnit(type = 'guard', chief = false) {
       mk(new THREE.CylinderGeometry(0.1, 0.085, 0.3, 12), A1, 0, -0.68, -0.02, L);
     }
     belt(mk, '#1a1618', 0.86, 0.62);
-    blade = glow(new THREE.BoxGeometry(0.03, 0.08, 0.95), '#ff3aa0', 0.36, 1.1, -0.72, body, 3);
+    // Energy sword: a dark hilt with two curved plasma prongs and a soft halo.
+    blade = new THREE.Group();
+    blade.position.set(0.4, 1.1, -0.4);
+    mk(new THREE.CylinderGeometry(0.03, 0.035, 0.22, 10).rotateX(Math.PI / 2), '#1a1c22', 0, 0, 0.1, blade);
+    mk(new THREE.BoxGeometry(0.16, 0.05, 0.06), '#2a2e38', 0, 0, -0.02, blade);
+    for (const sd of [-1, 1]) {
+      const pr = glow(new THREE.BoxGeometry(0.022, 0.06, 0.62), '#7fe0ff', sd * 0.05, 0, -0.34, blade, 3);
+      pr.rotation.y = -sd * 0.07;
+      const tip = glow(new THREE.ConeGeometry(0.03, 0.14, 6).rotateX(-Math.PI / 2), '#cfffff', sd * 0.028, 0, -0.71, blade, 3);
+      tip.rotation.y = -sd * 0.05;
+    }
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.9), new THREE.MeshBasicMaterial({ color: '#4fc8ff', transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    halo.rotation.x = -Math.PI / 2; halo.position.z = -0.38; blade.add(halo);
+    body.add(blade);
     blade.visible = false;
     shell = new THREE.Mesh(new THREE.SphereGeometry(0.62, 18, 12).scale(0.95, 1.55, 0.8), shellMat(neon));
     shell.position.y = 1.05;
@@ -358,6 +389,12 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.BoxGeometry(0.24, 0.24, 0.26), '#1c1d20', 0, 1.7, -0.02);
     glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), '#ffd040', 0, 1.71, -0.16);
     for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.5, 0.02, 0.02), '#1c1d20', 0, 1.05 + i * 0.12, -0.26);
+    // Rounded over the slabs: stacked shoulder domes, a curved chest plate and belly bands, and
+    // a row of spines down the back.
+    for (const sd of [-1, 1]) for (let i = 0; i < 2; i++) { const d = ball(0.24 - i * 0.04, 1.1, 0.8, 1.0, i ? '#3a3d42' : '#55595f', sd * (0.52 + i * 0.04), 1.62 - i * 0.09, 0, body, true); d.rotation.z = -sd * (0.3 + i * 0.15); }
+    { const p = mk(new THREE.SphereGeometry(0.46, 18, 8, Math.PI * 1.1, Math.PI * 0.8, Math.PI * 0.28, Math.PI * 0.3), '#55595f', 0, 1.25, 0.02); p.scale.set(1.0, 1.0, 0.7); }
+    for (let i = 0; i < 2; i++) mk(new THREE.TorusGeometry(0.33 - i * 0.02, 0.025, 6, 18, Math.PI).rotateY(Math.PI), '#2a2c30', 0, 0.98 - i * 0.08, 0.0).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 5; i++) mk(new THREE.ConeGeometry(0.035, 0.16, 6), '#1c1d20', 0, 1.62 - i * 0.13, 0.29).rotation.x = 0.9;
     for (const s of [-1, 1]) mk(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 10).rotateZ(Math.PI / 2), '#2a2c30', s * 0.38, 1.52, -0.18);
     belt(mk, '#1c1d20', 0.94, 0.64);
     helmet = new THREE.Group();
@@ -373,8 +410,6 @@ export function buildUnit(type = 'guard', chief = false) {
     const C = { suit: '#22282c', boot: '#101214' };
     legs = rig(body, C, mk);
     mk(new THREE.BoxGeometry(0.36, 0.5, 0.26), '#2c3438', 0, 1.18, 0.04);
-    mk(new THREE.BoxGeometry(0.1, 0.24, 0.1), '#22282c', 0, 1.5, -0.04).rotation.x = -0.4;
-    mk(new THREE.BoxGeometry(0.2, 0.18, 0.34), '#2c3438', 0, 1.62, -0.12);
     glow(new THREE.BoxGeometry(0.03, 0.06, 0.36), neon, 0, 1.74, -0.1, body, 2);
     glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), neon, 0, 1.62, -0.3);
     for (let i = -1; i <= 1; i++) mk(new THREE.BoxGeometry(0.09, 0.12, 0.05), '#1b2024', i * 0.1, 1.1, -0.12);
@@ -382,6 +417,14 @@ export function buildUnit(type = 'guard', chief = false) {
     belt(mk, '#1b2024', 0.94, 0.38);
     kneePads(legs, mk, '#1b2024');
     mk(new THREE.BoxGeometry(0.1, 0.08, 0.34), '#2c3438', -0.2, 1.2, -0.2);
+    // Bird-like head: an elongated rounded skull, a hooked beak, eyes, quills sweeping back; a
+    // capsule neck and slim capsule arms.
+    ball(0.11, 0.9, 0.85, 1.5, '#3a4448', 0, 1.62, -0.12);
+    mk(new THREE.ConeGeometry(0.045, 0.16, 8).rotateX(-Math.PI / 2), '#8a8070', 0, 1.58, -0.33);
+    for (const sd of [-1, 1]) glow(new THREE.SphereGeometry(0.018, 8, 6), neon, sd * 0.06, 1.66, -0.24, body, 2);
+    for (let i = 0; i < 4; i++) mk(new THREE.ConeGeometry(0.018, 0.2, 5), '#5a2a2a', (i - 1.5) * 0.04, 1.72, 0.02).rotation.x = 1.9;
+    cap(0.045, 0.16, '#2c3438', 0, 1.47, -0.06, -0.4);
+    for (const sd of [-1, 1]) cap(0.04, 0.26, '#2c3438', sd * 0.21, 1.2, -0.1, 0.4, sd * 0.2);
     gun.position.set(0.22, 1.2, -0.3);
     mk(new THREE.BoxGeometry(0.06, 0.08, 0.6), '#1b1e22', 0, 0, -0.15, gun);
     glow(new THREE.BoxGeometry(0.02, 0.02, 0.5), '#30e0ff', 0, 0.05, -0.15, gun, 1.4);
@@ -809,6 +852,7 @@ export class Sentinel {
       badge: chief, quadAw: 0, fleeT: 0, meleeT: 0, burst: 0, lower: 0, aimT: 0, aiming: null, enraged: false, helmet: !!T.helmet, stagger: 0, sync: false,
       wallHp: T.wall ? WALL.hp : 0, wallPct: T.wall ? 100 : 0,
     };
+    if (type === 'jugg') g.sword = g.id % 2 === 0; // sword brutes: charge the moment they see you
     if (!post || !post.y) g.y = this.fac.groundAt(g.x, g.z, g.y + 0.5, 0.6);
     if (hunt) { g.state = 'search'; g.lkp = { ...hunt }; g.searchT = 18; }
     g.obj = withXray(buildUnit(type, chief));
@@ -1412,7 +1456,8 @@ export class Sentinel {
 
   _guardSpeed(g) {
     const s = TYPES[g.type].speed;
-    if (g.state === 'berserk') return 6.8;
+    if (g.lungeT > 0) return 12;
+    if (g.state === 'berserk') return g.sword ? 7.6 : 6.8;
     if (g.state === 'flee') return s[3] * 1.3;
     return g.state === 'alert' ? s[3] : g.state === 'search' ? s[2] : g.state === 'sus' ? s[1] : s[0];
   }
@@ -1565,7 +1610,7 @@ export class Sentinel {
     if (T.berserk && g.state === 'alert') {
       const tgt = g.target && agents.find((a) => a.role === g.target);
       const close = tgt && Math.hypot(tgt.pos.x - g.x, tgt.pos.z - g.z) < 11 && g.seenT > 0;
-      if (g.enraged || close || (g.shield <= 0 && g.hp < g.maxHp * 0.7)) {
+      if (g.enraged || close || (g.shield <= 0 && g.hp < g.maxHp * 0.7) || (g.sword && g.seenT > 0)) {
         g.state = 'berserk';
         g.berserkT = 6;
         g.path = null;
@@ -1651,11 +1696,14 @@ export class Sentinel {
         const seen = g.seenT > 0 || d < 6;
         if (seen) { g.lkp = { x: tgt.pos.x, z: tgt.pos.z, y: tgt.pos.y }; g.berserkT = 6; g.target = tgt.role; }
         else g.berserkT -= dt;
+        // Sword brutes close the last few metres with a lunge.
+        g.lungeT = Math.max(0, (g.lungeT || 0) - dt);
+        if (g.sword && d < 5.5 && d > 2.2 && g.lungeT <= 0 && g.meleeT <= 0 && seen) { g.lungeT = 0.4; this.emit({ t: 'bark', k: 'jugg', id: g.id }); }
         if (d > 2.0) this._moveTo(g, g.lkp ? g.lkp.x : tgt.pos.x, g.lkp ? g.lkp.z : tgt.pos.z, dt, this._guardSpeed(g), g.lkp ? g.lkp.y : tgt.pos.y);
         else g.yaw += angDiff(Math.atan2(-(tgt.pos.x - g.x), -(tgt.pos.z - g.z)), g.yaw) * Math.min(1, dt * 10);
-        if (d < 2.5 && g.meleeT <= 0 && Math.abs(tgt.pos.y - g.y) < 1.5 && g.jamT <= 0) {
+        if (d < 2.5 && g.meleeT <= 0 && Math.abs(tgt.pos.y - g.y) < 1.5 && (g.jamT <= 0 || g.sword)) {
           g.meleeT = 1.3;
-          this.emit({ t: 'emelee', id: g.id, role: tgt.role, dmg: Math.round(70 * this.D.guardDmg), a: [g.x, g.y + 1.2, g.z] });
+          this.emit({ t: 'emelee', id: g.id, role: tgt.role, dmg: Math.round((g.sword ? 120 : 70) * this.D.guardDmg), a: [g.x, g.y + 1.2, g.z], sword: g.sword ? 1 : 0 });
         }
         if (g.berserkT <= 0) { g.state = 'search'; g.searchT = 10; g.enraged = false; }
       } else { g.state = 'search'; g.searchT = 8; g.enraged = false; }
@@ -1844,7 +1892,7 @@ export class Sentinel {
     const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
     return {
       g: this.guards.map((g) => [g.id, r1(g.x), r1(g.y), r1(g.z), r2(g.yaw + g.look), STATES.indexOf(g.state), r2(clamp(g.aw, 0, 1)),
-        (g.chief ? 1 : 0) | (g.badge ? 2 : 0) | (g.found ? 4 : 0) | (g.moving ? 8 : 0) | (g.tower ? 16 : 0) | (g.lower > 0 ? 32 : 0) | (g.empT > 0 ? 64 : 0) | (g.helmet ? 128 : 0) | (g.radioT > 0 ? 256 : 0) | (g.sync ? 512 : 0) | (g.stagger > 0 ? 1024 : 0) | (g.incap ? 2048 : 0),
+        (g.chief ? 1 : 0) | (g.badge ? 2 : 0) | (g.found ? 4 : 0) | (g.moving ? 8 : 0) | (g.tower ? 16 : 0) | (g.lower > 0 ? 32 : 0) | (g.empT > 0 ? 64 : 0) | (g.helmet ? 128 : 0) | (g.radioT > 0 ? 256 : 0) | (g.sync ? 512 : 0) | (g.stagger > 0 ? 1024 : 0) | (g.incap ? 2048 : 0) | (g.sword ? 4096 : 0),
         Math.ceil(g.tagT), Math.ceil(g.scanT), g.rev ? 1 : 0, TYPE_KEYS.indexOf(g.type), g.maxShield ? Math.round((g.shield / g.maxShield) * 100) : 0, g.aiming ? (g.aiming === 'shooter' ? 1 : 2) : 0, g.type === 'bulwark' ? Math.round(g.wallPct) : 0]),
       d: this.drones.map((d) => [d.id, r1(d.x), r1(d.y), r1(d.z), r2(d.yaw), d.state === 'dead' ? 2 : d.state === 'hunt' ? 1 : 0, r2(clamp(d.aw, 0, 1)), d.empT > 0 ? 1 : 0, Math.ceil(d.tagT), d.rev ? 1 : 0, d.heli ? r1(d.sx) : 0, d.heli ? r1(d.sz) : 0, d.lock ? 1 : 0]),
       c: this.cams.map((c) => [c.id, r2(c.yaw), (c.hacked ? 1 : 0) | (c.loopT > 0 ? 2 : 0) | (c.empT > 0 ? 4 : 0), r2(clamp(c.aw, 0, 1))]),
@@ -1874,7 +1922,7 @@ export class Sentinel {
       if (g.type === 'bulwark' && wp !== undefined) { if ((g.wallPct ?? 100) > 0 && wp <= 0) g.wallBroke = true; g.wallPct = wp; }
       g.shield = (sh / 100) * g.maxShield;
       g.state = ns; g.aw = aw; g.chief = !!(fl & 1); g.badge = !!(fl & 2); g.found = !!(fl & 4); g.moving = !!(fl & 8); g.tower = !!(fl & 16);
-      g.lower = fl & 32 ? 0.5 : 0; g.empT = fl & 64 ? 1 : 0; g.helmet = !!(fl & 128); g.radioT = fl & 256 ? 1 : 0; g.sync = !!(fl & 512); g.stagger = fl & 1024 ? 1 : 0; g.incap = !!(fl & 2048);
+      g.lower = fl & 32 ? 0.5 : 0; g.empT = fl & 64 ? 1 : 0; g.helmet = !!(fl & 128); g.radioT = fl & 256 ? 1 : 0; g.sync = !!(fl & 512); g.stagger = fl & 1024 ? 1 : 0; g.incap = !!(fl & 2048); g.sword = !!(fl & 4096);
       g.tagT = tag; g.scanT = scan; g.rev = !!rev; g.hp = ns === 'dead' ? 0 : 1;
       g.aiming = aim === 1 ? 'shooter' : aim === 2 ? 'spotter' : null;
     }
@@ -1968,7 +2016,7 @@ export class Sentinel {
         U.wall.rotation.y += ((down ? 1.2 : 0) - U.wall.rotation.y) * Math.min(1, dt * 10);
         U.wall.userData.plane.material.uniforms.uT.value = this.t;
       }
-      if (U.blade) U.blade.visible = g.state === 'berserk';
+      if (U.blade) U.blade.visible = !dead && (g.state === 'berserk' || !!g.sword);
       if (U.helmet) U.helmet.visible = !!g.helmet;
       if (dead) {
         g.fallT = Math.min(1, (g.fallT || 0) + dt * 2.2);

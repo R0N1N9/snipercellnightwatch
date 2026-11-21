@@ -179,6 +179,7 @@ export const Phone = {
     // The phone in your left hand.
     const ph = this.phoneObj;
     const k = Math.max(Q.k, pk);
+    Q.vis = k; // the viewmodel's support hand lets go of the gun while the phone is up
     ph.visible = k > 0.02;
     if (ph.visible) {
       ph.position.set(-0.3 + 0.17 * k, -0.48 + 0.35 * k - Q.press * 0.012, -0.38 + 0.03 * k - Q.press * 0.01);
