@@ -674,16 +674,16 @@ export class Avatar {
     put(new THREE.CylinderGeometry(0.2, 0.205, 0.12, 22, 1, true).scale(1.04, 1, 0.8), P.rig, 0, 0.255, 0, 0, 0, 0, pv);
     for (const sx of [-1, 1]) put(slab(0.065, 0.03, 0.27, 0.01), P.rig, sx * 0.11, 0.535, 0.0, 0, 0, sx * -0.18, pv);
     for (let i = -1; i <= 1; i++) {
-      put(slab(0.074, 0.1, 0.05, 0.01), P.rig, i * 0.086, 0.26, -0.185, 0, 0, 0, pv);
+      put(slab(0.074, 0.1, 0.05, 0.01), P.pouch, i * 0.086, 0.26, -0.185, 0, 0, 0, pv);
       put(slab(0.05, 0.04, 0.03, 0.006), P.mag, i * 0.086, 0.325, -0.185, 0, 0, 0, pv);
       put(slab(0.02, 0.035, 0.008, 0.003), P.tab, i * 0.086, 0.35, -0.205, -0.3, 0, 0, pv);
     }
-    put(slab(0.19, 0.085, 0.032, 0.01), P.rig, 0, 0.425, -0.172, -0.06, 0, 0, pv);
+    put(slab(0.19, 0.085, 0.032, 0.01), P.pouch, 0, 0.425, -0.172, -0.06, 0, 0, pv);
     put(slab(0.075, 0.04, 0.006, 0.003), accent, 0.04, 0.43, -0.19, -0.06, 0, 0, pv);
     // Chest rig: wide low panel with five mag pouches, a map pocket above, H-harness + back X.
     put(slab(0.36, 0.15, 0.035, 0.015), P.rig, 0, 0.24, -0.15, -0.04, 0, 0, rv);
     for (let i = -2; i <= 2; i++) {
-      put(slab(0.064, 0.105, 0.048, 0.01), P.rig, i * 0.07, 0.25, -0.18, -0.04, 0, 0, rv);
+      put(slab(0.064, 0.105, 0.048, 0.01), P.pouch, i * 0.07, 0.25, -0.18, -0.04, 0, 0, rv);
       put(slab(0.044, 0.04, 0.028, 0.006), P.mag, i * 0.07, 0.315, -0.178, -0.04, 0, 0, rv);
       put(slab(0.018, 0.032, 0.008, 0.003), P.tab, i * 0.07, 0.34, -0.2, -0.3, 0, 0, rv);
     }
@@ -693,14 +693,14 @@ export class Avatar {
       put(slab(0.045, 0.012, 0.3, 0.004), P.web, sx * 0.1, 0.5, -0.01, -0.2, 0, sx * -0.12, rv); // over the shoulders
       put(slab(0.045, 0.3, 0.012, 0.004), P.web, sx * 0.1, 0.4, -0.145, -0.05, 0, 0, rv); // front straps
       put(slab(0.04, 0.38, 0.012, 0.004), P.web, 0, 0.36, 0.145, 0.05, 0, sx * 0.55, rv); // back X
-      put(slab(0.07, 0.11, 0.06, 0.012), P.rig, sx * 0.19, 0.24, -0.09, 0, sx * -0.6, 0, rv); // side utility pouches
+      put(slab(0.07, 0.11, 0.06, 0.012), P.pouch, sx * 0.19, 0.24, -0.09, 0, sx * -0.6, 0, rv); // side utility pouches
     }
     // Tourniquet on the left strap, radio on the left side, med pouch on the right.
     put(new THREE.CylinderGeometry(0.019, 0.019, 0.1, 10), '#1d1d1f', -0.115, 0.49, -0.115, 0.15);
     put(slab(0.025, 0.018, 0.02, 0.004), '#a8402e', -0.115, 0.545, -0.12);
-    put(slab(0.06, 0.13, 0.045, 0.01), P.rig, -0.205, 0.33, 0.05, 0, 0.5);
+    put(slab(0.06, 0.13, 0.045, 0.01), P.pouch, -0.205, 0.33, 0.05, 0, 0.5);
     put(new THREE.CylinderGeometry(0.004, 0.004, 0.38, 4), P.glove, -0.21, 0.56, 0.08, 0.1, 0, 0.12);
-    put(slab(0.05, 0.1, 0.07, 0.012), P.rig, 0.205, 0.27, 0.03, 0, -0.5);
+    put(slab(0.05, 0.1, 0.07, 0.012), P.pouch, 0.205, 0.27, 0.03, 0, -0.5);
     // Assault pack on the back.
     put(slab(0.25, 0.3, 0.11, 0.025), P.vest, 0, 0.34, 0.22);
     put(slab(0.22, 0.08, 0.03, 0.012), P.web, 0, 0.42, 0.285);
@@ -1109,7 +1109,7 @@ export class Avatar {
     const kit = look.kit || {};
     const hat = HATS[look.hat] ? look.hat : DEFAULT_GEAR[outfit].hat;
     const eyes = EYEWEAR[look.eyes] ? look.eyes : DEFAULT_GEAR[outfit].eyes;
-    const key = [outfit, thermal, pollo, lens, themeId, hat, eyes, look.vest, kit.scout, kit.stealth, kit.tactical, look.ponchoTheme, look.gear, look.headset, look.earpiece, look.rifle, look.irMark].join('|');
+    const key = [outfit, thermal, pollo, lens, themeId, hat, eyes, look.vest, look.gearAccent, kit.scout, kit.stealth, kit.tactical, look.ponchoTheme, look.gear, look.headset, look.earpiece, look.rifle, look.irMark].join('|');
     if (this.look === key) return;
     this.look = key;
     const wraith = outfit === 'wraith';
@@ -1167,7 +1167,11 @@ export class Avatar {
       // IR-reflective markers and armbands: a muted red that glints under IR.
       if (look.irMark && hex === this.accent) return setMat(o, irMarkMat());
       // Load-bearing kit (carrier, rig, pouches, webbing) in its own colour over the uniform.
-      if (look.gear && GEAR.has(hex)) return setMat(o, mat(retint(hex, look.gear, PAL.vest), o.userData.flat));
+      if (look.gear && GEAR.has(hex)) {
+        // Accents (pouches, webbing) can be a second colour, e.g. black on flat dark earth.
+        if (look.gearAccent && (hex === PAL.pouch || hex === PAL.web)) return setMat(o, mat(retint(hex, look.gearAccent, PAL.pouch), o.userData.flat));
+        return setMat(o, mat(retint(hex, look.gear, PAL.vest), o.userData.flat));
+      }
       if (T.colors && PRINTED.has(hex)) return setMat(o, camoMaterial(themeId, PRINTED.get(hex)));
       if (THEMED.has(hex)) hex = retint(hex, theme);
       else if (wraith && WRAITH_MAP[hex]) hex = WRAITH_MAP[hex];
@@ -1201,7 +1205,7 @@ export class Avatar {
     // back up when you stop (blended, like the first-person view).
     this._runK = (this._runK || 0) + ((s.sprint && st === 0 ? 1 : 0) - (this._runK || 0)) * Math.min(1, dt * 8);
     const low = s.lowReady ? 1 : this._runK;
-    this.aim.rotation.x = s.pitch * (1 - low) + (s.lowReady ? s.pitch : -0.85 * low);
+    this.aim.rotation.x = s.pitch * (1 - low) + (s.lowReady ? -0.75 : -0.85) * low; // the head stays level
     this.aim.rotation.y = low * (s.w ? 0.25 : 0.55);
     this.aim.rotation.z = low * (s.w ? 0.1 : 0.35);
     this._pistolOut = !!s.w;
