@@ -17,10 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <!-- ?v= tags make browsers fetch fresh copies after an update (GitHub Pages caches files for 10 min). -->
-  <link rel="stylesheet" href="style.css?v=20261126c" />
-  <link rel="stylesheet" href="src/multiverse/multiverse.css?v=20261126c" />
-  <link rel="stylesheet" href="src/multiverse/input.css?v=20261126c" />
-  <link rel="stylesheet" href="src/cell/cell.css?v=20261126c" />
+  <link rel="stylesheet" href="style.css?v=20261126d" />
+  <link rel="stylesheet" href="src/multiverse/multiverse.css?v=20261126d" />
+  <link rel="stylesheet" href="src/multiverse/input.css?v=20261126d" />
+  <link rel="stylesheet" href="src/cell/cell.css?v=20261126d" />
   <script type="importmap">
     { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
   </script>
@@ -68,6 +68,7 @@
           <label class="field"><span>Sensitivity <em id="sens-val">1.0</em></span><input id="in-sens" type="range" min="0.3" max="2.5" step="0.05" value="1" /></label>
           <label class="check"><input id="in-invert" type="checkbox" /> Invert look</label>
           <label class="check"><input id="in-toggle" type="checkbox" /> Toggle scope (instead of hold)</label>
+          <label class="check"><input id="in-cant" type="checkbox" /> Canted pistol hold (centre of screen; ADS straightens it)</label>
           <label class="field"><span>Touch look · right thumb <em data-v="touchSensR"></em></span><input data-setting="touchSensR" type="range" min="0.3" max="3" step="0.05" /></label>
           <label class="field"><span>Touch look · left thumb <em data-v="touchSensL"></em></span><input data-setting="touchSensL" type="range" min="0.3" max="3" step="0.05" /></label>
           <label class="field"><span>Gyro aim <em>(phones &amp; tablets)</em></span><select data-setting="gyroMode"><option value="off">Off</option><option value="scoped">When scoped</option><option value="always">Always</option></select></label>
@@ -338,6 +339,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/main.js?v=20261126c"></script>
+  <script type="module" src="src/main.js?v=20261126d"></script>
 </body>
 </html>

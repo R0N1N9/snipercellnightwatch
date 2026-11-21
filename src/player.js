@@ -375,7 +375,8 @@ export class LocalPlayer {
 
     // --- Movement
     let speed = this.stance === 2 ? PLAYER.prone : this.stance === 1 ? PLAYER.crouch : PLAYER.walk;
-    const sprinting = a.sprint && !this.scoped && this.stance === 0 && a.my < -0.3 && !this.noSprint;
+    // keepReload (NightWatch): a reload in progress holds you to a walk instead of being cancelled.
+    const sprinting = a.sprint && !this.scoped && this.stance === 0 && a.my < -0.3 && !this.noSprint && !(this.keepReload && this.reloadT > 0);
     if (sprinting) speed = PLAYER.sprint;
     // Sprinting: weapon at carry, no shooting, and an in-progress reload is abandoned.
     this.sprinting = sprinting && canMove;

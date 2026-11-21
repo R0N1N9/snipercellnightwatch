@@ -75,11 +75,9 @@ export const KitMethods = {
     if (live && !tab && !quad && shooterKit) {
       if (I.pressed('KeyH') || I.pressed('cell-deadeye')) this._deadeye();
       if (I.pressed('KeyX') || I.pressed('cell-lure')) this._throwLure();
-      if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._ammoMenu();
+      if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._roundsCycle();
       if (this.xr && this.xr.menu) for (let i = 1; i <= 4; i++) if (I.pressed('Digit' + i)) { this._ammoPick(['std', 'xr', 'pen', 'emp'][i - 1]); act.slot1 = act.slot2 = false; }
     }
-    // Spotter's slingshot (T / SLING): the same noise lure.
-    if (live && !tab && !quad && this.role === 'spotter' && (I.pressed('KeyT') || I.pressed('cell-lure'))) this._throwLure();
     // Downed: V / PING / HELP calls for a pickup on your position.
     this._helpCd = Math.max(0, (this._helpCd || 0) - dt);
     if (this.downed && !this.kia && (I.pressed('KeyQ') || I.pressed('cell-ping') || I.pressed('cell-help'))) this._pickupCall();
@@ -213,11 +211,46 @@ export const KitMethods = {
   },
 
   // ---- LURE: a thrown noise-maker that pulls patrols off their route ------------------
+  // X / LURE: the left hand comes off the rifle and throws the lure overhand, like a grenade;
+  // it leaves the hand at the top of the swing.
   _throwLure() {
     this._hint && this._hint('lure');
     const K = this.kit;
+    if (this.lureAnim) return;
     if (K.lures <= 0) { this.hud.flash('NO LURES — resupply', 'red'); return; }
     K.lures--;
+    this.lureAnim = { t: 0, released: false };
+  },
+  _lureAnimTick(dt) {
+    const A = this.lureAnim;
+    if (!A) { if (this.lureHand) this.lureHand.visible = false; return; }
+    if (!this.lureHand) {
+      const g = new THREE.Group();
+      const hand = this.tdGloveFactory ? this.tdGloveFactory() : null;
+      if (hand) g.add(hand);
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8), lam('#2a2c30'));
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 4), new THREE.MeshBasicMaterial({ color: '#ff3040' }));
+      led.position.y = 0.05; can.add(led);
+      can.position.set(0.0, 0.06, -0.06);
+      g.add(can);
+      g.userData.can = can;
+      g.traverse((o) => { o.renderOrder = 11; o.frustumCulled = false; });
+      this.camera.add(g);
+      this.lureHand = g;
+    }
+    A.t += dt;
+    const H = this.lureHand, t = A.t, e = (x) => x * x * (3 - 2 * x), seg = (a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+    H.visible = true;
+    // Wind up back past the shoulder, whip forward, follow through low.
+    const up = e(seg(0, 0.2)), fwd = e(seg(0.2, 0.34)), down = e(seg(0.34, 0.6));
+    H.position.set(-0.3 + 0.08 * up + 0.16 * fwd - 0.02 * down, -0.5 + 0.42 * up - 0.05 * fwd - 0.35 * down, -0.25 + 0.2 * up - 0.45 * fwd + 0.1 * down);
+    H.rotation.set(0.6 - 1.4 * up + 1.6 * fwd, 0.2, 0.3 - 0.2 * fwd);
+    H.userData.can.visible = !A.released;
+    if (!A.released && t >= 0.3) { A.released = true; this._launchLure(); }
+    if (t >= 0.65) { this.lureAnim = null; H.visible = false; }
+  },
+  _launchLure() {
+    const K = this.kit;
     const o = this.player.eyePos(new THREE.Vector3());
     const d = this.player.aimDir(new THREE.Vector3());
     const mesh = new THREE.Group();
@@ -227,10 +260,10 @@ export const KitMethods = {
     mesh.add(b, led);
     mesh.position.copy(o);
     this.scene.add(mesh);
-    // Fired from a slingshot: flatter and further than a throw.
-    this.lures.push({ p: o.clone(), v: d.multiplyScalar(24).add(new THREE.Vector3(0, 2.6, 0)), mesh, led, landed: false, t: 0, tick: 0.8 });
+    // Thrown overhand, like a grenade.
+    this.lures.push({ p: o.clone(), v: d.multiplyScalar(17).add(new THREE.Vector3(0, 3.6, 0)), mesh, led, landed: false, t: 0, tick: 0.8 });
     this.audio.click();
-    this.hud.flash(`SLINGSHOT \u00B7 LURE OUT (${K.lures} left)`, 'cyan');
+    this.hud.flash(`LURE OUT (${K.lures} left)`, 'cyan');
   },
 
   _lureTick(dt) {
