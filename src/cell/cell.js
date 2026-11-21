@@ -1203,7 +1203,7 @@ export class CellGame {
     this._kitKeys(dt, I, tab, quad, live, act);
     this._abInput(dt, I, act, live && !tab && !quad);
     // Spotter's binoculars: X (or BINO) to swap from the P-9; scope raises them.
-    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino')) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
+    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino') || (this.role === 'spotter' && I.pressed('swap'))) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
     const seat = this._seat();
     if (!live || tab || quad) {
@@ -2913,7 +2913,7 @@ class CellHud {
     bar.className = 'cell-tbar';
     // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP', 'z'], ['cell-hack', 'HACK']] : [];
-    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ...(g.role === 'spotter' ? [['cell-bino', 'BINO']] : []), ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
+    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
       ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-quad', 'DRONE'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
@@ -3028,6 +3028,12 @@ class CellHud {
 
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
+    // Touch swap button names what you'd swap to. The spotter's P-9 is primary, binoculars secondary.
+    if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
+    if (this.elSwap) {
+      const lbl = g.role === 'spotter' ? (g.bino && g.bino.on ? 'PRIMARY' : 'SECONDARY') : P.slot === 0 ? 'SECONDARY' : 'PRIMARY';
+      if (this.elSwap.textContent !== lbl) this.elSwap.textContent = lbl;
+    }
     // Objective & alarm.
     const lab = S.alarmLabel;
     if (lab !== this._al) { this._al = lab; this.el.alS.textContent = lab; this.el.alarm.dataset.s = lab.toLowerCase(); }

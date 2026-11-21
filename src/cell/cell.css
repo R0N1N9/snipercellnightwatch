@@ -30,7 +30,6 @@
 /* Valley HUD and touch bits that don't belong in this mode */
 body.cell-mode #hud, body.cell-mode #touch .tbar, body.cell-mode #touch .breath, body.cell-mode #touch .bipodb,
 body.cell-mode #touch .zdn, body.cell-mode #touch .zup, body.cell-mode #touch .rng { display: none !important; }
-body.cell-spotter #touch .swp { display: none !important; }
 
 #cell-hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: var(--sans); color: var(--ink); }
 #cell-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }

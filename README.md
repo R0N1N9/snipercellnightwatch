@@ -322,7 +322,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
 - **Recon drone:** G (desktop) tosses it up out of your left hand before the feed cuts in. Hold G to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
 - **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. G takes the sticks; hold G recalls it.
-- **Thermal binoculars (X or BINO):** swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
+- **Thermal binoculars (X, or the weapon-swap button on touch):** the P-9 is the spotter's primary and the binoculars are the secondary. Swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
@@ -408,7 +408,7 @@ The lone operative carries both kits. Shift+E plants C4.
 
 **On an iPad or a phone:**
 
-- The action buttons sit in a strip along the bottom centre, like the desktop key hints, between the move stick and the fire buttons. They cover every action, including TABLET, HACK, ISR, QUAD, RECALL, SYNC, HELP, LIGHT, DROP, PING, TAG, USE, SUPP, NV and CHAT. Anything on the press-and-hold command wheel has no separate button (SWEEP appears only inside the ISR view, where the wheel doesn't open).
+- The action buttons sit in a strip along the bottom centre, like the desktop key hints, between the move stick and the fire buttons. They cover every action, including TABLET, HACK, ISR, QUAD, RECALL, SYNC, HELP, LIGHT, DROP, PING, TAG, USE, SUPP, NV and CHAT. The weapon-swap button next to ZOOM is labelled with what you'd swap to: SECONDARY while your primary is out, PRIMARY while your secondary is out (for the spotter, the binoculars are the secondary, so there is no separate BINO button). Anything on the press-and-hold command wheel has no separate button (SWEEP appears only inside the ISR view, where the wheel doesn't open).
 - The Auto preset gives iPads Medium, with a capped render resolution.
 - For better radio voices, install enhanced male voices: Settings → Accessibility → Spoken Content → Voices → English, then Aaron, Arthur or Evan (Enhanced).
 
