@@ -21,7 +21,7 @@
 // Headshots kill anything, whatever the weapon. Infiltration keeps its plain security guards.
 // Reinforcements always come from OUTSIDE the building: the barracks door and the south gate.
 import * as THREE from 'three';
-import { lam, glowMat, SPOTS, ROOMS, drawX, BUILDING } from './facility.js';
+import { lam, glowMat, SPOTS, ROOMS, drawX, BUILDING, mergeBoxes } from './facility.js';
 import { clamp, mulberry32 } from '../util.js';
 
 export const DIFFS = {
@@ -141,6 +141,22 @@ function carbine(gun, mk, short = false) {
   mk(new THREE.BoxGeometry(0.04, 0.1, 0.05), '#17181a', 0, -0.09, 0.08 * k, gun).rotation.x = 0.3;
   mk(new THREE.BoxGeometry(0.045, 0.05, 0.12), '#141517', 0, 0.08, -0.04, gun);
   mk(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8).rotateX(Math.PI / 2), '#2a2c2f', 0, -0.035, -0.36 * k, gun);
+  // Refinements: slotted handguard, top rail, angled foregrip, buttpad, sling.
+  mk(new THREE.BoxGeometry(0.075, 0.08, 0.22 * k), '#25272b', 0, 0.0, -0.33 * k, gun);
+  for (let i = 0; i < 4; i++) for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.004, 0.02, 0.03), '#0f1012', s * 0.039, 0.0, -0.25 * k - i * 0.05 * k, gun);
+  for (let i = 0; i < 9; i++) mk(new THREE.BoxGeometry(0.05, 0.008, 0.014), '#101113', 0, 0.054, 0.1 - i * 0.05 * k, gun);
+  mk(new THREE.BoxGeometry(0.035, 0.07, 0.04), '#17181a', 0, -0.07, -0.3 * k, gun).rotation.x = -0.5;
+  mk(new THREE.BoxGeometry(0.065, 0.14, 0.025), '#0f1012', 0, -0.025, 0.39 * k, gun);
+  mk(new THREE.BoxGeometry(0.01, 0.01, 0.6 * k), '#2b2620', 0.04, -0.06, 0.0, gun);
+}
+
+// Shared kit detail: knee pads (on each hip pivot's lower leg) and a belt with pouches.
+function kneePads(legs, mk, col) {
+  for (const L of legs) mk(new THREE.BoxGeometry(0.16, 0.12, 0.05), col, 0, -0.47, -0.105, L);
+}
+function belt(mk, col, y = 0.94, w = 0.44) {
+  mk(new THREE.BoxGeometry(w, 0.06, 0.28), col, 0, y, 0);
+  for (const [x, z] of [[-0.14, -0.15], [0.14, -0.15], [-0.23, 0], [0.23, 0.02]]) mk(new THREE.BoxGeometry(0.08, 0.09, 0.06), col, x, y - 0.03, z);
 }
 
 export function buildUnit(type = 'guard', chief = false) {
@@ -166,6 +182,25 @@ export function buildUnit(type = 'guard', chief = false) {
     gun.position.set(0.05, 1.18, -0.28);
     carbine(gun, mk);
     for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.11, 0.11, 0.42), C.suit, s * 0.22, 1.28, -0.16).rotation.y = -s * 0.35;
+    // Kit: helmet shell with ear covers, NVG mount and side rails; plate carrier with a mag
+    // shingle, radio and shoulder pads; belt; hydration pack; knee and elbow pads; gloves.
+    const kitC = chief ? '#2d2838' : '#25282c', padC = '#1b1d20';
+    for (const s of [-1, 1]) {
+      mk(new THREE.BoxGeometry(0.05, 0.1, 0.12), kitC, s * 0.15, 1.6, 0.0);
+      mk(new THREE.BoxGeometry(0.02, 0.03, 0.16), '#14151a', s * 0.155, 1.69, 0.0);
+      mk(new THREE.BoxGeometry(0.14, 0.06, 0.2), kitC, s * 0.27, 1.45, -0.0).rotation.z = s * 0.35;
+      mk(new THREE.BoxGeometry(0.08, 0.08, 0.08), padC, s * 0.27, 1.22, -0.27);
+      mk(new THREE.BoxGeometry(0.07, 0.07, 0.08), '#111214', s * 0.2, 1.24, -0.38);
+    }
+    mk(new THREE.BoxGeometry(0.07, 0.05, 0.05), '#14151a', 0, 1.74, -0.12);
+    mk(new THREE.BoxGeometry(0.05, 0.04, 0.06), '#14151a', 0, 1.7, -0.16);
+    for (let i = -1; i <= 1; i++) { mk(new THREE.BoxGeometry(0.1, 0.13, 0.06), kitC, i * 0.11, 1.12, -0.19); mk(new THREE.BoxGeometry(0.06, 0.03, 0.03), '#101113', i * 0.11, 1.2, -0.2); }
+    mk(new THREE.BoxGeometry(0.16, 0.08, 0.05), kitC, 0, 1.33, -0.19);
+    mk(new THREE.BoxGeometry(0.06, 0.14, 0.05), padC, -0.2, 1.28, 0.1);
+    mk(new THREE.CylinderGeometry(0.006, 0.006, 0.22, 4), '#111', -0.21, 1.46, 0.1);
+    mk(new THREE.BoxGeometry(0.3, 0.36, 0.08), kitC, 0, 1.25, 0.19);
+    belt(mk, padC);
+    kneePads(legs, mk, padC);
   } else if (type === 'scav') {
     // Hunched little conscript: coolant pack on its back, slit visor, twitchy.
     const C = { suit: '#2b2a2f', boot: '#121214' };
@@ -186,6 +221,10 @@ export function buildUnit(type = 'guard', chief = false) {
     carbine(gun, mk, true);
     glow(new THREE.SphereGeometry(0.03, 8, 6), '#60ff70', 0, 0.075, -0.05, gun, 2);
     for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.09, 0.09, 0.36), C.suit, s * 0.22, 1.22, -0.16).rotation.y = -s * 0.3;
+    // Straps over the chest, shoulder pads, belt, knee pads.
+    for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.05, 0.5, 0.02), '#1d1c1a', s * 0.12, 1.2, -0.21).rotation.x = 0.35; mk(new THREE.BoxGeometry(0.16, 0.07, 0.24), '#4a3f30', s * 0.3, 1.42, -0.02).rotation.z = s * 0.4; }
+    belt(mk, '#1d1c1a', 0.94, 0.46);
+    kneePads(legs, mk, '#1d1c1a');
   } else if (type === 'jugg' || type === 'overseer') {
     // Hulking enforcer: plated, neon seams, heavy cannon on the left, energy blade on the right.
     const boss = type === 'overseer';
@@ -204,6 +243,9 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.BoxGeometry(0.16, 0.18, 0.66), '#26232a', 0, 0, -0.1, gun);
     glow(new THREE.BoxGeometry(0.17, 0.04, 0.4), '#b050ff', 0, 0.1, -0.15, gun);
     mk(new THREE.BoxGeometry(0.14, 0.14, 0.4), C.suit, 0.32, 1.25, -0.18);
+    for (const L of legs) { mk(new THREE.BoxGeometry(0.22, 0.18, 0.08), boss ? '#4a3e66' : '#4e4040', 0, -0.47, -0.11, L); glow(new THREE.BoxGeometry(0.12, 0.02, 0.02), neon, 0, -0.42, -0.155, L, 1.2); }
+    for (const y of [1.08, 1.2]) mk(new THREE.BoxGeometry(0.64, 0.015, 0.44), '#1a1618', 0, y, 0);
+    belt(mk, '#1a1618', 0.94, 0.6);
     blade = glow(new THREE.BoxGeometry(0.03, 0.08, 0.95), '#ff3aa0', 0.36, 1.1, -0.72, body, 3);
     blade.visible = false;
     shell = new THREE.Mesh(new THREE.SphereGeometry(0.62, 18, 12).scale(0.95, 1.55, 0.8), shellMat(neon));
@@ -219,6 +261,9 @@ export function buildUnit(type = 'guard', chief = false) {
     for (const s of [-1, 1]) { mk(new THREE.BoxGeometry(0.34, 0.3, 0.5), '#4a4e55', s * 0.52, 1.5, 0); glow(new THREE.BoxGeometry(0.02, 0.4, 0.02), neon, s * 0.36, 1.18, -0.26); }
     mk(new THREE.BoxGeometry(0.24, 0.24, 0.26), '#1c1d20', 0, 1.7, -0.02);
     glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), '#ffd040', 0, 1.71, -0.16);
+    for (let i = 0; i < 3; i++) mk(new THREE.BoxGeometry(0.5, 0.02, 0.02), '#1c1d20', 0, 1.05 + i * 0.12, -0.26);
+    for (const s of [-1, 1]) mk(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 10).rotateZ(Math.PI / 2), '#2a2c30', s * 0.38, 1.52, -0.18);
+    belt(mk, '#1c1d20', 0.94, 0.64);
     helmet = new THREE.Group();
     mk(new THREE.BoxGeometry(0.36, 0.34, 0.38), '#55595f', 0, 1.74, -0.02, helmet);
     glow(new THREE.BoxGeometry(0.3, 0.04, 0.02), neon, 0, 1.74, -0.22, helmet);
@@ -236,6 +281,10 @@ export function buildUnit(type = 'guard', chief = false) {
     mk(new THREE.BoxGeometry(0.2, 0.18, 0.34), '#2c3438', 0, 1.62, -0.12);
     glow(new THREE.BoxGeometry(0.03, 0.06, 0.36), neon, 0, 1.74, -0.1, body, 2);
     glow(new THREE.BoxGeometry(0.16, 0.03, 0.02), neon, 0, 1.62, -0.3);
+    for (let i = -1; i <= 1; i++) mk(new THREE.BoxGeometry(0.09, 0.12, 0.05), '#1b2024', i * 0.1, 1.1, -0.12);
+    mk(new THREE.BoxGeometry(0.14, 0.06, 0.2), '#2c3438', 0.22, 1.4, 0.02).rotation.z = 0.4;
+    belt(mk, '#1b2024', 0.94, 0.38);
+    kneePads(legs, mk, '#1b2024');
     gun.position.set(0.22, 1.2, -0.3);
     mk(new THREE.BoxGeometry(0.06, 0.08, 0.6), '#1b1e22', 0, 0, -0.15, gun);
     glow(new THREE.BoxGeometry(0.02, 0.02, 0.5), '#30e0ff', 0, 0.05, -0.15, gun, 1.4);
@@ -257,6 +306,24 @@ export function buildUnit(type = 'guard', chief = false) {
   tag.position.set(0, 2.15, 0);
   tag.visible = false;
   root.add(tag);
+  // All that kit is a lot of little meshes: merge the static ones on the body (one mesh per
+  // material) so a compound full of troops stays cheap to draw.
+  const mergeIn = (grp) => {
+    const byMat = new Map();
+    for (const o of [...grp.children]) {
+      if (!o.isMesh || o === blade || o === beam) continue;
+      o.updateMatrix();
+      if (!byMat.has(o.material)) byMat.set(o.material, []);
+      byMat.get(o.material).push(o);
+    }
+    for (const [m, list] of byMat) {
+      if (list.length < 2) continue;
+      const merged = mergeBoxes(list.map((o) => ({ geo: o.geometry, m: o.matrix })), m);
+      for (const o of list) grp.remove(o);
+      grp.add(merged);
+    }
+  };
+  for (const grp of [body, gun, ...(legs || [])]) mergeIn(grp);
   body.scale.setScalar(T.scale);
   root.userData = { body, legs, gun, beam, tag, shell, wall, blade, helmet, phase: Math.random() * 6, scale: T.scale };
   return root;

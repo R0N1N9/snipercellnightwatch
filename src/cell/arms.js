@@ -19,7 +19,7 @@ export const MAGNUM = {
 };
 export const P9 = {
   key: 'm18', name: 'P-9', short: 'P-9', caliber: '9 mm', slot: 'pistol', kind: 'semi',
-  mag: 12, spareMags: 1, muzzle: 380, damage: { head: 150, torso: 50, legs: 35 }, cycle: 0.24, reload: 1.4, reloadEmpty: 1.8,
+  mag: 12, spareMags: 2, muzzle: 380, damage: { head: 150, torso: 50, legs: 35 }, cycle: 0.24, reload: 1.4, reloadEmpty: 1.8,
   zooms: [1], scope: false, adsFov: 46, fixedZero: 25, glint: 0, recoil: 0.03, sway: 0, spread: 0.03,
 };
 
@@ -74,9 +74,9 @@ export function buildSMG() {
   for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) box(0.002, 0.012, 0.024, M.dark, sx * 0.029, 0.006, -0.3 - i * 0.036);
   box(0.058, 0.012, 0.1, tan, 0, -0.022, -0.36);
   // Lower: textured pistol grip, flared magwell, big trigger guard.
-  const grip = box(0.036, 0.11, 0.05, poly, 0, -0.065, 0.025, 0.3);
+  const grip = box(0.036, 0.11, 0.05, poly, 0, -0.065, 0.03, -0.3);
   void grip;
-  for (let i = 0; i < 4; i++) box(0.037, 0.004, 0.044, M.dark, 0, -0.04 - i * 0.022, 0.03 + i * 0.006, 0.3);
+  for (let i = 0; i < 4; i++) box(0.037, 0.004, 0.044, M.dark, 0, -0.04 - i * 0.022, 0.022 + i * 0.0066, -0.3);
   box(0.04, 0.03, 0.18, poly, 0, -0.025, -0.08);
   box(0.034, 0.008, 0.07, poly, 0, -0.048, -0.025);
   box(0.006, 0.022, 0.006, M.dark, 0, -0.035, -0.02);
@@ -96,6 +96,15 @@ export function buildSMG() {
   const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0045, 10), M.red);
   dot.position.set(0, 0.078, -0.068);
   g.add(dot);
+  // Back-up irons (cosmetic): two green dots on a rear sight behind the reflex, a red dot on a
+  // front post at the end of the rail.
+  const green = new THREE.MeshBasicMaterial({ color: '#30ff60' }), red = new THREE.MeshBasicMaterial({ color: '#ff2a2a' });
+  for (const sx of [-0.008, 0.008]) {
+    box(0.008, 0.016, 0.01, M.dark, sx, 0.063, -0.018);
+    const gd = new THREE.Mesh(new THREE.SphereGeometry(0.0032, 8, 6), green); gd.position.set(sx, 0.068, -0.012); g.add(gd);
+  }
+  box(0.008, 0.024, 0.01, M.dark, 0, 0.067, -0.27);
+  const rf = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 8, 6), red); rf.position.set(0, 0.077, -0.264); g.add(rf);
   // Long magazine ahead of the trigger (textured), angled foregrip.
   const magG = new THREE.Group();
   const mag = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.17, 0.05), poly);
@@ -140,10 +149,10 @@ export function buildMagnum() {
   box(0.036, 0.04, 0.01, frameM, 0, -0.042, -0.068);
   box(0.008, 0.026, 0.008, dark, 0, -0.035, -0.03);
   // Grip: chunky, raked, wraparound texture, flared magwell, beavertail.
-  box(0.044, 0.13, 0.064, gripM, 0, -0.078, 0.012, 0.22);
+  box(0.044, 0.13, 0.064, gripM, 0, -0.078, 0.02, -0.22);
   const texM = new THREE.MeshLambertMaterial({ color: '#3d4148', emissive: '#3d4148', emissiveIntensity: 0.12 });
-  for (let i = 0; i < 6; i++) box(0.046, 0.004, 0.058, texM, 0, -0.04 - i * 0.019, 0.012 + i * 0.0042, 0.22);
-  box(0.05, 0.016, 0.07, frameM, 0, -0.142, 0.03, 0.22);
+  for (let i = 0; i < 6; i++) box(0.046, 0.004, 0.058, texM, 0, -0.04 - i * 0.019, 0.012 + i * 0.0045, -0.22);
+  box(0.05, 0.016, 0.07, frameM, 0, -0.142, 0.036, -0.22);
   box(0.036, 0.016, 0.03, frameM, 0, 0.004, 0.052, -0.3);
   const slide = new THREE.Group();
   // Long slide with a chamfered front, serrations front and back, a top rib and a window.
@@ -195,8 +204,8 @@ export function buildP9() {
   const dark = new THREE.MeshLambertMaterial({ color: '#111214' });
   box(0.032, 0.026, 0.165, frameM, 0, -0.006, -0.064); // frame / dust cover
   box(0.026, 0.008, 0.06, frameM, 0, -0.022, -0.11); // accessory rail
-  box(0.034, 0.112, 0.052, gripM, 0, -0.068, 0.006, 0.2); // grip
-  for (let i = 0; i < 5; i++) box(0.035, 0.004, 0.046, frameM, 0, -0.035 - i * 0.02, 0.006 + i * 0.004, 0.2);
+  box(0.034, 0.112, 0.052, gripM, 0, -0.068, 0.012, -0.2); // grip, raked back
+  for (let i = 0; i < 5; i++) box(0.035, 0.004, 0.046, frameM, 0, -0.035 - i * 0.02, 0.006 + i * 0.004, -0.2);
   box(0.03, 0.008, 0.012, frameM, 0, -0.026, -0.045); // trigger guard front
   box(0.006, 0.02, 0.006, dark, 0, -0.03, -0.022); // trigger
   box(0.03, 0.022, 0.012, frameM, 0, 0.0, 0.03); // beavertail

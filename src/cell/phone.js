@@ -32,6 +32,7 @@ export const SHOOTER_REQ = [
   { k: 'decoy', name: 'DECOY' },
   { k: 'lights', name: 'LIGHTS' },
   { k: 'drone', name: 'DRONE' },
+  { k: 'supplyme', name: 'SUPPLY ON ME', req: 'supply', me: true }, // the supply drone drops it at your feet
 ];
 // Console commands at the crosshair, in the tablet's order (so the number keys match).
 export const CMDS = [
@@ -231,8 +232,8 @@ export const Phone = {
     this.cmdWheel = null;
     if (!this.input) return;
     const spot = this.role === 'spotter' || this.operative;
-    const ICON = { scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
-    const SHORT = { 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON DRONE': 'DRONE' };
+    const ICON = { supplyme: '⬇', scan: '◉', jam: '≋', emp: 'ϟ', supply: '▣', lights: '☾', spoof: '⟲', decoy: '♪', drone: '✦', medevac: '✚', sweep: '◎' };
+    const SHORT = { 'SUPPLY ON ME': 'SUPPLY → ME', 'JAM EARPIECES': 'JAM', 'SPOOF CAMS': 'SPOOF', 'DECOY PING': 'DECOY', 'MEDEVAC DRONE': 'MEDEVAC', 'RECON DRONE': 'DRONE' };
     // Spotter: console commands. Shooter: requests to the spotter, landing on your crosshair.
     const list = spot ? CMDS : SHOOTER_REQ;
     const W = (this.cmdWheel = new Wheel(list.map((o) => ({ k: o.k, label: SHORT[o.name] || o.name, group: spot ? 'cmd' : 'req', icon: ICON[o.k] || '•' })), { id: 'cell-cmdwheel', centre: spot ? 'COMMAND' : 'REQUEST', fallback: null }));
@@ -263,9 +264,13 @@ export const Phone = {
       if (!was) return false;
       const k = W.close();
       const o = k && list.find((c) => c.k === k);
-      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.k, this._aimPoint()); }
+      if (o && this._cmdWheelOk()) { if (spot) this._pointCmd(o); else this._requestPayload(o.req || o.k, o.me ? this._myPoint() : this._aimPoint()); }
       return true;
     };
+  },
+  _myPoint() {
+    const P = this.player.pos;
+    return { x: P.x + 1.2, y: P.y, z: P.z + 0.8 };
   },
   _cmdWheelOk() {
     // Never while scoped: that thumb is aiming.
@@ -281,7 +286,9 @@ export const Phone = {
     if (this.role === 'shooter' && !this.operative) {
       // Shooter: keys 3–8 request that support at the crosshair (1 / 2 are your weapons).
       if (this.tablet.visible || this.downed || this.kia || this.paused || (this._voteOpen && this._voteOpen())) return;
-      for (let i = 0; i < SHOOTER_REQ.length; i++) if (I.pressed('Digit' + (i + 3))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
+      // Shift+3: a supply drop on yourself.
+      if (I.pressed('Digit3') && (I.held('ShiftLeft') || I.held('ShiftRight'))) { this._requestPayload('supply', this._myPoint()); return; }
+      for (let i = 0; i < 6; i++) if (I.pressed('Digit' + (i + 3))) { this._requestPayload(SHOOTER_REQ[i].k, this._aimPoint()); return; }
       return;
     }
     if (!(this.role === 'spotter' || this.operative) || !this.ops) return;

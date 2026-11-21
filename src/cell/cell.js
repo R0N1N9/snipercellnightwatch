@@ -204,7 +204,7 @@ function cloakMaterial() {
 
 // The beefy suppressed bolt gun for the first-person view. Same anchor contract as the
 // valley's rifles (gripR / gripL / muzzle / bolt / boltKnob / mag / sight).
-function buildKR50() {
+export function buildKR50() {
   const g = new THREE.Group();
   const mat = (hex) => new THREE.MeshLambertMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.14 });
   const M = { body: mat('#2a2d31'), dark: mat('#17181b'), hi: mat('#3a3e44'), olive: mat('#3b3f36'), glow: new THREE.MeshBasicMaterial({ color: '#40ffb0' }) };
@@ -221,8 +221,8 @@ function buildKR50() {
   cyl(0.044, 0.044, 0.02, M.hi, 0, 0.0, -0.94, 16);
   cyl(0.044, 0.044, 0.02, M.hi, 0, 0.0, -1.3, 16);
   // Grip, trigger guard, mag well, thumbhole stock.
-  const grip = box(0.04, 0.12, 0.055, M.olive, 0, -0.08, 0.02);
-  grip.rotation.x = 0.3;
+  const grip = box(0.04, 0.12, 0.055, M.olive, 0, -0.08, 0.035);
+  grip.rotation.x = -0.3; // raked back like a real pistol grip
   box(0.01, 0.01, 0.08, M.dark, 0, -0.045, -0.04);
   const magG = new THREE.Group();
   const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.11, 0.1), M.dark);
@@ -255,6 +255,24 @@ function buildKR50() {
   const lens = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), new THREE.MeshBasicMaterial({ color: '#07160e' }));
   lens.position.set(0, sy, 0.062);
   g.add(lens);
+  // Refinements: a toothed top rail, scope rings and turrets, an adjustable cheek riser, a
+  // rubber recoil pad, a textured grip and magazine, a folded bipod and sling points.
+  for (let i = 0; i < 16; i++) box(0.05, 0.007, 0.012, M.dark, 0, 0.079, 0.06 - i * 0.026);
+  for (const z of [-0.08, -0.28]) { const r = cyl(0.03, 0.03, 0.022, M.hi, 0, sy, z, 14); void r; }
+  const tur = (x, y, z, rot) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.03, 14), M.hi); t.position.set(x, y, z); if (rot) t.rotation.z = Math.PI / 2; g.add(t); const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.006, 14), M.dark); cap.position.copy(t.position); if (rot) { cap.rotation.z = Math.PI / 2; cap.position.x += 0.016; } else cap.position.y += 0.016; g.add(cap); };
+  tur(0, sy + 0.035, -0.19, false);
+  tur(0.035, sy, -0.19, true);
+  box(0.054, 0.018, 0.1, M.dark, 0, 0.095, 0.17);
+  const ck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 10).rotateZ(Math.PI / 2), M.hi); ck.position.set(0.034, 0.07, 0.17); g.add(ck);
+  box(0.064, 0.16, 0.02, mat('#101113'), 0, -0.03, 0.39);
+  for (let i = 0; i < 4; i++) box(0.066, 0.004, 0.022, M.dark, 0, -0.09 + i * 0.04, 0.39);
+  for (let i = 0; i < 4; i++) { const t = box(0.042, 0.005, 0.05, M.dark, 0, -0.055 - i * 0.022, 0.035 + i * 0.0066); t.rotation.x = -0.3; }
+  const magPart = (w, h, d, y) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M.hi); o.position.y = y; magG.add(o); };
+  for (let i = 0; i < 3; i++) magPart(0.052, 0.005, 0.102, -0.02 - i * 0.03);
+  magPart(0.056, 0.014, 0.108, -0.108);
+  for (const sx of [-1, 1]) { const leg = box(0.014, 0.014, 0.22, M.dark, sx * 0.02, -0.05, -0.62); void leg; }
+  box(0.05, 0.02, 0.03, M.hi, 0, -0.04, -0.5);
+  for (const z of [-0.78, 0.3]) { const sw = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), M.hi); sw.position.set(0, -0.045, z); sw.rotation.y = Math.PI / 2; g.add(sw); }
   const anchor = (x, y, z) => { const a = new THREE.Object3D(); a.position.set(x, y, z); g.add(a); return a; };
   g.userData = {
     gripR: anchor(0, -0.09, 0.03), gripL: anchor(-0.005, -0.04, -0.5), muzzle: anchor(0, 0, -1.33),
@@ -1429,9 +1447,9 @@ export class CellGame {
       start = hitP.clone().addScaledVector(dir, skip);
       if (start.distanceTo(o) > 880) break;
     }
-    if (rifle) this._trail(from, lastP, true);
+    if (rifle) this._trail(from, lastP, true, ammo);
     else this._tracer(from, lastP, '#ffe0a0', 0.05);
-    this.send({ t: 'shot', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: lastP.toArray().map((v) => Math.round(v * 100) / 100), r: rifle ? 1 : 0, s: sup ? 1 : 0 });
+    this.send({ t: 'shot', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: lastP.toArray().map((v) => Math.round(v * 100) / 100), r: rifle ? 1 : 0, s: sup ? 1 : 0, am: rifle ? ammo : undefined });
     // Rounds snapping past make officers bolt.
     for (const g of this.sentinel.guards) {
       if (g.state === 'dead' || (first && first.enemy === g)) continue;
@@ -1608,7 +1626,7 @@ export class CellGame {
 
   _onRemoteShot(m) {
     const a = new THREE.Vector3(...m.a), b = new THREE.Vector3(...m.b);
-    if (m.r) this._trail(a, b, false); else this._tracer(a, b, '#ffe0a0', 0.05);
+    if (m.r) this._trail(a, b, false, m.am); else this._tracer(a, b, '#ffe0a0', 0.05);
     const d = this.camera.position.distanceTo(a);
     this.audio.shotDistant(a, d / 343, !!m.s);
     if (this.isHost) this._noise(a, m.r ? 10 : m.s ? 8 : 70, !m.s);
@@ -1620,15 +1638,18 @@ export class CellGame {
   }
 
   // The shooter's signature: a long white vapor trail that hangs in the night air.
-  _trail(a, b, mine) {
+  // Each round type has its own colour: standard white-blue, explosive orange, penetrator
+  // violet, EMP electric cyan.
+  _trail(a, b, mine, ammo) {
+    const TC = { std: ['#cfe6ff', '#7aa6ff'], xr: ['#ffb070', '#ff5a20'], pen: ['#e0b0ff', '#a050ff'], emp: ['#b0fff8', '#20e8ff'] }[ammo] || ['#cfe6ff', '#7aa6ff'];
     const len = a.distanceTo(b);
     const geo = new THREE.CylinderGeometry(0.018, 0.018, len, 6, 1, true).translate(0, len / 2, 0).rotateX(Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({ color: '#cfe6ff', transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+    const mat = new THREE.MeshBasicMaterial({ color: TC[0], transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
     const m = new THREE.Mesh(geo, mat);
     m.position.copy(a);
     m.lookAt(b);
     this.scene.add(m);
-    const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 6, 1, true).translate(0, len / 2, 0).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#7aa6ff', transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 6, 1, true).translate(0, len / 2, 0).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: TC[1], transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.add(glow);
     this.trails.push({ mesh: m, t: 0, life: mine ? 2.2 : 2.6, grow: true });
   }
@@ -2872,11 +2893,26 @@ class CellHud {
     // Spotter (and lone operative): picture-in-picture squares for the console and the drone.
     const pipOn = game.role === 'spotter' || game.operative;
     this.el.pip.style.display = pipOn ? '' : 'none';
-    root.querySelectorAll('.c-sq').forEach((sq) => sq.addEventListener('pointerdown', (e) => {
+    // Tap (or click) any on-screen view to collapse it to its title strip; tap again to bring it
+    // back: the objective board, the console / ISR squares and the bodycams. Caught before the
+    // touch layer so the tap never aims or fires.
+    const views = () => [root.querySelector('.c-obj'), ...root.querySelectorAll('.c-pip .c-sq'), ...document.querySelectorAll('#cell-bodycams .bc')];
+    const viewAt = (x, y) => views().find((v) => {
+      if (!v || !v.getClientRects().length || getComputedStyle(v).display === 'none') return false;
+      const r = v.getBoundingClientRect();
+      return r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    });
+    const tapView = (e) => {
+      if (game.paused || game.ended || document.pointerLockElement) return;
+      const pt = e.touches ? e.changedTouches[0] : e;
+      const v = pt && viewAt(pt.clientX, pt.clientY);
+      if (!v) return;
       e.preventDefault();
-      if (sq.dataset.sq === 'ops') game.tablet.open();
-      else { if (game.isr.active) game.isr.exit(); else game.isr.enter(); }
-    }));
+      e.stopPropagation();
+      if (e.type === 'touchstart' || e.type === 'mousedown') { v.classList.toggle('min'); game.audio.click && game.audio.click(); }
+    };
+    addEventListener('touchstart', tapView, { capture: true, passive: false });
+    addEventListener('mousedown', tapView, { capture: true });
     this.sqOps = root.querySelector('[data-sq="ops"] canvas');
     this.sqIsr = root.querySelector('[data-sq="isr"] canvas');
     // The shooter's HUD stays minimal: hints fade once you've read them.
@@ -2913,7 +2949,7 @@ class CellHud {
     bar.className = 'cell-tbar';
     // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
     const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
-    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
+    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
       ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
@@ -3104,6 +3140,15 @@ class CellHud {
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
     if (this.abBtns) this._abilTick(dt);
+    // Context buttons only while they do something: DROP (carrying the drive), SEND / DENY (a
+    // request waiting), RECALL (drone out).
+    if (this.tbar) {
+      const ctx = { 'cell-drop': g.obj.drive === g.role, 'cell-yes': g.requests.some((r) => r.st === 'pending'), 'cell-no': g.requests.some((r) => r.st === 'pending'), 'cell-recall': !!(g._quadOut && g._quadOut()) };
+      for (const [a, on] of Object.entries(ctx)) {
+        const el = this._ctxEl?.[a] ?? ((this._ctxEl = this._ctxEl || {})[a] = this.tbar.querySelector(`[data-act="${a}"]`) || 0);
+        if (el && (el.style.display === 'none') === on) el.style.display = on ? '' : 'none';
+      }
+    }
     // Touch swap button names what you'd swap to. The spotter's P-9 is primary, binoculars secondary.
     if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
     if (this.elSwap) {

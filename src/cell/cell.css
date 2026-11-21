@@ -256,7 +256,7 @@ body.cell-cine #cell-hud .c-debrief { background: rgba(0, 0, 0, 0.25); }
 #cell-hud .c-sync.go b { color: #30ff90; animation: cellblink 0.3s infinite alternate; }
 /* Top right: CYBER OPS and ISR side by side at the very top, the partner chip under them,
    then the radio subtitles. */
-#cell-hud .c-pip { position: absolute; right: 18px; top: 14px; display: flex; flex-direction: row; gap: 6px; pointer-events: auto; }
+#cell-hud .c-pip { position: absolute; right: 18px; top: 14px; display: flex; flex-direction: row; align-items: flex-start; gap: 6px; pointer-events: auto; }
 #cell-hud.has-pip .c-partner { top: 140px; }
 #cell-hud .c-sq { width: 168px; cursor: pointer; border: 1px solid rgba(0, 255, 224, 0.45); background: rgba(0, 10, 14, 0.7); }
 #cell-hud .c-sq span { display: block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: var(--cell); padding: 2px 5px; }
@@ -444,3 +444,14 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 #touch .cell-abil .ab.on span { color: #fff; }
 #touch .cell-abil .ab.on i b { background: #fff; }
 #touch .cell-abil .ab:active { transform: scale(0.94); }
+
+/* Collapsed views (tap to toggle): just a title strip. */
+#cell-hud .c-obj.min .c-obj-n, #cell-hud .c-obj.min .c-obj-a, #cell-hud .c-obj.min .c-obj-h { display: none !important; }
+#cell-hud .c-obj.min { padding: 4px 10px; }
+#cell-hud .c-obj.min .c-obj-t { font-size: 13px; }
+#cell-hud .c-obj.min .c-obj-t::after { content: '  \25B8'; color: var(--cell-dim); }
+#cell-hud .c-obj, #cell-hud .c-pip .c-sq, #cell-bodycams .bc { cursor: pointer; }
+#cell-hud .c-pip .c-sq.min canvas { display: none; }
+#cell-hud .c-pip .c-sq.min { height: auto !important; aspect-ratio: auto !important; }
+#cell-bodycams .bc.min { aspect-ratio: auto; height: 20px; }
+#cell-bodycams .bc.min canvas, #cell-bodycams .bc.min .rec, #cell-bodycams .bc.min s, #cell-bodycams .bc.min::after { display: none; }

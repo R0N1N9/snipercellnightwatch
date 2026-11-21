@@ -82,8 +82,8 @@ export const Devices = {
     el.id = 'cell-bodycams';
     el.innerHTML = ['shooter', 'spotter'].map((r) => `<div class="bc" data-r="${r}"><canvas></canvas><i class="rec">\u25CF REC</i><b></b><s></s></div>`).join('');
     document.body.appendChild(el);
-    // Chest-mounted, wide-angle (DMZ-style), not a copy of their eyes.
-    this.bcCams = { shooter: new THREE.PerspectiveCamera(100, 16 / 10, 0.1, 900), spotter: new THREE.PerspectiveCamera(100, 16 / 10, 0.1, 900) };
+    // Shoulder-mounted, wide-angle (MW-style), not a copy of their eyes.
+    this.bcCams = { shooter: new THREE.PerspectiveCamera(92, 16 / 10, 0.05, 900), spotter: new THREE.PerspectiveCamera(92, 16 / 10, 0.05, 900) };
     for (const c of Object.values(this.bcCams)) c.rotation.order = 'YXZ';
     this._bcT = 0;
   },
@@ -108,14 +108,15 @@ export const Devices = {
       let p, yaw, pitch, st, alive = true;
       if (role === this.role) { const P = this.player; p = P.pos; yaw = P.yaw; pitch = P.pitch; st = P.stance; alive = !this.kia; }
       else { const Q = this.partner; if (!Q.seen) continue; p = Q.pos; yaw = Q.yaw; pitch = Q.pitch || 0; st = Q.st; alive = !Q.kia; }
-      // Chest rig, slightly right of centre, ahead of the vest; follows the body more than the
-      // head (pitch damped), with a little walk sway.
-      const chest = st === 2 ? 0.32 : st === 1 ? 0.85 : 1.3;
-      cam.position.set(p.x, p.y + chest, p.z);
-      const sway = Math.sin(this.t * 7) * 0.012;
-      cam.rotation.set(pitch * 0.6 - 0.04, yaw + sway, sway * 0.6);
-      cam.translateX(0.08);
-      cam.translateZ(st === 2 ? -0.55 : -0.32);
+      // Shoulder cam (MW-style): on the right shoulder strap, just above and behind the shoulder,
+      // looking along their aim, so their shoulder, arm and weapon sit in the bottom of the frame.
+      const sh = st === 2 ? 0.6 : st === 1 ? 1.3 : 1.68;
+      cam.position.set(p.x, p.y + sh, p.z);
+      const sway = Math.sin(this.t * 7) * 0.01;
+      cam.rotation.set(pitch * 0.85 - 0.05, yaw + sway, sway * 0.5);
+      cam.translateX(st === 2 ? 0.26 : 0.24);
+      cam.translateZ(st === 2 ? 0.02 : 0.1);
+      if (box.classList.contains('min')) { box.querySelector('b').textContent = `BODYCAM \u00B7 ${role === this.role ? this.name : this.partnerName} \u25B8`; continue; }
       const r = box.getBoundingClientRect();
       const w = Math.max(40, Math.round(r.width)), h = Math.max(30, Math.round(r.height));
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
@@ -123,17 +124,18 @@ export const Devices = {
       cam.updateProjectionMatrix();
       box.querySelector('b').textContent = `BODYCAM \u00B7 ${role === this.role ? this.name : this.partnerName}${alive ? '' : ' \u00B7 NO SIGNAL'}`;
       box.querySelector('s').textContent = this._bcStamp();
-      if (!alive) continue;
-      // Hide the wearer's own model so their hood, arms and rifle don't fill the frame.
+      if (!alive || box.classList.contains('min')) continue;
+      // Keep the wearer in shot (shoulder, arm, weapon) but drop the head so it doesn't fill
+      // the left of the frame.
       const av = role === this.role ? null : this.partner.avatar;
-      const was = av && av.root.visible;
-      if (av) av.root.visible = false;
+      const was = av && av.neck && av.neck.visible;
+      if (av && av.neck) av.neck.visible = false;
       // Low-light sensor: a lot more gain than your eyes get.
       const R = this.renderer, ex = R.toneMappingExposure;
       R.toneMappingExposure = ex * 4;
       this._cornerRender(cam, w, h, cv, cv.getContext('2d'));
       R.toneMappingExposure = ex;
-      if (av) av.root.visible = was;
+      if (av && av.neck) av.neck.visible = was;
     }
   },
   _bcStamp() {
