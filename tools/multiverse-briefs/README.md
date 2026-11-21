@@ -39,6 +39,8 @@ and five transitions, plus the plunge that links surf to the underwater world.
 | neon, ww2, pixel, terminal, manga, toon, toybox, surf, comic | worlds | in matches |
 | abyss | world (underwater; the owner's showpiece) | in matches, always straight after surf; still owed a top-tier polish pass |
 | plunge | linking transition, surf → abyss | in matches |
+| cartridge, tidy-up | world exits (pixel, toybox) | in matches; always played when a kill ends a round in their world |
+| reboot, page-turn, last-reel, swallowed | world exits (terminal, manga, toon, abyss) | brief only |
 | paper | world (flat-drawn first person) | first build done (report in `reports/`); second-engineer pass not started |
 | snow, orbit, heli, worm, arcade, noir, tapestry, petri | worlds | brief only |
 | radar, telescope, wormhole, bullet-hole, channel-surf and the rest | transitions | brief only |
