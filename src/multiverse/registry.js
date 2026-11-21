@@ -10,6 +10,9 @@
 // dives after them, and the duel carries on underwater). The world named by `then` is only
 // reached that way while its lead-in is playable; a transition marked `link: true` is only
 // ever played as somebody's `via`, never drawn in the rotation.
+// A transition with `from: '<world>'` is that world's own way out: it is written around what
+// the world is (a cartridge pulled from a console, a terminal crashing, toys tidied away) and is
+// always played when a kill ends a round there; it is never drawn in the ordinary rotation.
 // `opener: true` marks the chained pair the owner wants shown off first: in the first match a
 // device hosts, it is the world that follows the first kill (see Director._armOpener).
 // `dev: true` keeps an entry out of the match rotation (examples / templates).
@@ -51,7 +54,12 @@ export const TRANSITIONS = [
   { id: 'wormhole', wip: true, load: () => import('./transitions/wormhole.js') },
   { id: 'channel-surf', wip: true, load: () => import('./transitions/channel-surf.js') },
   { id: 'cosmic-zoom', wip: true, load: () => import('./transitions/cosmic-zoom.js') },
-  { id: 'reboot', wip: true, load: () => import('./transitions/reboot.js') },
+  { id: 'reboot', from: 'terminal', wip: true, load: () => import('./transitions/reboot.js') },
+  { id: 'cartridge', from: 'pixel', load: () => import('./transitions/cartridge.js') },
+  { id: 'tidy-up', from: 'toybox', load: () => import('./transitions/tidy-up.js') },
+  { id: 'page-turn', from: 'manga', wip: true, load: () => import('./transitions/page-turn.js') },
+  { id: 'last-reel', from: 'toon', wip: true, load: () => import('./transitions/last-reel.js') },
+  { id: 'swallowed', from: 'abyss', wip: true, load: () => import('./transitions/swallowed.js') },
   { id: 'storybook', wip: true, load: () => import('./transitions/storybook.js') },
   { id: 'slot-machine', wip: true, load: () => import('./transitions/slot-machine.js') },
   { id: 'bullet-hole', wip: true, load: () => import('./transitions/bullet-hole.js') },
@@ -102,7 +110,9 @@ export function loadTransition(id) {
 
 export const dimensionKind = (id) => { const e = DIMENSIONS.find((d) => d.id === id); return e ? { view: e.view, look: e.look } : {}; };
 export const playableDimensions = () => DIMENSIONS.filter((d) => !d.dev && !d.wip).map((d) => d.id);
-export const playableTransitions = () => TRANSITIONS.filter((d) => !d.dev && !d.wip && !d.first && !d.link).map((d) => d.id);
+export const playableTransitions = () => TRANSITIONS.filter((d) => !d.dev && !d.wip && !d.first && !d.link && !d.from).map((d) => d.id);
+// A world's own way out, if it has one that can be played.
+export const exitOf = (id, ok = () => true) => (TRANSITIONS.find((t) => t.from === id && !t.dev && !t.wip && ok(t.id)) || {}).id || null;
 
 // Where a kill in world `id` leads, if it is chained to another: { dim, fx } (fx null when the
 // linking transition is not available, in which case an ordinary one is drawn). `ok(id)` lets

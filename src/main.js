@@ -545,11 +545,12 @@ const openLab = async () => {
     (e) => (e.id === 'valley' ? 'always opens the match' : lead(e.id) ? `follows ${lead(e.id).id}` : ''),
     (e) => go({ first: e.id, only: e.id }));
   fill($('lab-fx'), 'fx', TRANSITIONS, loadTransition,
-    (e) => (e.first ? 'the first kill' : e.link ? 'links two worlds' : ''),
+    (e) => (e.first ? 'the first kill' : e.link ? 'links two worlds' : e.from ? `leaving ${e.from}` : ''),
     (e) => {
       // Shown between the two worlds it was made for, or between two picked at random.
       const made = DIMENSIONS.find((d) => d.via === e.id);
-      const dims = made ? [made.id, made.then] : listed(DIMENSIONS).filter((d) => d.id !== 'valley').map((d) => d.id).sort(() => Math.random() - 0.5);
+      const others = listed(DIMENSIONS).filter((d) => d.id !== 'valley' && d.id !== e.from).map((d) => d.id).sort(() => Math.random() - 0.5);
+      const dims = made ? [made.id, made.then] : e.from ? [e.from, others[0] || e.from] : others;
       go({ dev: { fxlab: e.id, from: dims[0], to: dims[1] || dims[0] } });
     });
 };

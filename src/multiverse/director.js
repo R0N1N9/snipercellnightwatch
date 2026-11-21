@@ -9,7 +9,7 @@ import { MvInput } from './input.js';
 import { AudioKit } from './audiokit.js';
 import { MvHud } from './hud.js';
 import { Mux } from './transport.js';
-import { loadDimension, loadTransition, playableDimensions, playableTransitions, firstTransition, dimensionKind, chainOf, chainedDimensions, openerDimension, metaOf } from './registry.js';
+import { loadDimension, loadTransition, playableDimensions, playableTransitions, firstTransition, dimensionKind, chainOf, chainedDimensions, openerDimension, exitOf, metaOf } from './registry.js';
 import { PLAYER_COLORS, DEFAULTS, BOT_SKILL } from './contract.js';
 import { mulberry32 } from '../util.js';
 import finale from './finale.js';
@@ -286,6 +286,9 @@ export class Director {
     }
     // A chained pair of worlds brings its own transition.
     if (this.linkFx) { const id = this.linkFx; this.linkFx = null; return id; }
+    // A world with a way out of its own leaves by it (a drawn round is no exit: nobody won it).
+    const out = this._killExit ? exitOf(this.mod && this.mod.id, (id) => this._usable(id)) : null;
+    if (out) return out;
     return this._draw('fxBag', playableTransitions().filter((id) => !this.off.has(id)), this.lastFx) || 'none';
   }
 
@@ -698,7 +701,9 @@ export class Director {
     const done = winner >= 0 && score[winner] >= this.target;
     this.linkFx = null;
     const dim = done ? FINALE : this._nextDim(winner >= 0);
+    this._killExit = winner >= 0;
     const fx = this._nextFx();
+    this._killExit = false;
     this.lastFx = fx;
     const next = { dim, fx, seed: mixSeed(this.matchSeed, done ? 9999 : this.round + 1) };
     const m = { t: 'mv', k: 'point', r: this.round, winner, victim, how, score, next };
