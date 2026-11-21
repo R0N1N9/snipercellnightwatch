@@ -40,7 +40,13 @@ export const PRESETS = {
   },
 };
 
-export const DEFAULT_RULES = { preset: 'halo', ...PRESETS.halo, autoZero: true };
+// Graphics looks (applied by src/look.js and the grade pass in game.js).
+export const LOOKS = {
+  inked: { name: 'Inked', sub: 'cel + ink', desc: 'Bold black ink lines around everything and flat, cel-shaded color. The default.' },
+  og: { name: 'OG', sub: 'original', desc: 'The original look: soft shading, a light silhouette outline and a filmic grade.' },
+};
+
+export const DEFAULT_RULES = { preset: 'halo', ...PRESETS.halo, autoZero: true, look: 'inked' };
 
 // The live rules everything reads.
 export const RULES = { ...DEFAULT_RULES };
@@ -53,6 +59,8 @@ export function normalizeRules(r) {
   // Close is the default; 'auto' (follow the style) is opt-in.
   out.range = r && ['auto', 'close', 'medium', 'long', 'extreme'].includes(r.range) ? r.range : 'close';
   out.styleRange = (p && p.range) || 'long';
+  // Graphics look (src/look.js): the host's choice, like everything else here. Inked by default.
+  out.look = r && r.look === 'og' ? 'og' : 'inked';
   if (r && r.preset === 'custom') {
     const num = (v, d, lo, hi) => (typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
     out.preset = 'custom';

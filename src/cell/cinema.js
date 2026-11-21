@@ -1,7 +1,7 @@
 // Sniper Cell — the two cut-scenes, played locally on each client (skippable).
 //   INTRO  the van comes down the plateau track with its lights on, stops, both doors swing
 //          open, the operators step out, gear up (rifle up, comms check, a flicker of active
-//          camo, the tablet lights), and walk together to the cliff over Kestrel Ridge.
+//          camo, the tablet lights), and walk together into the wooded draw below Kestrel Ridge.
 //   OUTRO  after the van pulls out: an open road across a plain, the van running flat out
 //          toward a sunrise, ending on its silhouette against the sun as the debrief rolls.
 import * as THREE from 'three';
@@ -10,6 +10,7 @@ import { hazeUniforms } from '../atmosphere.js';
 import { terrainHeight, lam } from './facility.js';
 import { buildVan, setVanLights } from './van.js';
 import { VanSound } from './vansound.js';
+import { installHalo } from './halo.js';
 
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -67,11 +68,15 @@ export class Cinema {
       g.scene.add(av.root);
       return { role, av, p: new THREE.Vector3(), yaw: 0, moving: false };
     });
+    this.title.textContent = '';
+    this._voiced = new Set();
+    this._titled = false;
+    // Knoll drops come in by air (HALO); the others by van.
+    if (g.drop.air) { this._startAir(); this._fadeTo(1); return; }
     this.van = buildVan();
     g.scene.add(this.van);
-    this.vx = 6;
-    this.vz0 = 196;
-    this.vz1 = 143;
+    // The chosen drop point: down the draw, or up onto the ridge (the walk-out ends at SPOTS.insert).
+    [this.vx, this.vz0, this.vz1] = g.drop.van;
     this.title.textContent = '';
     this._voiced = new Set();
     this.vs = new VanSound(g.audio);
@@ -122,8 +127,9 @@ export class Cinema {
       if (t < 6.4) { x = seatX; z = vz - 0.1; A.hidden = true; }
       else if (t < 7.6) { const u = ease((t - 6.4) / 1.2); x = lerp(seatX, doorX, u); z = vz - 0.4; yaw = side > 0 ? -Math.PI / 2 : Math.PI / 2; moving = true; A.hidden = false; }
       else if (t < 9) { const u = ease((t - 7.6) / 1.4); x = lerp(doorX, frontX, u); z = lerp(vz - 0.4, vz - 4.2, u); yaw = Math.atan2(-(frontX - doorX), 4) ; moving = true; }
-      else if (t < 11) { x = frontX; z = vz - 4.2; yaw = 0; st = t > 9.6 && t < 10.4 && A.role === 'shooter' ? 1 : 0; }
+      else if (t < 11) { x = frontX; z = vz - 4.2; yaw = 0; st = 0; }
       else { const u = Math.min(1, (t - 11) / 4.5); x = frontX; z = lerp(vz - 4.2, vz - 22, u); yaw = 0; moving = true; }
+      A.hidden = t < 6.4; // in the van until the doors open
       A.p.set(x, terrainHeight(x, z), z);
       A.av.setVisible(!A.hidden);
       A.av.update(dt, { p: A.p, yaw, pitch: t > 9 && t < 11 ? -0.05 : 0, st, moving, w });
@@ -138,26 +144,29 @@ export class Cinema {
     const S = this.actors[0];
     if (t < 6) {
       // Wide: watching the van come down the track toward us, the valley glow beyond.
-      const cp = new THREE.Vector3(vx + 13, terrainHeight(vx + 13, 150) + 2.4, 150);
-      cam.position.lerpVectors(new THREE.Vector3(vx + 16, cp.y + 3, 165), cp, ease(t / 6));
+      const z1 = this.vz1 + 7, z0 = this.vz1 + 22;
+      const cp = new THREE.Vector3(vx + 13, terrainHeight(vx + 13, z1) + 2.4, z1);
+      cam.position.lerpVectors(new THREE.Vector3(vx + 16, cp.y + 3, z0), cp, ease(t / 6));
       cam.lookAt(vx, vy + 1, vz);
       cam.fov = 42;
     } else if (t < 9) {
       // Close on the doors as they come out.
-      cam.position.set(vx - 1.2, vy + 1.5, vz - 6.5);
+      // Centred on the van, so both operators are the same distance from the lens.
+      cam.position.set(vx, vy + 1.5, vz - 7.5);
       cam.lookAt(vx, vy + 1.1, vz - 0.5);
       cam.fov = 48;
     } else if (t < 11) {
       // Gear-up: facing them, van lights behind.
       const fz = vz - 4.2;
-      cam.position.set(vx + 0.6, terrainHeight(vx, fz - 3.2) + 1.45, fz - 3.2 - (t - 9) * 0.25);
-      cam.lookAt(vx, terrainHeight(vx, fz) + 1.35, fz);
+      cam.position.set(vx, terrainHeight(vx, fz - 4.6) + 1.45, fz - 4.6 - (t - 9) * 0.25);
+      cam.lookAt(vx, terrainHeight(vx, fz) + 1.2, fz);
       cam.fov = 40;
     } else {
-      // Walking out together toward the cliff and Kestrel Ridge below.
+      // Walking out together up the draw, into the trees toward the ridge.
+      // Behind the pair, centred between them (not over one shoulder).
       const ahead = S.p;
-      cam.position.set(vx + 0.4, ahead.y + 1.9, ahead.z + 3.6);
-      cam.lookAt(vx, ahead.y - 2 - (t - 11) * 1.2, ahead.z - 40);
+      cam.position.set(vx, ahead.y + 1.9, ahead.z + 4.8);
+      cam.lookAt(vx, ahead.y + 0.6, ahead.z - 40);
       cam.fov = 52;
     }
     cam.aspect = innerWidth / innerHeight;
@@ -187,8 +196,9 @@ export class Cinema {
     if (this.active !== 'intro') return;
     this.active = null;
     for (const A of this.actors) g.scene.remove(A.av.root);
-    g.scene.remove(this.van);
+    if (this.van) g.scene.remove(this.van);
     if (this.vs) this.vs.stop();
+    if (this.air) this._endAir();
     this._show(false);
     this._say('');
     this.title.classList.remove('on');
@@ -329,7 +339,7 @@ export class Cinema {
   update(dt) {
     if (!this.active) return;
     this.t += dt;
-    if (this.active === 'intro') this._updateIntro(dt);
+    if (this.active === 'intro') { if (this.air) this._updateAir(dt); else this._updateIntro(dt); }
     else this._updateOutro(dt);
   }
 
@@ -341,3 +351,4 @@ export class Cinema {
     return true;
   }
 }
+installHalo(Cinema);

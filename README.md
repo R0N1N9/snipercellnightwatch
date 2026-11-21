@@ -1,12 +1,12 @@
-<p align="center"><img src="icon.svg" width="120" alt="Draxxed Sklounst logo"></p>
+<p align="center"><img src="icon.svg" width="120" alt="Sniper Cell logo"></p>
 
-<h1 align="center">Draxxed Sklounst</h1>
+<h1 align="center">Sniper Cell</h1>
 
 <p align="center"><em>One valley. Two rifles. Eight hundred metres.</em></p>
 
-A 1v1 long-range sniper duel that runs in the browser on desktop, phones and tablets. No install, no server: one player hosts, the other opens the invite link, and the two connect peer-to-peer over WebRTC.
+A 1v1 long-range sniper duel that runs in the browser on desktop, phones and tablets. (Formerly *Draxxed Sklounst*; the old name still turns up as an easter egg.) No install, no server: one player hosts, the other opens the invite link, and the two connect peer-to-peer over WebRTC.
 
-It also has **[Sniper Cell: NightWatch](#sniper-cell)**, a co-op (or solo) night stealth mode: a shooter and a spotter infiltrate a guarded two-storey data center, steal intel from a hidden server and get out in a van.
+It also has **[NightWatch](#nightwatch-co-op)**, a co-op (or solo) night stealth mode: a shooter and a spotter infiltrate a guarded data-center tower, steal intel from a hidden server and get out in a van.
 
 ![The practice range: looking out over the valley from the ridge with the Mk22 MRAD](docs/screenshots/practice-range.png)
 
@@ -40,7 +40,7 @@ It also has **[Sniper Cell: NightWatch](#sniper-cell)**, a co-op (or solo) night
 - Both players start on opposite ridgelines, about 800 m apart. Spawns are random among three points per ridge, and sides swap every round.
 - You get one life per round. First to 4 rounds wins.
 - **Predator UAV**: a drone circles high over the valley. Every 60 s of live play it pings both players in red on each other's HUD. For 8 s afterwards you can press **U** to tune into its live thermal feed of the enemy. A UAV jammer blocks the ping and the feed.
-- **Pollo Hermano** (easter egg): pick the Thermal poncho, then the *Pollo Hermano* poncho skin. You wear a yellow chicken suit and your rifle flings yellow chickens instead of bullets: held by the beak, pulled back by the feet, slingshot style. They fly exactly like the rifle's bullets under the current sniping style and do the same damage on a direct hit. A chicken that lands gets up and runs at the enemy (5 m/s) and pecks them (4 damage every 0.6 s) until it's shot: the pistol is ideal. Fling yours at the ground near enemy chickens and they brawl. Up to 8 live chickens each; they wander off after 45 s. The AI shoots chickens near it with its pistol. With the suit selected, the main menu becomes *Draxxed Sklounst: The Reckoning*. The suit isn't remembered between visits: every fresh load starts on the standard poncho and the classic title. Pecked to death? You don't just die: a kraken bursts out of the ground and swallows the town, then a vast AI overlord reaches down from the sky and flicks you off the map: "The AI Overlords have deemed this one unworthy." (Both players watch it instead of the killcam.) In flight a chicken glows and trails yellow like a tracer.
+- **Pollo Hermano** (easter egg): pick the Thermal poncho, then the *Pollo Hermano* poncho skin. You wear a yellow chicken suit and your rifle flings yellow chickens instead of bullets: held by the beak, pulled back by the feet, slingshot style. They fly exactly like the rifle's bullets under the current sniping style and do the same damage on a direct hit. A chicken that lands gets up and runs at the enemy (5 m/s) and pecks them (4 damage every 0.6 s) until it's shot: the pistol is ideal. Fling yours at the ground near enemy chickens and they brawl. Up to 8 live chickens each; they wander off after 45 s. The AI shoots chickens near it with its pistol. With the suit selected, the main menu takes the game's old name, *Draxxed Sklounst*. The suit isn't remembered between visits: every fresh load starts on the standard poncho and the classic title. Pecked to death? You don't just die: a kraken bursts out of the ground and swallows the town, then a vast AI overlord reaches down from the sky and flicks you off the map: "The AI Overlords have deemed this one unworthy." (Both players watch it instead of the killcam.) In flight a chicken glows and trails yellow like a tracer.
 - **Sniping style** (main menu, host's choice applies to both players). Two bars: the shooting style (bullet physics) and, underneath, the shooting distance:
   - **Halo** (the default): instant hit, no drop, wind or sway, 5×/10×/20× zoom. Plays at Close range.
   - **Call of Duty**: fast bullets, light drop, no wind, slightly bigger hitboxes. Plays at Medium range.
@@ -49,6 +49,11 @@ It also has **[Sniper Cell: NightWatch](#sniper-cell)**, a co-op (or solo) night
   - **Custom**: sliders for drop, bullet speed (slow to instant), wind, drag, sway and hitbox size.
   - **Distance** (mix and match with any physics; Close is the default; each sits under the style it suits): Close ~250 m (valley floor between the town and the meadow), Medium ~500 m (forward slopes, in the trees), Long ~800 m (ridge to ridge), Extreme ~1150 m (opposite ridges at opposite ends of the valley) or Auto (the style's own). It sets where both sides spawn and where the AI sets up; the valley itself doesn't change.
   - Option: the rangefinder (F) auto-sets your zero to the measured distance.
+- **Graphics style** (on this panel, under Settings, and on the NightWatch panel: all three are the same setting; the host's choice applies to both players, in the duel and in NightWatch):
+  - **Inked** (the default): comic-book ink lines around everything (silhouettes and folds, found in the depth buffer and fading with distance) and three-tone cel shading on props, figures and your rifle, with fuller color. Grass is left uninked so the slopes don't turn to noise.
+  - **OG**: the original look, with soft shading, a light silhouette-only outline and a slightly desaturated filmic grade.
+  - On Low quality there's no post-processing, so Inked gets the cel shading but no ink lines.
+  - NightWatch (Sentinel and Infiltration missions) follows the same setting, with the same choice on its own menu (Inked / OG graphics). The host's choice goes to the partner with the mission.
 - **Bolt cycling** (standard Mk22 bolt): after a scoped shot, lifting your finger off fire drops you out of the scope so the bolt is worked, then you go straight back in if you're still holding (or have toggled) scope. Keep fire held to stay on target and watch the shot; turn this off in Settings to unscope by hand.
 - **Bipod** (Battlefield-style): go prone and hold still for half a second and it sets itself (turn that off in Settings to set it only by hand), or press **X** (BIPOD on touch). Your support hand reaches forward and flicks the legs down, then the rifle settles. You can't fire while your hand is off the rifle. Once set, the scope is dead still and recoil is reduced. Moving, standing, switching or pressing X again folds the legs; folding with X keeps it up until you move or get up.
 - **Supply drone** (V, then a 90 s cooldown): a cargo hexacopter flies in from behind your ridge and drops a parachute crate where you aim (within 60 m) or at your feet. Walk onto it to refill both weapons. Both players see and hear it, and the AI uses it to find you.
@@ -81,7 +86,7 @@ It also has **[Sniper Cell: NightWatch](#sniper-cell)**, a co-op (or solo) night
 
 - Controls sit in arcs around where each thumb rests, inset from the corners and clear of notches. A fixed joystick sits bottom-left; push it fully forward to sprint. Zero −/+, Range and the weapon swap sit in an outer ring around the right-hand FIRE button. The left thumb also has a second **FIRE** and a **BREATH** toggle, so either thumb can aim while the other fires.
 - Drag anywhere that isn't a button to aim. Left and right thumbs each have their own sensitivity in Settings.
-- **SCOPE** and **BREATH** are toggles. Breath releases itself when you unscope or run out of air.
+- **SCOPE** (the larger button just above FIRE) and **BREATH** are toggles. Breath releases itself when you unscope or run out of air. **RELOAD** sits to FIRE's left.
 - **Gyro aiming** (Settings): Off, When scoped (default on phones) or Always, with its own sensitivity and invert. It needs HTTPS, so it works from the hosted page, not an opened file. iPhones ask for motion permission the first time.
 - Pills along the top hold your tools (with charges), kit, the Predator feed and the menu.
 
@@ -109,17 +114,17 @@ Click the game view with the mouse and it switches to mouse mode: the mouse aims
 | Pause menu | Esc | II |
 | Sandbox tools | B | TOOLS |
 
-## Sniper Cell
+## NightWatch (co-op)
 
-A night stealth mode for one or two players, built around the feel of a classic night sniping level: a dark valley, a lit compound below, a suppressed rifle with a night-vision scope and a white vapour trail on every shot. Its rules are adapted from **Cold Archive**'s co-op infiltration (agent + Overwatch, SENTINEL's alarm, bandwidth-based payloads). The players use the Draxxed Sklounst operator models in Multicam Black. The shooter wears a chest rig and a dark urban-digital poncho; the spotter wears a plate carrier and a cap.
+A night stealth mode for one or two players, built around the feel of a classic night sniping level: a dark valley, a lit compound below, a suppressed rifle with a night-vision scope and a white vapour trail on every shot. Its rules are adapted from **Cold Archive**'s co-op infiltration (agent + Overwatch, SENTINEL's alarm, bandwidth-based payloads). The players use the duel's operator models in Multicam Black. The shooter wears a chest rig and a dark urban-digital poncho; the spotter wears a plate carrier and a cap.
 
 Pick **NIGHTWATCH** (the cyan button) on the main menu, then a mission, the **staging area** loadout, and how to play.
 
-**Play it:** [r0n1n9.github.io/snipercellnightwatch/#nightwatch](https://r0n1n9.github.io/snipercellnightwatch/#nightwatch) opens Sniper Cell with NightWatch selected. Use `#infiltration` for the other mission.
+**Play it:** [r0n1n9.github.io/snipercellnightwatch/#nightwatch](https://r0n1n9.github.io/snipercellnightwatch/#nightwatch) opens NightWatch with the Sentinel mission selected. Use `#infiltration` for the other mission.
 
 ### Missions
 
-- **NightWatch** (default): SENTINEL's augmented night garrison.
+- **Sentinel** (default): SENTINEL's augmented night garrison.
   - **Officers:** human-sized and cowardly. They flee when they're alone, when shot at, or when they lose their pack leader.
   - **Juggernauts:** a recharging energy shell. When it breaks, they berserk with an energy blade.
   - **Bulwarks:** behind a hard-light wall. Snipe through its sight-port, or catch them when they lower it to fire. Tower bulwarks carry beam rifles and you see a red laser before they fire.
@@ -202,6 +207,24 @@ The data center has **two storeys** with two stairwells. Guards, cameras and pat
 
 **Inside the building:** patrols on both floors.
 
+**Drop point:** the NightWatch menu shows a briefing map of Kestrel Ridge. Pick where you go in, on the map or with the buttons under it. When you host, your pick applies to both of you.
+
+- **Tree line** (the default, described below): the van drops you in the woods south of the ridge.
+- **Ridge**: the van takes you straight onto the plateau above the cliff, with no approach.
+- **Tower roof**: a HALO jump straight onto the roof, then down the service hatch (hold E) onto the data floor. The same hatch takes you back up.
+- **West knoll** / **East knoll**: a HALO jump. The intro shows a transport droning in with the ramp down, the jump light going green, freefall (with a point-of-view shot and an altimeter), canopies opening, a point-of-view shot under canopy, and the landing on the knoll. You hear the engines, the wind in freefall, the canopy snap and flutter, and the landing.
+
+**Layout:** **Standard layout** is the map as built. **Random layout** scatters the yard's cover (containers, trucks, HVAC, generators, sandbags, crates), the light poles and the west fence cut from the game's seed, so both players get the same compound. Roads, doors, guard routes, the towers, the barracks and the drone bay stay clear.
+
+**The building** is a tower. The lobby floor is at ground level and the data floor is about 24 m up, with empty storeys of dark office glass between them.
+
+- **Getting up:** take the **elevator** (stand in the car and press E, or press E at a landing to call it) or climb the **stair tower** (eight switchback flights).
+- **Lobby:** a **security checkpoint** sits just inside the front doors. Walking through the metal detector sets it off: a buzzer, a noise the guards come to, and a jump in SENTINEL's alert. Step round the ends of the rope barriers instead. Hacking the CCTV desk switches it off. An officer works the checkpoint desk and another watches the elevator.
+- **Ground floor:** security / CCTV, electrical (relay), the mailroom, the guard room and the plant room.
+- **Data floor:** the three rack rooms (keycard doors), offices, the break room, comms and storage. The archive server is always up there.
+
+**The approach:** the van drops you in a wooded draw south of the ridge. Walk north up the draw, using the tree line as cover (tree crowns block sight), over the crest and out to the cliff that overlooks the compound. Four or five **pickets** hold the draw: a sentry at a sandbagged observation post, two walkers on the valley floor, a lookout below the crest and sometimes one on the tree line. Each one that spots you radios it in, so take them quietly. The objective board counts the ones left until you're over the crest. An AI partner walks the draw with you (crouching when you do) and moves to its post once you crest the hill.
+
 The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and spread out: no two starting guards stand within about 9 m of each other, except a pack leader and its follower.
 
 ### Guards notice
@@ -227,38 +250,78 @@ The garrison is kept lean, about 34 in NightWatch and 28 in Infiltration, and sp
   - **N** to reach up and pull the goggles down: your hand comes up, the goggles flip down with a click and a tube whine, and the picture irises open as the tubes warm.
   - The goggles and scope are smooth, near-white phosphor with a slight blue cast.
   - Bright lights, including a weapon light in your face, wash it out.
-  - **IR strobes** on both operators' helmets and shoulders, and **IR lasers** from both weapons, show only in night vision and the ISR IR view.
+  - **IR strobes** on both operators' helmets and shoulders flash about once a second, and **IR lasers** come from both weapons. They show only in night vision (goggles, the NV scope, the recon quad) and the ISR's IR view. The strobes keep a minimum size on screen, so you can pick out your partner across the compound and the ISR sees both operators from altitude.
 - **Weapon lights (L):** a weapon light makes you easy to see. Guards also walk over to wherever the beam lands, so it works as a distraction.
 - **Sync shots:**
   1. Look at an enemy and **hold F** (or tap SYNC on touch) to mark it for your teammate: a pulsing circle sits over its head. The wheel's SYNC option works too.
   2. Put your own crosshair on another enemy's head. You don't need to aim down sights. Your teammate holds theirs on the marked one, or an AI Ra takes it.
   3. When both crosshairs are on heads that die to one shot (no helmet), a solid **FIRE** block locks on, both weapons fire on their own, and both enemies go down.
+  4. With an AI partner and two marks, the AI takes the **first** one you marked and you take the **second** (the tags read SYNC 1 · ALLY and SYNC 2 · YOU). An AI Ra fires from his rifle at any range; an AI Rōnin takes his with the pistol out to about 75 m.
+- **Firing:** hold the trigger and every weapon keeps firing at its own rate (semi-autos and the bolt gun as fast as they cycle; burst mode repeats bursts).
 - **Downed but alive:** a body-shot kill leaves an enemy down but alive. It's out of the fight, but the reticle still goes red over it. Headshot it on the ground to finish it, and your character calls "X-ray down".
 - **Radio chatter:**
   - Operators call fresh contacts in their field of view: "Contact, north-east, 60 meters".
-  - When your partner drops an enemy you pinged, they call "X-ray down".
+  - When your partner drops an enemy you pinged, they call "X-ray down". Marking an enemy gets no spoken acknowledgement.
   - Switching on night vision sometimes gets a "Going dark".
+- **Zoom:** the ISR sensor zooms smoothly from 40° to 1.8° (wheel, + / −, hold [ or ], pinch, or the ZOOM pills on touch), with a zoom ladder on the right of the view. On the tablet, pinch or scroll the map, and zoom the live camera / bodycam feed up to 6× with its ＋ − buttons, the scroll wheel or a pinch (double-click resets).
 - **HUD:**
   - The comms log fades after a few seconds; the tablet keeps the full log.
   - **O** shows or hides the objective board, and **P** expands or compacts it.
+
+The **Staging area · Loadout** screen shows each operator in full kit on a turntable (drag to turn; tabs switch between shooter and spotter).
+
+### Shared kit
+
+- **Tablet / map / ISR:** your weapon drops away, your left hand brings the tablet up until it fills the view, and the screen flickers on. On the tablet, the ISR button flips to the Predator feed (both roles), and TAB flips back.
+- **Laser sights (K or LASER):** a visible red laser from your weapon, on by default. Your partner sees yours; guards can catch it too.
+- **Body drag (hold E on a body):** drag it out of sight, then let go. You move at half speed while dragging.
+- **Bodycams:** both operators' head cams show as small squares in the ISR view. Turn on **Partner bodycam** in the pause menu to keep your partner's in a corner of your screen.
+- **Spotlight drones:** a helicopter drone circles high over each way in (west, east and south), sweeping a spotlight across the ground. Stand in the light too long and it locks on: an alarm, and every guard near you comes. Stay out of the light, or shoot it down. The wreck makes a crash the guards nearby hear.
+- **Look:** both operators wear multicam black with flat dark earth load-bearing kit (carrier, rig, belts, straps) and IR-reflective red markers. The shooter has a clear coiled earpiece under the hood; the spotter has a ball cap and an FDE headset with a boom mic.
 
 ### Roles
 
 **Shooter** (default callsign **Ra**):
 
 - KR-50 Nightjar: bolt-action, integrally suppressed, with Halo-style hitscan and a night-vision scope.
-- Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi) or the **M50 Magnum** (7 rounds and a heavy hit, like Halo's magnum). Its suppressor is fitted by default and removable.
+  - Dead-on through the scope, wide from the hip (the crosshair opens to show it), with a real kick.
+  - **Standard bolt** (default): tap fire and you come off the glass to work the bolt; keep fire held to stay scoped. The **straight-pull bolt** (Staging area) cycles while you stay on target.
+  - **Collateral:** a KR-50 round carries on through bodies and through thin interior walls and doors (losing some punch each time).
+  - **Z: rounds menu** (left of the screen; 1–4, click or tap). Each swap is a full reload animation, and supply crates restock the special rounds.
+    - **Standard:** the default round, with collateral.
+    - **Explosive:** sticks where it hits, blinks for a second and blows. It kills a juggernaut or titan it's stuck to and catches anything within about 5 m. Loud.
+    - **Penetrator:** punches through exterior walls and bulwark shields.
+    - **EMP:** kills drones, cameras, lights, shields and radios around the hit (non-lethal to people).
+  - **Breath and wind:** hold **SHIFT** on the scope to steady it (a few seconds, then a cooldown). The scope shows the crosswind and a hold-off dot for the range; the round drifts with the wind.
+  - **Recoil and noise:** the rifle kicks. Its suppressed crack and the M50's still carry a short way, fading with distance (startling anyone very close); beyond that they're silent.
+- **Ghillie freeze:** prone and dead still for two seconds and you all but vanish past ~15 m. Move or fire and it breaks.
+- **Marked for death:** three kills on tagged enemies, each within 10 s of the last, give you Deadeye back and a full camo battery.
+- **Overwatch lock:** hold the scope steady on an area for 1.5 s and everything around your point of aim is marked for the team while you hold it. Your partner sees the ring.
+- **Counter-sniper read:** the tower snipers' sightlines show to you as red lasers.
+- **Spotter relay:** tagged enemies off your screen get an arrow at the edge with their range.
+- **M: camera darts** (three): fire a tiny camera into a wall or the ground. It marks enemies in front of it and appears on the tablet map; click it to watch its feed.
+- **First-use hints:** the first time you use an ability, a short card explains it.
+- Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi) or the **M50 Magnum** (7 rounds, slow and heavy: a deep boom, a big kick and a wide hip spread, so aim down sights or get close). Its suppressor is fitted by default and removable: your support hand comes up to the muzzle and twists the can off and pockets it (or threads it back on). You can't fire mid-gesture.
 - **Stealth kit:**
   - **G** active camo. **Firing breaks it.**
   - **H** Deadeye.
   - **X** lures.
   - **T** Mark & Execute.
   - **E** knife takedown.
+- **Requests at the crosshair:** keys **3–8** request supply, scan, EMP, decoy, lights or the recon drone on the spot you're aiming at. On touch, press and hold empty screen, drag to a request and lift.
+- **Pings:** V (or PING) on open ground drops a plain PING marker. F (or TAG) on open ground calls "look here".
   - The shooter can't unlock doors, only walk through ones that are already open.
 
 **Spotter** (default callsign **Rōnin**):
 
-- P-9 pistol (2 magazines) with a removable suppressor.
+- P-9 pistol (2 magazines) with a removable suppressor (**B**: animated twist off / on).
+- **Eyes on:** anything in your field of view, in the clear and within about 40 m (60 m aimed), is marked for the team while you can see it, like the quad's neurolink. Your crosshair on an enemy tags it at once with a ping. Sight marks don't send an AI Ra after them; tag with F or ping ENEMY for that.
+- **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, cut lights, spoof cams, decoy, recon drone, medevac) at the spot you're aiming at, with the phone animation. **0** (or the SWEEP button) calls an **ISR sweep** on the ground under your crosshair.
+- **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
+- **Recon drone:** Q tosses it up out of your left hand before the feed cuts in. Hold Q to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
+- **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. Q takes the sticks; hold Q recalls it.
+- **Thermal binoculars (X or BINO):** swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
+- **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
   - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
   - **Hold** for **quickhacks**: your left hand brings up your phone and the HUD switches to scan mode (time slows in solo). Everything hackable in view gets tagged.
@@ -312,7 +375,7 @@ Play with headphones. Every sound is positioned in 3D (HRTF panning):
 - Your partner's footsteps.
 - Shots, impacts and C4 blasts.
 
-### Sniper Cell controls
+### NightWatch controls
 
 | Key | Shooter | Spotter |
 | --- | --- | --- |
@@ -399,7 +462,7 @@ The first time one sniper shoots the other, the game is "hijacked": a cheerful d
 
 ## Single-file version
 
-`dist/draxxed-sklounst.html` is the whole game in one file. Double-click it to play, or send it to a friend; it needs an internet connection only to find the other player. Since a file has no web address, the host shares the 5-letter code rather than a link. Rebuild it after code changes with `npm install && npm run build:single`.
+`dist/sniper-cell.html` is the whole game in one file. Double-click it to play, or send it to a friend; it needs an internet connection only to find the other player. Since a file has no web address, the host shares the 5-letter code rather than a link. Rebuild it after code changes with `npm install && npm run build:single`.
 
 ## Hosting
 
@@ -415,7 +478,7 @@ Matchmaking uses the free public PeerJS broker only to exchange connection detai
 
 ## Radio voice lines
 
-`audio/vo/` holds the Sniper Cell radio lines, rendered with [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) (Apache-2.0) and processed with ffmpeg. The script list is `tools/vo/lines.py`; to add or change a line, edit it there (keep the text identical to the game's), then run:
+`audio/vo/` holds the NightWatch radio lines, rendered with [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) (Apache-2.0) and processed with ffmpeg. The script list is `tools/vo/lines.py`; to add or change a line, edit it there (keep the text identical to the game's), then run:
 
 ```
 pip install kokoro-onnx soundfile        # plus ffmpeg
@@ -452,5 +515,5 @@ Resolution also scales dynamically to hold the frame rate. You can override the 
 | `src/briefmap.js` | Topographic briefing map drawn from the real terrain |
 | `src/net.js` | PeerJS / BroadcastChannel transport |
 | `src/config.js` | Gameplay tuning |
-| `src/cell/` | Sniper Cell: NightWatch / Infiltration (co-op stealth mode; file list under [Sniper Cell › Code](#code)) |
+| `src/cell/` | NightWatch: Sentinel / Infiltration missions (co-op stealth mode; file list under [NightWatch › Code](#code)) |
 | `src/atmofx.js` | Atmospheric particles (motes, mist, fireflies, moths) shared by both modes |

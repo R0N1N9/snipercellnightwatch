@@ -336,6 +336,8 @@ details[open] { display: flex; flex-direction: column; gap: 10px; }
 .tb.big i { font-size: 28px; }
 .tb.big span { font-size: 10px; }
 .tb.mid { width: 64px; height: 64px; }
+.tb.mid.scope { width: 80px; height: 80px; }
+.tb.mid.scope i { font-size: 28px; }
 .tb.mid i { font-size: 22px; }
 .tb.sm { width: 50px; height: 50px; }
 .tb.fire { border-color: rgba(242, 179, 91, 0.85); color: var(--amber); background: rgba(40, 26, 8, 0.45); }
@@ -417,7 +419,6 @@ body.touch #h-hint { bottom: 30%; }
 #pause .menu-card { max-height: calc(100dvh - 32px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* Pollo Hermano easter egg */
-#title .reckon { display: block; font-size: 0.42em; letter-spacing: 0.32em; color: #f2c81e; margin-top: 6px; text-shadow: 0 0 18px rgba(242, 200, 30, 0.45); }
 body.reckoning .tag { color: #f2c81e; }
 .lo-opt.pollo.on { border-color: #f2c81e !important; background: rgba(242, 200, 30, 0.14) !important; }
 /* Sniping style / distance bars */

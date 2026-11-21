@@ -28,7 +28,7 @@ import { Input } from '../input.js';
 import { WEAPON, PLAYER } from '../config.js';
 import { RULES, applyRules } from '../rules.js';
 import { clamp, segSegClosest } from '../util.js';
-import { Facility, SPOTS, FENCE, BUILDING, ROOMS, CARDS, terrainHeight, lam, glowMat } from './facility.js';
+import { Facility, SPOTS, DROPS, setInsertion, SHAFT, CHECKPOINT, FENCE, BUILDING, ROOMS, CARDS, terrainHeight, lam, glowMat } from './facility.js';
 import { Sentinel, DIFFS, guardCapsules, buildDrone, angDiff } from './sentinel.js';
 import { Ops, AiSpotter, PAYLOAD, HACK } from './ops.js';
 import { Tablet } from './tablet.js';
@@ -42,19 +42,23 @@ import { installNVG } from './nvg.js';
 import { Ambience } from './ambient.js';
 import { installSpatial } from './spatial.js';
 import { installPhone } from './phone.js';
+import { installXRounds, XR, AMMO_NAME } from './xrounds.js';
+import { installAbilities } from './abilities.js';
+import { installDevices } from './devices.js';
 import { wallBlock } from './sentinel.js';
 import { Cinema } from './cinema.js';
 import { Radio, setVoiceSetting } from './voice.js';
 import { Minigame } from './minigame.js';
-import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildKnife, normLoadout } from './arms.js';
-import { ISR } from './isr.js';
+import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildKnife, normLoadout, cellLook } from './arms.js';
+import { ISR, ISR_FOV } from './isr.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
 import { AtmosFX } from '../atmofx.js';
+import { applyLook } from '../look.js';
 import { Chat } from './chat.js';
 
 export const MISSIONS = {
-  nightwatch: { name: 'NIGHTWATCH', title: 'SNIPER CELL: NIGHTWATCH', line: 'Kestrel Ridge \u00B7 0217 hrs \u00B7 SENTINEL\u2019s augmented garrison is on the night shift.' },
-  infiltration: { name: 'INFILTRATION', title: 'SNIPER CELL: INFILTRATION', line: 'Kestrel Ridge \u00B7 0140 hrs \u00B7 a skeleton crew of security guards.' },
+  nightwatch: { name: 'SENTINEL', title: 'NIGHTWATCH: SENTINEL', line: 'Kestrel Ridge \u00B7 0217 hrs \u00B7 SENTINEL\u2019s augmented garrison is on the night shift.' },
+  infiltration: { name: 'INFILTRATION', title: 'NIGHTWATCH: INFILTRATION', line: 'Kestrel Ridge \u00B7 0140 hrs \u00B7 a skeleton crew of security guards.' },
 };
 
 export const ROLES = {
@@ -73,7 +77,7 @@ export const OBJECTIVES = [
   { k: 'perimeter', title: 'BREACH THE PERIMETER', hint: 'Get inside the fence — the cut on the west side or the south gate.' },
   { k: 'relay', title: 'TAP THE NETWORK', hint: 'Plant a relay in the Electrical Room (SE corner). Opens the data floor to Overwatch.' },
   { k: 'card', title: 'FIND A KEYCARD', hint: 'Search the office desk drawers (E). Each rack-room door takes its own colour-tagged keycard. The Site Chief carries a master badge.' },
-  { k: 'find', title: 'FIND THE ARCHIVE SERVER', hint: 'Swipe into the rack rooms on both floors. Look for the cabinet with the slow amber beacon.' },
+  { k: 'find', title: 'FIND THE ARCHIVE SERVER', hint: 'Take the elevator or the stair tower up to the data floor and swipe into its rack rooms. Look for the cabinet with the slow amber beacon.' },
   { k: 'upload', title: 'UPLOAD THE MALWARE', hint: 'Spotter: jack in at the lit rack (E), lock the signal, then hold the rack while it uploads. Shooter: cover them.' },
   { k: 'drive', title: 'EXTRACT THE DRIVE', hint: 'Release the drive at the rack (E). A clean upload means SENTINEL never knows.' },
   { k: 'exfil', title: 'EXFILTRATE', hint: 'Get the drive out the loading dock to the van east of the fence. Spotter drives, shooter rides shotgun.' },
@@ -84,7 +88,9 @@ const BLEED = 30;
 const BRIEF = {
   nightwatch: [
     'Sniper Cell, Overwatch. ISR on station.',
-    'Target: archive server. Two floors, six rack rooms.',
+    'Pickets in the draw. Drop them quiet.',
+    'Target: archive server. Data floor, up top.',
+    'Checkpoint in the lobby. Go round it.',
     'Relay in electrical. Keycards in the office drawers.',
     'Find the amber beacon. Upload clean, pull the drive.',
     'Botch it and ICE puts them on the walls.',
@@ -93,7 +99,9 @@ const BRIEF = {
   ],
   infiltration: [
     'Sniper Cell, Overwatch. ISR on station.',
-    'Target: archive server. Two floors, six rack rooms.',
+    'Pickets in the draw. Drop them quiet.',
+    'Target: archive server. Data floor, up top.',
+    'Checkpoint in the lobby. Go round it.',
     'Relay in electrical. Keycards in the office drawers.',
     'Find the amber beacon. Upload clean, pull the drive.',
     'Botch it and ICE puts them on the walls.',
@@ -104,23 +112,38 @@ const TOUCH = typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 1 
 const QUAD_BAT = 300; // seconds of flight (half rate while flying, quarter while parked)
 
 // ---------------------------------------------------------------------------
-// Post: night vision (goggles / scope / quad feed), active-camo shimmer, damage, grain.
+// Post: ink lines (Inked look), night vision (goggles / scope / quad feed), active-camo shimmer,
+// damage, grain. The ink is the valley's (game.js GradeShader): the Laplacian of 1/z.
 // ---------------------------------------------------------------------------
 const CellShader = {
   uniforms: {
     tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) },
     uNV: { value: 0 }, uMode: { value: 0 }, uWash: { value: 0 }, uCloak: { value: 0 }, uDamage: { value: 0 }, uDown: { value: 0 }, uStatic: { value: 0 },
+    tDepth: { value: null }, uNear: { value: 0.05 }, uFar: { value: 4000 }, uInked: { value: 1 },
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTime, uNV, uMode, uCloak, uDamage, uDown, uStatic, uWash; uniform vec2 uRes; varying vec2 vUv;
+    uniform sampler2D tDepth; uniform float uNear, uFar, uInked;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+    float lin(vec2 uv){ float z = texture2D(tDepth, uv).x * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
+    float inkAt(vec2 uv){
+      vec2 o = 1.6 / uRes;
+      float d0 = lin(uv), wc = 1.0 / d0;
+      float wl = 1.0 / lin(uv - vec2(o.x, 0.0)), wr = 1.0 / lin(uv + vec2(o.x, 0.0));
+      float wu = 1.0 / lin(uv + vec2(0.0, o.y)), wd = 1.0 / lin(uv - vec2(0.0, o.y));
+      float lap = abs(wl + wr - 2.0 * wc) + abs(wu + wd - 2.0 * wc);
+      float ref = max(wc, max(max(wl, wr), max(wu, wd)));
+      return smoothstep(0.012, 0.03, lap / ref) * (1.0 - step(uFar * 0.97, d0)) * (1.0 - 0.7 * smoothstep(120.0, 900.0, d0));
+    }
     void main(){
       vec2 uv = vUv;
       vec2 d = uv - 0.5; d.x *= uRes.x / uRes.y; float r = length(d);
       // Active camo: the edges of your view ripple like heat over glass.
       if (uCloak > 0.0) uv += vec2(sin(uv.y * 40.0 + uTime * 6.0), cos(uv.x * 36.0 + uTime * 5.0)) * 0.0022 * uCloak * smoothstep(0.25, 0.75, r);
       vec3 c = texture2D(tDiffuse, uv).rgb;
+      // Inked look: black ink on silhouettes and folds (before night vision, so goggles show it too).
+      if (uInked > 0.5) c = mix(c, vec3(0.0045, 0.0045, 0.006), inkAt(uv) * 0.92);
       float g = hash(uv * uRes + fract(uTime) * 91.7) - 0.5;
       if (uNV > 0.0) {
         float l = dot(c, vec3(0.3, 0.59, 0.11));
@@ -308,7 +331,7 @@ function buildSky(scene) {
 
 // ---------------------------------------------------------------------------
 export class CellGame {
-  constructor({ mode, net, role, diff = 'operative', seed = 7, quality = 'medium', settings, audio, name, partnerName, mission = 'nightwatch' }) {
+  constructor({ mode, net, role, diff = 'operative', seed = 7, quality = 'medium', settings, audio, name, partnerName, mission = 'nightwatch', look = 'inked', insert = 'draw', layout = 'standard' }) {
     // 'solo' (AI partner) | 'operative' (one operator, both roles) | 'host' | 'guest'
     this.mode = mode;
     this.isHost = mode !== 'guest';
@@ -316,6 +339,9 @@ export class CellGame {
     this.operative = mode === 'operative';
     this.aiPartner = mode === 'solo';
     this.mission = MISSIONS[mission] ? mission : 'nightwatch';
+    // Drop point (menu choice; the host's applies to both): the tree-line draw or the ridge.
+    this.drop = setInsertion(insert);
+    this.dropKind = SPOTS.drop;
     if (this.operative) role = 'shooter';
     this.net = net || null;
     this.role = role;
@@ -332,8 +358,10 @@ export class CellGame {
     this.ended = null;
 
     if (this.mission === 'nightwatch') Object.assign(OBJECTIVES[2], { hint: 'Search the office desk drawers (E). Each rack-room door takes its own colour-tagged keycard. The Overseer (violet juggernaut) carries a master badge.' });
-    // Halo-style ballistics for this mode: instant, straight, no sway.
-    applyRules({ preset: 'halo' });
+    // Halo-style ballistics for this mode: instant, straight, no sway. The graphics look is the
+    // host's (it rides in the cell hello), as in the valley.
+    this.look = look === 'og' ? 'og' : 'inked';
+    applyRules({ preset: 'halo', look: this.look });
     RULES.zooms = null;
     RULES.hitbox = 1.15;
 
@@ -344,8 +372,8 @@ export class CellGame {
     this.scene.add(this.camera);
     this._lights();
     buildSky(this.scene);
-    this.fac = new Facility(this.scene, quality, seed);
-    this.sentinel = new Sentinel(this, { diff, seed, sim: this.isHost, mission: this.mission });
+    this.fac = new Facility(this.scene, quality, seed, { layout });
+    this.sentinel = new Sentinel(this, { diff, seed, sim: this.isHost, mission: this.mission, pickets: this.drop.approach });
     this.sfx = new Sfx(audio);
     this.effects = new Effects(this.scene);
     this.input = new Input(this.renderer.domElement, document.getElementById('touch'));
@@ -355,7 +383,7 @@ export class CellGame {
     for (const k of ['touchSensR', 'touchSensL', 'gyroMode', 'gyroSens', 'gyroInvertY']) if (this.settings[k] !== undefined) this.input[k] = this.settings[k];
 
     // Mission state (host-authoritative; mirrored on the guest).
-    this.obj = { perimeter: false, relay: false, badge: false, found: false, aligned: false, upload: 0, uploading: false, trace: 0, traced: false, drive: null, driveAt: null, exfil: false, access: 1, drops: this.D.drops, canCrack: false, crack: 0, step: 0, cards: [], searched: [], used: {}, commsDown: false, cctv: false, quiet: null, ice: false, ifak: { shooter: 1, spotter: 1 }, barracks: 'ok', barracksT: 0, bay: 'ok', c4: [] };
+    this.obj = { perimeter: false, relay: false, badge: false, found: false, aligned: false, upload: 0, uploading: false, trace: 0, traced: false, drive: null, driveAt: null, exfil: false, access: 1, drops: this.D.drops, canCrack: false, crack: 0, step: 0, cards: [], searched: [], used: {}, commsDown: false, cctv: false, quiet: null, ice: false, ifak: { shooter: 1, spotter: 1 }, barracks: 'ok', barracksT: 0, bay: 'ok', c4: [], lift: { y: 0, to: 0 } };
     this.crates = [];
     this.crateId = 1;
     this.prompts = {}; // role -> { label, p }
@@ -369,12 +397,18 @@ export class CellGame {
 
     this.loadout = normLoadout(this.settings.cellLoadout);
     this._setupPlayer();
+    this._xrInit();
+    this._abInit();
+    this._devInit();
+    this.laserOn = true;
     this._setupPartner();
     this.ops = this.role === 'spotter' ? new Ops(this) : this.solo ? new Ops(this) : null;
     if (this.ops && this.loadout.spotter.perk === 'bandwidth' && (this.role === 'spotter' || this.operative)) this.ops.bwMul = 1.4;
     if ((this.role === 'spotter' || this.operative) && this.loadout.spotter.perk === 'drops') this.obj.drops += 2;
     this.aiSpot = this.aiPartner && this.role === 'shooter' ? new AiSpotter(this, this.ops) : null;
-    this.aiShoot = this.aiPartner && this.role === 'spotter' ? { perch: 0, cool: 3, aim: null, aimT: 0, moveT: 0, sayT: 0, holdT: 0, coverT: 0 } : null;
+    this.aiShoot = this.aiPartner && this.role === 'spotter' ? { perch: this.drop.perch || 0, cool: 3, aim: null, aimT: 0, moveT: 0, sayT: 0, holdT: 0, coverT: 0 } : null;
+    // The approach: until you're over the crest an AI partner walks the draw with you.
+    this.approach = this.drop.approach;
     this.quad = null;
     this.quadCd = 0;
     this._kitInit();
@@ -451,8 +485,10 @@ export class CellGame {
 
   _initComposer() {
     if (this.composer) return;
-    const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.quality === 'high' ? 4 : 0 });
+    const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.quality === 'high' ? 4 : 0, depthTexture: new THREE.DepthTexture(innerWidth, innerHeight) });
     this.composer = new EffectComposer(this.renderer, rt);
+    // The ping-pong buffer must not share the depth texture the post pass samples for ink.
+    this.composer.renderTarget2.depthTexture = new THREE.DepthTexture(innerWidth, innerHeight);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     if (this.quality !== 'low') this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.5, 0.85));
     this.post = new ShaderPass(CellShader);
@@ -475,14 +511,18 @@ export class CellGame {
   _setupPlayer() {
     const P = (this.player = new LocalPlayer());
     const i = this.role === 'shooter' ? 0 : 1;
-    const sp = this.role === 'shooter' ? SPOTS.perches[0] : SPOTS.insert[1];
-    const sx = this.role === 'shooter' ? sp.x : SPOTS.insert[1].x, sz = this.role === 'shooter' ? sp.z + 3 : SPOTS.insert[1].z;
+    // Both of you start at the drop-off in the draw and walk in.
+    const sp = SPOTS.insert[this.role === 'shooter' ? 0 : 1];
+    const sx = sp.x, sz = sp.z;
     P.vest = this.role === 'shooter' ? 'rig' : 'plate';
-    P.reset(new THREE.Vector3(sx, terrainHeight(sx, sz), sz), 0);
+    P.reset(new THREE.Vector3(sx, this.fac.groundAt(sx, sz, 200, 0.5), sz), 0);
     this._arm();
     P.autoBipod = false;
-    P.autoCycle = false;
-    P.straightPull = true; // Halo-feel: the bolt runs while you stay on the glass
+    // KR-50 bolt: standard by default (like multiplayer: tap fire and you come off the glass to
+    // work the bolt; keep fire held to stay scoped). The straight-pull bolt (loadout) cycles while
+    // you stay on target.
+    P.autoCycle = true;
+    P.straightPull = this.loadout.shooter.bolt === 'straight';
     P.hp = this.D.hp;
     this.hp = this.D.hp;
     this.maxHp = this.D.hp;
@@ -515,6 +555,16 @@ export class CellGame {
     can.position.set(0, 0.022, -0.225);
     pm.add(can);
     this.pistolCan = can;
+    // A knurled ring and a witness mark on each can so you can see it turn.
+    for (const c of [can, this.viewmodel.models.smg.userData.can, this.viewmodel.models.mag50.userData.can]) {
+      if (!c) continue;
+      const r = c.geometry.parameters.radiusTop;
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.08, r * 1.08, 0.014, 12).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#2a2c30', emissive: '#2a2c30', emissiveIntensity: 0.2 }));
+      ring.position.z = c.geometry.parameters.height * 0.42;
+      const mark = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.003, c.geometry.parameters.height * 0.7), new THREE.MeshBasicMaterial({ color: '#6c7076' }));
+      mark.position.set(0, r * 1.02, 0);
+      c.add(ring, mark);
+    }
     this.viewmodel.root.traverse((o) => { o.renderOrder = 10; o.frustumCulled = false; });
     this.viewmodel.setLook({ outfit: 'wraith', poncho: this.role === 'shooter', theme: 'mcblack' });
     this.i = i;
@@ -532,11 +582,7 @@ export class CellGame {
   }
 
   _look(role) {
-    // Both operators wear the multicam-black kit. The shooter adds a chest rig and the
-    // urban-digital poncho; the spotter wears the plate carrier with a quad on the pack.
-    return role === 'shooter'
-      ? { outfit: 'wraith', theme: 'mcblack', vest: 'rig', poncho: true, ponchoTheme: 'urbandark', hat: 'none', eyes: 'goggles', kit: { stealth: 'suppressor' } }
-      : { outfit: 'wraith', theme: 'mcblack', vest: 'plate', poncho: false, hat: 'cap', eyes: 'goggles', kit: { scout: 'drone' } };
+    return cellLook(role);
   }
 
   _setupPartner() {
@@ -546,10 +592,10 @@ export class CellGame {
     this.scene.add(av.root);
     this.cloakMat = cloakMaterial();
     const ai = this.aiPartner;
-    const p = r === 'shooter' ? SPOTS.perches[0] : { x: SPOTS.insert[1].x + 3, z: SPOTS.insert[1].z - 3 };
+    const p = SPOTS.insert[r === 'shooter' ? 0 : 1];
     this.partner = {
-      role: r, name: this.partnerName, ai, avatar: av, pos: new THREE.Vector3(p.x, terrainHeight(p.x, p.z), p.z), tpos: null,
-      yaw: 0, pitch: -0.05, st: ai ? (r === 'shooter' ? 2 : 1) : 0, w: r === 'spotter', moving: false, sprinting: false, cloak: false, cloakFlicker: false,
+      role: r, name: this.partnerName, ai, avatar: av, pos: new THREE.Vector3(p.x, this.fac.groundAt(p.x, p.z, 200, 0.5), p.z), tpos: null,
+      yaw: 0, pitch: -0.05, st: 0, w: r === 'spotter', moving: false, sprinting: false, cloak: false, cloakFlicker: false,
       hp: 100, downed: false, kia: false, alive: true, tablet: false, e: false, quad: null, seen: ai, ammo: 1, lastT: 0,
     };
     // Your own (local) operator model, used when you are down and the camera pulls out.
@@ -613,6 +659,7 @@ export class CellGame {
     P.nv = !!m.nv;
     P.sy = m.sy || 0;
     P.wl = !!m.wl;
+    P.ex = m.ex || {};
   }
 
   _sendState() {
@@ -622,7 +669,7 @@ export class CellGame {
     this.send({
       t: 'cp', p: [r(P.pos.x), r(P.pos.y), r(P.pos.z)], y: r(P.yaw), pi: r(P.pitch), st: P.stance, w: P.def.slot === 'pistol' ? 1 : 0,
       mv: P.moving ? 1 : 0, sp: P.sprinting ? 1 : 0, ck: this.cloak.on ? 1 : 0, cf: this.cloak.flick > 0 ? 1 : 0, hp: Math.round(this.hp),
-      dn: this.downed ? 1 : 0, kia: this.kia ? 1 : 0, tb: this.tablet.visible ? 1 : 0, e: this._eHeld ? 1 : 0, q, sc: P.scoped ? 1 : 0, am: r(total / full), nv: this.nv ? 1 : 0, sy: this.syncAim || 0, wl: this.wl.on ? 1 : 0,
+      dn: this.downed ? 1 : 0, kia: this.kia ? 1 : 0, tb: this.tablet.visible ? 1 : 0, e: this._eHeld ? 1 : 0, q, sc: P.scoped ? 1 : 0, am: r(total / full), nv: this.nv ? 1 : 0, sy: this.syncAim || 0, wl: this.wl.on ? 1 : 0, ex: this._abState(),
     });
   }
 
@@ -670,13 +717,18 @@ export class CellGame {
       case 'boom': this._boom(m); break;
       case 'blasthurt': if (m.role === this.role) this._damage(m.dmg, { x: m.x, z: m.z }); break;
       case 'sweepfx': this.isr.sweepFx = { x: m.x, z: m.z, r: m.r, t: 0 }; break;
+      case 'xc': this._xrRemote(m.c); break;
+      case 'chk': this._checkpointFx(); break;
+      case 'tp': if (m.role === this.role) this.player.pos.set(m.x, m.y, m.z); break;
+      case 'dart': this._addDart(m.d); break;
+      case 'chain': if (this.role === 'shooter' || this.operative) this._chainKill(); break;
       case 'vote': if (this.isHost) this._castVote(m.role, m.v); break;
       case 'heal': if (m.role === this.role) this._heal(m.hp); break;
       case 'ammo': if (m.role === this.role) this._ammo(); break;
       case 'trace': this.hud.flash('TRACED', 'red'); break;
       case 'decoy': this.audio.beep(new THREE.Vector3(m.x, 1, m.z), true); break;
       case 'quadhit': if (this.quad && this.quad.active) this._quadDamage(m.dmg); break;
-      case 'noise': if (this.isHost) this.sentinel.noise({ x: m.x, y: m.y, z: m.z }, m.r, !!m.loud); break;
+      case 'noise': if (this.isHost) this.sentinel.noise({ x: m.x, y: m.y, z: m.z }, m.r, !!m.loud, !!m.grad); break;
       case 'fx': this._fx(m); break;
       case 'sfx': this._sentinelFx(m.ev); break;
       case 'aligned': case 'extracted': if (this.isHost) this._serverResult(m); break;
@@ -693,12 +745,12 @@ export class CellGame {
   // ---- helpers used by ops / tablet ------------------------------------------------
   localAgent() {
     const P = this.player;
-    return { role: this.role, light: this.wlMine || null, pos: P.pos, yaw: P.yaw, stance: this.downed ? 2 : P.stance, moving: P.moving, sprinting: P.sprinting, cloak: this.cloak.on, cloakFlicker: this.cloak.flick > 0, alive: !this.kia, downed: this.downed };
+    return { role: this.role, light: this.wlMine || null, pos: P.pos, yaw: P.yaw, stance: this.downed ? 2 : P.stance, moving: P.moving, sprinting: P.sprinting, cloak: this.cloak.on, cloakFlicker: this.cloak.flick > 0, alive: !this.kia, downed: this.downed, ghillie: !!(this.ab && this.ab.ghillie), laser: !!this.laserOn };
   }
   partnerAgent() {
     const Q = this.partner;
     if (Q.ai || !Q.seen) return null;
-    return { role: Q.role, light: this.wlTheirs || null, pos: Q.pos, yaw: Q.yaw, stance: Q.downed ? 2 : Q.st, moving: Q.moving, sprinting: Q.sprinting, cloak: Q.cloak, cloakFlicker: Q.cloakFlicker, alive: Q.alive && !Q.kia, downed: Q.downed };
+    return { role: Q.role, light: this.wlTheirs || null, pos: Q.pos, yaw: Q.yaw, stance: Q.downed ? 2 : Q.st, moving: Q.moving, sprinting: Q.sprinting, cloak: Q.cloak, cloakFlicker: Q.cloakFlicker, alive: Q.alive && !Q.kia, downed: Q.downed, ghillie: !!(Q.ex && Q.ex.gh), laser: !!(Q.ex && Q.ex.lz) };
   }
   agents() {
     return [this.localAgent(), this.partnerAgent()].filter(Boolean);
@@ -764,7 +816,7 @@ export class CellGame {
       // The console's pulse only hears the network: drones, cameras, devices. People don't show.
       case 'scan': S.scanT = 4; for (const d of S.drones) if (d.state !== 'dead') { d.scanT = 4; d.tagT = Math.max(d.tagT, 8); } for (const c of S.cams) c.scanT = 4; this._toast('Network pulse \u2014 every drone, camera and device for 4 s. (People don\u2019t show: use the ISR sweep.)', 'cyan'); break;
       // ISR ping sweep: a circle on the ground; everything inside, flesh or machine, gets marked.
-      case 'qmark': this._neuroMark(target.ids || []); break;
+      case 'qmark': this._neuroMark(target.ids || [], !!target.auto); break;
       case 'pdrone': { const d = S.byId(target.id); if (d && d.state !== 'dead') { d.empT = 8; this._toast('Drone shorted out for 8 s.', 'cyan'); } break; }
       case 'blind': { const e = S.byId(target.id); if (e && e.state !== 'dead') { e.blindT = 6; e.aw = 0; if (e.state === 'alert' || e.state === 'berserk') { e.state = 'search'; e.searchT = 6; e.target = null; } this._toast('Optics rebooted: he\u2019s blind for 6 s.', 'cyan'); } break; }
       case 'plight': this.fac.lightsOff((L) => L.id === target.id, 20); this._toast('Light cut for 20 s.', 'dim'); break;
@@ -782,11 +834,14 @@ export class CellGame {
         {
           const room = this._roomFor(target);
           // Inside a building the pulse fills the room: shells, walls, cameras, lights.
-          S.emp(target.x, target.z, room ? PAYLOAD.emp.r * 1.6 : PAYLOAD.emp.r);
-          if (room) this.fac.lightsOff((L) => L.room === room.id, 15);
-          else this.fac.lightsOff((L) => !L.interior && Math.hypot(L.x - target.x, L.z - target.z) < PAYLOAD.emp.r, 10);
+          const er = target.r || PAYLOAD.emp.r;
+          S.emp(target.x, target.z, room && !target.r ? er * 1.6 : er);
+          if (room && !target.r) this.fac.lightsOff((L) => L.room === room.id, 15);
+          else this.fac.lightsOff((L) => Math.hypot(L.x - target.x, L.z - target.z) < er && (!L.interior || Math.abs((L.y || 0) - (target.y || 0)) < 5), 10);
+          // An EMP round also stops radios close by.
+          if (target.r) for (const g of S.guards) if (g.state !== 'dead' && Math.hypot(g.x - target.x, g.z - target.z) < er) { g.jamT = Math.max(g.jamT, 6); g.radioT = 0; }
         }
-        this._toast('EMP \u2014 drones, cameras and shields in the area dark for 7 s.', 'cyan');
+        this._toast(target.r ? 'EMP round \u2014 electronics, shields and radios dark around the hit.' : 'EMP \u2014 drones, cameras and shields in the area dark for 7 s.', 'cyan');
         this._broadcastFx({ k: 'emp', x: target.x, z: target.z });
         break;
       case 'supply':
@@ -848,7 +903,8 @@ export class CellGame {
       }
       case 'tag': {
         const e = S.byId(target.id);
-        if (e && e.hp > 0) { e.tagT = HACK.tag; e.tagBy = target.by || by; }
+        // auto: a sight mark (crosshair), not a 'take him' call, so an AI Ra doesn't fire on it.
+        if (e && e.hp > 0) { e.tagT = Math.max(e.tagT || 0, HACK.tag); e.tagBy = target.by || by; e.autoTag = !!target.auto; }
         break;
       }
       case 'perch':
@@ -919,7 +975,7 @@ export class CellGame {
   }
   // Title with the colour split: SNIPER (white) CELL (red) : MISSION (cyan).
   get titleHTML() {
-    return `<span class="t-w">SNIPER</span> <span class="t-r">CELL</span><span class="t-w">:</span> <span class="t-c">${MISSIONS[this.mission].name}</span>`;
+    return `<span class="t-w">NIGHT</span><span class="t-r">WATCH</span><span class="t-w">:</span> <span class="t-c">${MISSIONS[this.mission].name}</span>`;
   }
   get missionLine() {
     return MISSIONS[this.mission].line;
@@ -930,7 +986,7 @@ export class CellGame {
   _afterIntro() {
     this.comms('Weapons free on your call. Stay in the dark.', 'dim');
     // Overwatch's briefing: short, clipped radio lines, each typed out as its own subtitle.
-    for (const line of BRIEF[this.mission === 'nightwatch' ? 'nightwatch' : 'infiltration']) this._voice('isr', line, true);
+    for (const line of BRIEF[this.mission === 'nightwatch' ? 'nightwatch' : 'infiltration']) if (this.drop.approach || !/^Pickets/.test(line)) this._voice('isr', line, true);
     this.input.requestLock();
   }
 
@@ -980,6 +1036,11 @@ export class CellGame {
       this.camera.fov = C.cam.fov;
       this.camera.updateProjectionMatrix();
       this.viewmodel.visible = false;
+      // Only the cut-scene's own two operators: hide the gameplay models waiting at the drop.
+      this.partner.avatar.setVisible(false);
+      this.selfAvatar.setVisible(false);
+      if (this.irLasers) { this.irLasers.partner.set(this.camera.position, this.camera.position, false); this.irLasers.me.set(this.camera.position, this.camera.position, false); }
+      if (this.strobes) for (const k of ['partner', 'self']) for (const st of this.strobes[k] || []) st.visible = false;
     }
     this.audio.setListener(C.active === 'outro' ? C.cam : this.camera);
     if (!C.render(this.renderer)) this._render(dt);
@@ -999,7 +1060,7 @@ export class CellGame {
   _updateLocal(dt, a) {
     const P = this.player, I = this.input;
     const tab = this.tablet.visible;
-    const quad = this.quad && this.quad.active;
+    let quad = this.quad && this.quad.active;
     // Keys for this mode.
     // TAB: the spotter taps it for the tablet (tap again: ISR, again: back to first person)
     // and holds it for quickhacks (phone out). The shooter's TAB is just the map.
@@ -1007,7 +1068,7 @@ export class CellGame {
       const cycle = () => {
         if (this.tablet.visible) { this.tablet.close(); this.isr.enter(); }
         else if (this.isr.active) this.isr.exit();
-        else this.tablet.open();
+        else this._raise('tablet', () => this.tablet.open());
       };
       if (!I.held('Tab')) this._tabBlock = false;
       if (this.tablet.visible || this.isr.active) { if (I.pressed('Tab') || I.pressed('cell-tab')) { cycle(); this._tabBlock = true; } this._tabT = 0; }
@@ -1022,7 +1083,12 @@ export class CellGame {
         if (I.pressed('cell-tab')) cycle();
       }
       if (I.pressed('cell-hack')) { if (this.qh.on) this._qhExit(); else this._qhEnter(); }
-    } else if (I.pressed('Tab') || I.pressed('cell-tab')) this.tablet.toggle();
+    } else if (I.pressed('Tab') || I.pressed('cell-tab')) {
+      // Shooter: TAB raises the map tablet; in the ISR view it flips back to the tablet.
+      if (this.isr.active) { this.isr.exit(); this.tablet.open(); }
+      else if (this.tablet.visible) this.tablet.close();
+      else this._raise('tablet', () => this.tablet.open());
+    }
     if ((I.pressed('KeyL') || I.pressed('cell-light')) && !tab) this._wlToggle();
     if (I.pressed('KeyN') || I.pressed('cell-nv')) this._nvgToggle();
     // Objective board: O shows / hides it, P expands / compacts it (P is the sweep in the ISR view).
@@ -1032,7 +1098,7 @@ export class CellGame {
     const bHeld = (I.held('KeyB') || I.held('T:cell-sup')) && !tab;
     if (bHeld) { this._bT = (this._bT || 0) + dt; if (this._bT > 0.45 && !this._bDone) { this._bDone = true; this._toggleSup(); } }
     else { if (this._bT > 0 && !this._bDone) { if (P.w.def.modes) this._cycleMode(); else this._toggleSup(); } this._bT = 0; this._bDone = false; }
-    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyI') || I.pressed('cell-isr')) && !tab && !quad && !this.downed) { if (this.isr.active) this.isr.exit(); else this.isr.enter(); }
+    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyI') || I.pressed('cell-isr')) && !tab && !quad && !this.downed) { if (this.isr.active) this.isr.exit(); else this._raise('isr', () => this.isr.enter()); }
     if ((I.pressed('KeyJ') || I.pressed('cell-drop')) && this.obj.drive === this.role) { if (this.isHost) this._dropDrive(this.role, this.player.pos); else this._broadcast({ k: 'drop', role: this.role, at: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z } }); }
     const pr = this.prompts[this.role];
     if ((I.pressed('KeyE') || I.pressed('cell-use')) && pr && (pr.key === 'jack' || pr.key === 'extract') && !tab) this._serverMinigame(pr.key);
@@ -1057,6 +1123,8 @@ export class CellGame {
         this._qT = 0; this._qDone = false;
       }
       if (I.pressed('cell-recall') && this._quadOut()) this._recallQuad();
+      // A park / recall / launch just now changes what this frame drives.
+      quad = !!(this.quad && this.quad.active);
     }
     // F: tap = tag what's under the crosshair; hold on an enemy (or SYNC) = mark it as your
     // teammate's sync target.
@@ -1082,7 +1150,8 @@ export class CellGame {
     this._kitUpdate(dt);
     this.quadCd = Math.max(0, this.quadCd - dt);
     if (!this._quadOut() && this.quadBat !== undefined) this.quadBat = Math.min(QUAD_BAT, this.quadBat + dt * 3);
-    if (this.quad && this.quad.parked) { this.quad.bat -= dt * 0.25; if (this.quad.bat <= 0) { this.comms('Quad battery dead \u2014 it\u2019s coming home.', 'cyan', this.name); this._endQuad(); } }
+    if (this.quad && this.quad.parked && this.quad.auto && !this.quad.recall) this._quadAuto(dt);
+    if (this.quad && this.quad.parked) { this.quad.bat -= dt * 0.25; if (this.quad.bat <= 0) { this.comms('Drone battery dead \u2014 it\u2019s coming home.', 'cyan', this.name); this._endQuad(); } }
 
     // Cloak battery (Cold Archive: drain 14/s, regen 7 × camo/s).
     const C = this.cloak;
@@ -1106,8 +1175,13 @@ export class CellGame {
     const live = !this.downed && !this.kia;
     const act = { ...a };
     this._qhTick(dt, I, act);
+    this._cmdKeys(I);
     if (this.qh.on) this._eHeld = false;
     this._kitKeys(dt, I, tab, quad, live, act);
+    this._abInput(dt, I, act, live && !tab && !quad);
+    // Spotter's binoculars: X (or BINO) to swap from the P-9; scope raises them.
+    if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino')) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
+    if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
     const seat = this._seat();
     if (!live || tab || quad) {
       act.fire = false; act.fireHeld = false; act.scope = false; act.reload = act.reload && live && !quad;
@@ -1122,30 +1196,36 @@ export class CellGame {
       if (isr && (I.pressed('KeyP') || I.pressed('cell-sweep'))) this._isrSweep();
       act.mx = act.my = 0; act.sprint = act.jump = act.crouch = act.prone = false; act.fire = act.fireHeld = act.scope = false; act.lookX = act.lookY = 0; act.zoomIn = act.zoomOut = false; act.slot1 = act.slot2 = act.swap = false; act.reload = false;
     }
+    else if (I.pressed('cell-sweep') && (this.role === 'spotter' || this.operative) && !tab && !quad && !this.downed) {
+      // SWEEP outside the ISR view: the drone sweeps the ground under your crosshair.
+      this._pointCmd({ k: 'sweep', name: 'ISR SWEEP', p: null });
+    }
     if (seat) { act.mx = act.my = 0; act.sprint = act.jump = act.crouch = act.prone = false; act.fire = act.fireHeld = false; act.scope = false; }
     if (this.role === 'spotter') { act.slot1 = act.slot2 = act.swap = false; if (!P.scoped) act.zoomIn = act.zoomOut = false; }
     act.zeroUp = act.zeroDown = false;
-    act.breath = false;
+    act.breath = !!(this.ab && this.ab.breath.on);
     P.noSprint = !!this.obj.drive && this.obj.drive === this.role;
-    P.speedMul = tab ? 0.55 : 1;
+    P.speedMul = (tab ? 0.55 : 1) * (this.obj.drag && this.obj.drag[this.role] ? 0.5 : 1);
     if (this.downed) { P.stance = 2; }
     P.update(dt, act, this.fac, { canMove: live && !quad && !seat });
     if (seat) { const w = this._seatWorld(seat); P.pos.set(w.x, w.y - P.eye + 0.62, w.z); P.vel.set(0, 0, 0); P.stance = 0; this._wasSeated = seat; }
     else if (this._wasSeated) { const d = this._doorWorld(this._wasSeated); P.pos.set(d.x, this.fac.groundAt(d.x, d.z, 5, 0.5), d.z); this._wasSeated = null; }
     if (this.downed) { P.vel.x *= 0.2; P.vel.z *= 0.2; }
     if (P.def.kind === 'bolt' && P.boltEvent) { P.boltEvent = false; this.audio.bolt(0.05); }
-    if (quad) this._updateQuad(dt, a);
+    if (quad && this.quad && this.quad.active) this._updateQuad(dt, a); // (a recall this frame ends it)
 
     // Fire. (A green sync pulls the trigger for you.)
     if (this._autoFire) { this._autoFire = false; if (live && !quad && !seat) { act.fire = true; this._syncShotId = this.syncAim; } }
+    if (this.supAnim) { act.fire = false; act.fireHeld = false; }
     const mode = P.w.mode;
     if (act.fire && live && P.w.chamber === 0 && P.w.mag === 0) { this.audio.click(); if (P.w.reserve > 0) P.startReload(); }
     else if (live && mode === 'full') { if (act.fireHeld || act.fire) { if (P.canFire()) this._fire(); } }
     else if (live && mode === 'burst') {
-      if (act.fire && !(this._burst > 0)) this._burst = 3;
-      if (this._burst > 0 && P.canFire()) { this._fire(); this._burst--; }
+      this._burstGap = Math.max(0, (this._burstGap || 0) - dt);
+      if ((act.fire || (act.fireHeld && this._burstGap <= 0)) && !(this._burst > 0)) this._burst = 3;
+      if (this._burst > 0 && P.canFire()) { this._fire(); this._burst--; if (!this._burst) this._burstGap = 0.22; }
       if (P.w.chamber === 0 && P.w.mag === 0) this._burst = 0;
-    } else if (act.fire && live && P.canFire()) this._fire();
+    } else if ((act.fire || act.fireHeld) && live && P.canFire()) this._fire(); // hold to keep firing at the weapon's rate
     // Footsteps make noise (running only, cloak halves it).
     if (P.moving && P.onGround && live) {
       this._stepT = (this._stepT || 0) - dt * (P.sprinting ? 1.6 : 1);
@@ -1172,21 +1252,30 @@ export class CellGame {
       this.camera.fov = WEAPON.baseFov;
     } else {
       P.eyePos(this.camera.position);
-      this.camera.rotation.set(P.pitch, P.yaw, 0);
-      this.camera.fov = P.fov();
+      // Recoil kick on top of your aim, settling back over ~0.25 s.
+      const k = this.camKick || 0, ky = this.camKickYaw || 0;
+      const sw = P.def.slot === 'rifle' && P.scopeT > 0.5 ? this._swayOff() : { x: 0, y: 0 };
+      this.camera.rotation.set(P.pitch + k + sw.y, P.yaw + ky - sw.x, -ky * 0.6);
+      this.camKick = k * Math.exp(-dt * 11);
+      this.camKickYaw = ky * Math.exp(-dt * 11);
+      this.camera.fov = this.bino && this.bino.on ? P.fov() + (13 - P.fov()) * this.bino.k : P.fov();
     }
     this.camera.updateProjectionMatrix();
     // First-person weapon.
     const scopedRifle = P.def.scope && P.scopeT > 0.6;
-    this.viewmodel.visible = live && !scopedRifle && !quad && !tab && !seat && !isr && !(this.knifeT > 0);
-    this.pistolCan.visible = !!(P.arms.find((w) => w.def.key === 'm18') || {}).sup;
-    for (const w of P.arms) { const M = this.viewmodel.models[w.def.key]; if (M && M.userData.can) M.userData.can.visible = !!w.sup; }
+    this.viewmodel.visible = live && !scopedRifle && !quad && !tab && !seat && !isr && !(this.knifeT > 0) && !this.devAnim && !(this.bino && this.bino.on);
+    // Suppressor cans (mid-gesture the can shows while it's in your hand).
+    const supU = this._supTick(dt), SA = this.supAnim;
+    const canShow = (w) => (SA && SA.w === w ? (SA.to ? supU > 0.18 : supU < 0.82) : !!w.sup);
+    const canOf = (w) => (w.def.key === 'm18' ? this.pistolCan : (this.viewmodel.models[w.def.key] || {}).userData?.can);
+    for (const w of P.arms) { const c = canOf(w); if (c) c.visible = canShow(w); }
     this.carry.visible = this.obj.drive === this.role && live && !quad && !isr;
     this._knifeTick(dt);
     this.viewmodel.update(dt, {
       def: P.def, scopeT: P.scopeT, speed: P.speed, sprint: P.sprinting, bobPhase: P.bobPhase, cycleT: P.cycleT,
       reloadT: P.reloadT, reloadDur: P.reloadDur, reloadEmpty: P.reloadEmpty, switchT: P.switchT, bipodT: 0, bipodState: 'stowed', bipodU: 0,
       empty: P.w.chamber === 0 && P.def.kind === 'semi', boltPending: false,
+      supU: SA ? supU : 0, supTo: SA ? SA.to : false, supCan: SA ? canOf(SA.w) : null,
     });
     this._cloakViewmodel(C.on);
     this.input.isScoped = P.scoped;
@@ -1195,6 +1284,7 @@ export class CellGame {
 
   _toggleCloak() {
     const C = this.cloak;
+    this._hint('camo');
     if (!C.on && (C.bat < 10 || C.lockT > 0)) { this.hud.flash('CAMO RECHARGING', 'red'); return; }
     C.on = !C.on;
     this.audio.click();
@@ -1212,55 +1302,142 @@ export class CellGame {
   }
 
   // ---- shooting ----------------------------------------------------------------------
+  // KR-50 scope sway (rad): a slow figure of eight, smaller crouched / prone, gone while you
+  // hold your breath, a little worse just after you let it out.
+  _swayOff() {
+    const P = this.player, t = this.t;
+    if (this.ab && this.ab.breath.on) return { x: 0, y: 0 };
+    let a = P.stance === 2 ? 0.0005 : P.stance === 1 ? 0.0011 : 0.0019;
+    if (P.moving) a *= 2;
+    if (this.kit && this.kit.deadeye > 0) a *= 0.2;
+    if (this.ab && this.ab.breath.cd > 0) a *= 1.4;
+    return { x: Math.sin(t * 0.9) * a, y: Math.sin(t * 1.8 + 0.6) * a * 0.6 };
+  }
+
+  // Current cone (radians, full width) for the weapon in hand.
+  _spreadNow() {
+    const P = this.player, def = P.def, ads = P.scopeT > 0.5;
+    let sp;
+    if (def.slot === 'rifle') sp = ads ? 0 : 0.075;
+    else sp = ads ? (def.adsSpread ?? (def.spread || 0.03) * 0.35) : (def.spread || 0.03);
+    if (P.moving) sp *= 1.5;
+    if (P.stance === 1) sp *= 0.85;
+    return sp;
+  }
+
   _fire() {
     const P = this.player, def = P.def;
     const rifle = def.slot === 'rifle';
     const sup = rifle || !!P.w.sup;
     const o = P.eyePos(new THREE.Vector3());
     const dir = P.aimDir(new THREE.Vector3());
-    // Hipfire spread on the pistol; the rifle is dead-on (Halo).
-    if (!rifle) { const sp = (def.spread || 0.03) * (P.scopeT > 0.5 ? 0.35 : 1) * (P.moving ? 1.5 : 1); dir.x += (Math.random() - 0.5) * sp; dir.y += (Math.random() - 0.5) * sp; dir.z += (Math.random() - 0.5) * sp; dir.normalize(); }
-    if (rifle && P.scopeT < 0.5) { dir.x += (Math.random() - 0.5) * 0.02; dir.y += (Math.random() - 0.5) * 0.02; dir.normalize(); }
+    // Spread: dead-on through the scope / sights, wide from the hip (the crosshair shows it).
+    {
+      const sp = this._spreadNow();
+      if (sp > 0) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * sp / 2;
+        const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(right, dir);
+        dir.addScaledVector(right, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).normalize();
+      }
+    }
+    if (this.ab) this.ab.stillT = 0;
+    // The KR-50 on the glass: breathing sway (still while you hold your breath) and wind drift.
+    if (rifle && P.scopeT > 0.5) {
+      const sw = this._swayOff();
+      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+      dir.addScaledVector(right, sw.x).add(new THREE.Vector3(0, sw.y, 0)).normalize();
+      const pre = this.fac.ray(o, o.clone().addScaledVector(dir, 900), 'shot');
+      dir.addScaledVector(right, this._windDrift(P.yaw, pre ? pre.t * 900 : 900)).normalize();
+    }
     // A sync shot is a locked shot: straight to the head you were holding.
     if (this._syncShotId) { const sg = this.sentinel.byId(this._syncShotId); this._syncShotId = 0; if (sg && sg.state !== 'dead') dir.copy(guardCapsules(sg)[0].a).sub(o).normalize(); }
     if (this.syncReady) this._syncFire();
     P.fireKick();
-    this.viewmodel.fired();
-    this.audio.shotLocal(sup, !rifle);
+    this.viewmodel.fired(def.heavy ? 1.9 : rifle ? 1.3 : 1);
+    // Felt recoil: the view kicks up (and a little sideways) and settles, leaving some climb.
+    const kick = def.kick || (rifle ? 0.05 : def.key === 'smg' ? 0.008 : 0.018);
+    this.camKick = (this.camKick || 0) + kick;
+    this.camKickYaw = (this.camKickYaw || 0) + (Math.random() - 0.5) * kick * 0.5;
+    P.pitch += kick * (rifle ? 0.25 : 0.35);
+    this.audio.shotLocal(sup, !rifle, def.heavy);
     this.stats.shots++;
     if (!sup) this.effects.muzzle(this.viewmodel.muzzleWorld(), dir);
     // Firing breaks the camo for a moment (it shimmers into view).
     // Firing drops the active camo entirely (and it can't come straight back).
     if (this.cloak.on) { this.cloak.on = false; this.cloak.lockT = 1.5; this.cloak.flick = 1.0; this.hud.flash('CAMO BROKEN', 'red', 0.8); }
     const end = o.clone().addScaledVector(dir, 900);
-    const res = this._hitscan(o, end);
-    const hitP = res ? res.point : end;
+    const ammo = rifle ? P.w.ammo || 'std' : 'std';
     const from = P.scopeT > 0.5 ? o.clone().add(new THREE.Vector3(0, -0.12, 0).applyEuler(this.camera.rotation)) : this.viewmodel.muzzleWorld(new THREE.Vector3());
-    if (rifle) this._trail(from, hitP, true);
-    else this._tracer(from, hitP, '#ffe0a0', 0.05);
-    this.send({ t: 'shot', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: hitP.toArray().map((v) => Math.round(v * 100) / 100), r: rifle ? 1 : 0, s: sup ? 1 : 0 });
-    // Noise: a suppressed shot carries ~10 m, an unsuppressed pistol 70 m and it's loud.
-    this._noise(P.pos, rifle ? 10 : sup ? 8 : 70, !sup);
+    // Noise: the suppressed .50 and the M50 still crack up close and fade with distance (a
+    // gradient out to ~18 / 14 m); a suppressed SMG / P-9 carries ~8 m; unsuppressed is 70 m and loud.
+    if (rifle) this._noise(P.pos, 18, false, true);
+    else if (sup && def.heavy) this._noise(P.pos, 14, false, true);
+    else this._noise(P.pos, sup ? 8 : 70, !sup);
     if (!sup) this.sentinel.stats.loudShots = (this.sentinel.stats.loudShots || 0) + 1, this._loud = true;
+    // The .50 carries on: through bodies (collateral) and thin interior walls and doors; the
+    // penetrator round through exterior walls and bulwark shields too. Each pass costs damage.
+    let start = o, mul = 1, first = null, lastP = end;
+    const passes = rifle ? (ammo === 'pen' ? 5 : 3) : 1;
+    for (let k = 0; k < passes; k++) {
+      const res = this._hitscan(start, end);
+      const hitP = res ? res.point : end;
+      lastP = hitP;
+      if (!first) first = res;
+      this._shotHit(res, hitP, start, mul, { rifle, def, o, ammo, P });
+      if (!res || !rifle || ammo === 'xr' || ammo === 'emp') break;
+      let skip = 0;
+      if (res.enemy) { skip = 0.6; mul *= 0.7; }
+      else if (res.blocked) { if (ammo !== 'pen') break; skip = 1.2; mul *= 0.8; }
+      else if (res.box && !res.terrain) {
+        const th = this._boxDepth(hitP, dir, res.box);
+        const lim = ammo === 'pen' ? 1.3 : 0.4;
+        if (th > lim || res.box.kind === 'fence') { if (res.box.kind !== 'fence') break; }
+        skip = th + 0.05; mul *= ammo === 'pen' ? 0.85 : 0.6;
+        this.effects.puff(hitP.clone().addScaledVector(dir, th), 'concrete', 0.5, 0.4);
+      } else break;
+      start = hitP.clone().addScaledVector(dir, skip);
+      if (start.distanceTo(o) > 880) break;
+    }
+    if (rifle) this._trail(from, lastP, true);
+    else this._tracer(from, lastP, '#ffe0a0', 0.05);
+    this.send({ t: 'shot', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: lastP.toArray().map((v) => Math.round(v * 100) / 100), r: rifle ? 1 : 0, s: sup ? 1 : 0 });
     // Rounds snapping past make officers bolt.
     for (const g of this.sentinel.guards) {
-      if (g.state === 'dead' || (res && res.enemy === g)) continue;
+      if (g.state === 'dead' || (first && first.enemy === g)) continue;
       const c = { x: g.x, y: g.y + 1.2, z: g.z };
-      const r = segSegClosest(o, hitP, c, c);
+      const r = segSegClosest(o, lastP, c, c);
       if (r.d2 < 2.5 * 2.5) {
         if (this.isHost) this.sentinel.nearMiss({ x: g.x, z: g.z }, { x: P.pos.x, z: P.pos.z });
         else this._broadcast({ k: 'nearmiss', at: { x: g.x, z: g.z }, from: { x: P.pos.x, z: P.pos.z } });
       }
     }
+    // Special magazine spent: back to standard.
+    if (rifle && ammo !== 'std' && P.w.mag + P.w.chamber <= 0) { P.w.ammo = 'std'; P.w.xr = false; this.hud.flash(`${AMMO_NAME[ammo]} MAG EMPTY`, 'amber', 1); }
+  }
+
+  // How far a ray travels through a box from the point where it entered.
+  _boxDepth(p, dir, b) {
+    let tMax = 1e9;
+    for (let i = 0; i < 3; i++) {
+      const d = [dir.x, dir.y, dir.z][i], q = [p.x, p.y, p.z][i];
+      if (Math.abs(d) < 1e-6) continue;
+      const t = ((d > 0 ? b.max[i] : b.min[i]) - q) / d;
+      if (t >= 0) tMax = Math.min(tMax, t);
+    }
+    return tMax === 1e9 ? 0 : tMax;
+  }
+
+  // One segment of a shot landing: lights, bulwark walls, bodies, enemies, the world.
+  _shotHit(res, hitP, o, mul, { rifle, def, ammo, P }) {
     if (res && res.light !== undefined) {
       this.effects.puff(hitP, 'metal', 0.6, 0.3);
       if (this.isHost) this._shootLight(res.light, hitP); else this._broadcast({ k: 'light', id: res.light, at: { x: hitP.x, y: hitP.y, z: hitP.z } });
     } else if (res && res.blocked) {
-      // A bulwark's wall ate it: sparks, and now it knows.
+      // A bulwark's wall ate it (unless it's a penetrator): sparks, and now it knows.
       const g = res.blocked;
       this.effects.puff(hitP, 'metal', 0.8, 0.3);
       this.sfx.shieldHit(hitP);
-      this.hud.flash('BLOCKED \u2014 HIT THE PORT', 'red', 0.9);
+      if (ammo !== 'pen') this.hud.flash('BLOCKED \u2014 HIT THE PORT', 'red', 0.9);
       if (this.isHost) { this.sentinel._alert(g, null, { x: P.pos.x, z: P.pos.z }); }
       else this._broadcast({ k: 'block', id: g.id, from: { x: P.pos.x, z: P.pos.z } });
     } else if (res && res.enemy && res.enemy.state === 'dead') {
@@ -1276,15 +1453,18 @@ export class CellGame {
       }
     } else if (res && res.enemy) {
       const e = res.enemy;
-      const dmg = def.damage[res.part] || def.damage.torso;
-      const dist = o.distanceTo(hitP);
+      let dmg = Math.round((def.damage[res.part] || def.damage.torso) * mul);
+      if (ammo === 'emp') dmg = Math.min(dmg, e.kind === 'd' ? 999 : 30);
+      const dist = P.pos.distanceTo(hitP);
       this.audio.hitConfirm(res.part === 'head');
       this.hud.hitMarker(res.part === 'head');
       this.stats.hits++;
       if (res.part === 'head') this.stats.heads++;
+      if (mul < 1) this.hud.flash('COLLATERAL', 'amber', 0.6);
       this.effects.puff(hitP, e.kind === 'd' ? 'metal' : 'dust', 0.9, 0.7);
       if (e.maxShield && e.shield > 0 && res.part !== 'head') { this.sfx.shieldHit(hitP); this.hud.flash('SHELL', 'cyan', 0.5); }
       if (e.helmet && res.part === 'head') { this.hud.flash('HELMET OFF \u2014 FOLLOW UP', 'amber', 0.9); }
+      if (this._markedChain) this._markedChain(e);
       if (this.isHost) this._applyHit(e.id, dmg, rifle ? 'rifle' : 'pistol', { x: P.pos.x, z: P.pos.z }, this.role, res.part === 'head', dist);
       else this.send({ t: 'hit', id: e.id, dmg, how: rifle ? 'rifle' : 'pistol', from: { x: P.pos.x, z: P.pos.z }, head: res.part === 'head', dist });
     } else if (res) {
@@ -1294,6 +1474,14 @@ export class CellGame {
       this._noise(hitP, 7, false);
     }
     if (res && res.quadHit) this._quadDamage(100);
+    if (!rifle || !res || res.quadHit) return;
+    // Special rounds.
+    if (ammo === 'xr') this._xrStick(hitP, res.enemy || res.blocked || null);
+    else if (ammo === 'emp') {
+      this.payload('emp', { x: hitP.x, z: hitP.z, y: hitP.y, r: 8 });
+      this.effects.puff(hitP, 'metal', 1.6, 0.5);
+      this.audio.zap && this.audio.zap(hitP);
+    }
   }
 
   // Instant hit: world boxes + terrain, every guard's capsules, drones.
@@ -1341,8 +1529,10 @@ export class CellGame {
     }
     for (const d of S.drones) {
       if (d.state === 'dead') continue;
-      const r = segSegClosest(o, end, { x: d.x - 0.5, y: d.y, z: d.z }, { x: d.x + 0.5, y: d.y, z: d.z });
-      if (r.d2 < 0.75 * 0.75 && r.s < bestT) { bestT = r.s; best = { t: r.s, point: o.clone().lerp(end, r.s), enemy: d, part: 'torso' }; }
+      // Spotlight helis are bigger: a capsule along the body.
+      const hx = d.heli ? Math.sin(d.yaw) * 1.3 : 0.5, hz = d.heli ? Math.cos(d.yaw) * 1.3 : 0, hr = d.heli ? 1.0 : 0.75;
+      const r = segSegClosest(o, end, { x: d.x - hx, y: d.y, z: d.z - hz }, { x: d.x + hx, y: d.y, z: d.z + hz });
+      if (r.d2 < hr * hr && r.s < bestT) { bestT = r.s; best = { t: r.s, point: o.clone().lerp(end, r.s), enemy: d, part: 'torso' }; }
     }
     return best;
   }
@@ -1363,10 +1553,12 @@ export class CellGame {
     // most one every 10 s, and only when nobody else is talking. Dropping an enemy your
     // partner pinged gets "your mark is down".
     const killer = by === 'ai' ? 'shooter' : by;
+    // Marked for death: the shooter's kills on tagged enemies chain (not AI Ra's).
+    if (by === 'shooter' && e.tagT > 0) { if (this.role === 'shooter' || this.operative) this._chainKill(); else this._broadcast({ k: 'chain' }); }
     if (how !== 'takedown' && this.t - (this._xrayT || -99) > 10 && Math.random() < 0.55) {
       this._xrayT = this.t;
       const pinged = e.tagBy && e.tagBy !== killer;
-      const lines = pinged ? ['Your mark is down.', 'X-ray down.'] : ['X-ray down.', 'Tango down.', 'Target down.', "He's down."];
+      const lines = pinged ? ['X-ray down.'] : ['X-ray down.', 'Tango down.', 'Target down.', "He's down."];
       const line = lines[Math.floor(Math.random() * lines.length)];
       setTimeout(() => this._radio(killer, line), 600);
     }
@@ -1391,9 +1583,9 @@ export class CellGame {
     if (this.isHost) this._noise(a, m.r ? 10 : m.s ? 8 : 70, !m.s);
   }
 
-  _noise(pos, r, loud) {
-    if (this.isHost) this.sentinel.noise(pos, r, loud);
-    else if (r >= 6) this.send({ t: 'ev', k: 'noise', x: pos.x, y: pos.y, z: pos.z, r, loud });
+  _noise(pos, r, loud, grad = false) {
+    if (this.isHost) this.sentinel.noise(pos, r, loud, grad);
+    else if (r >= 6) this.send({ t: 'ev', k: 'noise', x: pos.x, y: pos.y, z: pos.z, r, loud, grad });
   }
 
   // The shooter's signature: a long white vapor trail that hangs in the night air.
@@ -1483,15 +1675,19 @@ export class CellGame {
   }
 
   // ISR ping sweep at the sensor point (spotter / lone operative, in the ISR view).
-  _isrSweep() {
+  // ISR ping sweep: at the sensor point in the ISR view, or (at) the ground under your crosshair.
+  // Returns null, or why it couldn't run.
+  _isrSweep(at) {
     const I = this.isr;
-    if (I.sweepCd > 0) { this.hud.flash(`SWEEP ${Math.ceil(I.sweepCd)} s`, 'red'); return; }
+    if (I.sweepCd > 0) { const why = `SWEEP ${Math.ceil(I.sweepCd)} s`; if (!at) this.hud.flash(why, 'red'); return why; }
     I.sweepCd = 25;
-    const r = Math.max(18, Math.min(45, I.slant() * Math.tan((I.fov * Math.PI) / 360) * 0.8));
-    I.sweepFx = { x: I.spi.x, z: I.spi.z, r, t: 0 };
+    const r = at ? 30 : Math.max(18, Math.min(45, I.slant() * Math.tan((I.fov * Math.PI) / 360) * 0.8));
+    const x = at ? at.x : I.spi.x, z = at ? at.z : I.spi.z;
+    I.sweepFx = { x, z, r, t: 0 };
     this.sfx.ui(true);
     this._voice('isr', 'Sweep running.');
-    this.payload('isrsweep', { x: I.spi.x, z: I.spi.z, r });
+    this.payload('isrsweep', { x, z, r });
+    return null;
   }
 
   _heal(n) {
@@ -1507,6 +1703,7 @@ export class CellGame {
 
   _resupply() {
     this.player.refill();
+    this._xrResupply();
     this.hp = Math.min(this.maxHp, this.hp + 35);
     this.audio.click();
     this.hud.flash('RESUPPLIED +35 HP', 'cyan');
@@ -1550,28 +1747,68 @@ export class CellGame {
       if (this.isHost) best.tagT = HACK.tag;
       this.audio.ping && this.audio.ping();
       this.hud.flash(best.kind === 'd' ? 'DRONE TAGGED' : best.chief ? 'SITE CHIEF TAGGED' : 'TAGGED');
-      if (this.aiShoot) this.comms('Ra: I see him.', 'amber', this.partnerName);
     } else {
-      // Nothing there: drop a ping on the spot instead.
-      const at = this._aimPoint();
-      const pin = { x: at.x, z: at.z, label: 'PING', by: this.role };
-      this._addPin(pin);
-      this.send({ t: 'pin', ...pin });
+      // Nothing there: call "look here" on the spot (V on open ground drops a plain PING).
+      this._wheelPick('look', this._aimPoint(), null);
     }
   }
 
   // ---- recon quad (spotter) ----------------------------------------------------------
   _startQuad() {
     if (this.role !== 'spotter' && !this.operative) return;
-    const P = this.player;
-    if (this.tablet.visible) this.tablet.close();
-    if (this.isr.active) this.isr.exit();
-    this.quad = { active: true, parked: false, x: P.pos.x, y: P.pos.y + 2.2, z: P.pos.z, yaw: P.yaw, pitch: -0.2, bat: this.quadBat ?? QUAD_BAT, hp: 30, vy: 0 };
-    this.audio.startLoop('quad', this.camera.position, 'rotor', 0.22);
-    this.comms('Quad up. Look at enemies to neurolink them. Q park \u00B7 hold Q recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+    this._hint('drone');
+    const P = this.player, auto = this._quadAutoNext;
+    // Sent to a spot (tablet drag-and-drop, or the command at your crosshair): it flies itself
+    // there and holds, and you stay where you are. Otherwise you take the sticks.
+    if (!auto) { if (this.tablet.visible) this.tablet.close(); if (this.isr.active) this.isr.exit(); }
+    this.quad = { active: false, parked: !!auto, launching: !auto, auto: auto || null, x: P.pos.x, y: P.pos.y + 2.2, z: P.pos.z, yaw: P.yaw, pitch: -0.2, bat: this.quadBat ?? QUAD_BAT, hp: 30, vy: 0 };
+    if (auto) this.audio.startLoop('quad', new THREE.Vector3(this.quad.x, this.quad.y, this.quad.z), 'rotor', 0.22);
+    // By hand: tossed up out of the left hand, then the feed cuts in.
+    else this._raise('drone', () => { const q = this.quad; if (!q || !q.launching) return; q.launching = false; q.active = true; this.post.uniforms.uStatic.value = 1; this.audio.startLoop('quad', new THREE.Vector3(q.x, q.y, q.z), 'rotor', 0.22); });
+    if (auto) this.comms('Recon drone en route to the mark. Q to take it, hold Q to recall.', 'cyan', this.name);
+    else this.comms('Recon drone up. Look at enemies to neurolink them. Q park \u00B7 hold Q recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+  }
+  // Send the quad to a spot: launch it there, or redirect it if it's already up.
+  _quadTo(at) {
+    if (!at) return 'PICK A SPOT';
+    if (this._quadOut()) {
+      const q = this.quad;
+      if (q.active) { q.active = false; q.parked = true; }
+      q.auto = { x: at.x, z: at.z };
+      this.comms('Recon drone moving to the mark.', 'cyan', this.name);
+      return null;
+    }
+    this._quadAutoNext = { x: at.x, z: at.z };
+    const why = this.ops ? this.ops.use('quad') : 'NO CONSOLE';
+    this._quadAutoNext = null;
+    return why;
+  }
+  // Autopilot: climb to ~9 m over the ground, fly to the mark at 12 m/s, then hold and mark.
+  _quadAuto(dt) {
+    const q = this.quad, A = q.auto;
+    const P = this.player.pos;
+    let tx = A.x, tz = A.z;
+    const lp = Math.hypot(tx - P.x, tz - P.z);
+    if (lp > 250) { tx = P.x + (tx - P.x) * 250 / lp; tz = P.z + (tz - P.z) * 250 / lp; } // signal leash
+    const dx = tx - q.x, dz = tz - q.z, d = Math.hypot(dx, dz);
+    const inside = this.fac.insideBuilding(tx, tz);
+    const want = (inside ? 0 : 0) + Math.max(this.fac.groundAt(q.x, q.z, q.y, 0.5), terrainHeight(q.x, q.z)) + (d > 6 ? 9 : 7);
+    q.y += clamp(want - q.y, -4 * dt, 5 * dt);
+    if (d > 0.8) {
+      const st = Math.min(d, 12 * dt);
+      const p = { x: q.x + (dx / d) * st, y: q.y, z: q.z + (dz / d) * st };
+      this.fac.resolveHorizontal(p, 0.4, 0.5, 0);
+      q.x = p.x; q.z = p.z;
+      q.yaw = Math.atan2(-dx, -dz);
+    } else {
+      q.auto = null;
+      this.comms('Recon drone on station. It keeps marking. Q to take it.', 'cyan', this.name);
+      this.sfx.ui(true);
+    }
+    this.audio.updateLoop('quad', new THREE.Vector3(q.x, q.y, q.z));
   }
   _quadOut() {
-    return !!(this.quad && (this.quad.active || this.quad.parked));
+    return !!(this.quad && (this.quad.active || this.quad.parked || this.quad.launching || this.quad.recall));
   }
   // Leave the quad hovering where it is: it keeps marking what it can see. Rotor noise still carries.
   _parkQuad() {
@@ -1580,7 +1817,7 @@ export class CellGame {
     q.active = false;
     q.parked = true;
     this.sfx.ui(false);
-    this.comms('Quad parked. It keeps marking. Q to fly it, hold Q to recall.', 'cyan', this.name);
+    this.comms('Recon drone parked. It keeps marking. Q to fly it, hold Q to recall.', 'cyan', this.name);
   }
   _resumeQuad() {
     const q = this.quad;
@@ -1589,17 +1826,24 @@ export class CellGame {
     if (this.isr.active) this.isr.exit();
     q.active = true;
     q.parked = false;
+    q.auto = null;
     this.sfx.ui(true);
   }
   // Quick calldown: the quad comes straight home and is ready again in a few seconds.
   _recallQuad() {
-    if (!this.quad) return;
-    this.comms('Quad recalled.', 'cyan', this.name);
+    const q = this.quad;
+    if (!q || q.recall) return;
+    if (q.launching) { this._endQuad(false, true); return; }
+    this.comms('Recon drone recalled.', 'cyan', this.name);
     this.sfx.ui(false);
-    this._endQuad(false, true);
+    // It flies home (RECALLING overlay); _devTick lands it.
+    q.active = false; q.parked = false; q.auto = null;
+    q.recall = { t: 0, dur: 1.3, from: { x: q.x, y: q.y, z: q.z } };
+    this.post.uniforms.uStatic.value = 0.8;
   }
   _updateQuad(dt, a) {
     const q = this.quad;
+    if (!q || !q.active) return;
     q.bat -= dt * 0.5;
     const sens = 0.0022;
     q.yaw -= a.lookX * sens;
@@ -1617,14 +1861,14 @@ export class CellGame {
     if (d > 260) { p.x = q.x; p.z = q.z; }
     q.x = p.x; q.y = p.y; q.z = p.z;
     this.audio.updateLoop('quad', new THREE.Vector3(q.x, q.y, q.z));
-    if (q.bat <= 0) { this.comms('Quad battery dead — it’s coming home.', 'cyan', this.name); this._endQuad(); }
+    if (q.bat <= 0) { this.comms('Drone battery dead — it’s coming home.', 'cyan', this.name); this._endQuad(); }
     if (this.isHost) this.sentinel.quad = { alive: true, x: q.x, y: q.y, z: q.z };
   }
   _quadDamage(dmg) {
     if (!this.quad || !this.quad.active) return;
     this.quad.hp -= dmg;
     this.post.uniforms.uStatic.value = 1;
-    if (this.quad.hp <= 0) { this.comms('Quad shot down.', 'red', this.name); this._endQuad(true); }
+    if (this.quad.hp <= 0) { this.comms('Recon drone shot down.', 'red', this.name); this._endQuad(true); }
   }
   _endQuad(lost = false, recall = false) {
     if (!this.quad) return;
@@ -1641,6 +1885,25 @@ export class CellGame {
   // ---- host: objectives, interactions, doors, crates, AI shooter --------------------
   _hostTick(dt) {
     const S = this.sentinel, ob = this.obj;
+    // Elevator car: run toward the floor it's been sent to.
+    { const L = ob.lift, want = L.to * BUILDING.f1, d = want - L.y; if (Math.abs(d) > 0.001) L.y += Math.sign(d) * Math.min(Math.abs(d), SHAFT.speed * dt); }
+    // Lobby checkpoint: walking through the detector sets it off (unless the CCTV desk is ours).
+    this._ckPrev = this._ckPrev || {};
+    for (const a of this.agents()) {
+      if (!a.alive) continue;
+      const prev = this._ckPrev[a.role], C = CHECKPOINT;
+      this._ckPrev[a.role] = { z: a.pos.z, x: a.pos.x };
+      if (!prev || ob.cctv || a.pos.y > 1.2) continue;
+      const crossed = (prev.z - C.z) * (a.pos.z - C.z) <= 0 && prev.z !== a.pos.z;
+      if (crossed && a.pos.x > C.x0 && a.pos.x < C.x1 && this.t - (this._ckT || -99) > 6) {
+        this._ckT = this.t;
+        S.noise({ x: 0, y: 1, z: C.z }, 28, true);
+        S.raise(0.35, 'SENTINEL: checkpoint alarm in the lobby.');
+        this._toast('Checkpoint alarm! The detector went off \u2014 step round the barriers next time.', 'red');
+        this._broadcast({ k: 'chk' });
+        this._checkpointFx();
+      }
+    }
     // Remote quad position feeds SENTINEL (guards shoot support drones).
     if (!this.solo && this.partner.quad) { const q = this.partner.quad; S.quad = { alive: true, x: q[0], y: q[1], z: q[2] }; }
     else if (!this._quadOut()) S.quad = null;
@@ -1714,7 +1977,7 @@ export class CellGame {
     const m = this.medevac;
     if (!m) return;
     const tgt = this.agentPos(m.role);
-    const goal = { x: tgt.x, y: Math.max(tgt.y + 1.2, this.fac.insideBuilding(tgt.x, tgt.z) ? 1.6 : tgt.y + 1.2), z: tgt.z };
+    const goal = { x: tgt.x, y: tgt.y + 1.2, z: tgt.z };
     const cruise = this.fac.insideBuilding(tgt.x, tgt.z) ? 0 : 14;
     const dx = goal.x - m.x, dz = goal.z - m.z, d = Math.hypot(dx, dz);
     const sp = 18 * dt;
@@ -1727,6 +1990,40 @@ export class CellGame {
     }
   }
 
+  // AI partner on foot: follows you up the draw (a few metres back and to the side, crouched
+  // when you are), then walks out to its post once you're over the crest. True while walking.
+  _aiWalk(dt) {
+    const Q = this.partner, me = this.player.pos;
+    if (!Q.ai || Q.kia || Q.downed) return false;
+    if (this.approach && me.z < SPOTS.crest) {
+      this.approach = false;
+      Q.walkTo = Q.role === 'shooter' ? { x: SPOTS.perches[0].x, z: SPOTS.perches[0].z } : { x: SPOTS.overlook.x, z: SPOTS.overlook.z };
+      this._radio('partner', Q.role === 'shooter' ? 'Moving to the cliff.' : 'Setting up on the ridge.');
+    }
+    let tx, tz, run = false;
+    if (this.approach) {
+      const side = Q.role === 'shooter' ? 1 : -1, yaw = this.player.yaw;
+      tx = me.x + Math.sin(yaw) * 3.2 + Math.cos(yaw) * 2.2 * side;
+      tz = me.z + Math.cos(yaw) * 3.2 - Math.sin(yaw) * 2.2 * side;
+      Q.st = this.player.stance === 2 ? 1 : this.player.stance;
+    } else if (Q.walkTo) {
+      tx = Q.walkTo.x; tz = Q.walkTo.z; run = true; Q.st = 0;
+    } else return false;
+    const dx = tx - Q.pos.x, dz = tz - Q.pos.z, d = Math.hypot(dx, dz);
+    if (!this.approach && d < 0.8) { Q.walkTo = null; Q.moving = false; Q.sprinting = false; return false; }
+    const sp = (run ? 4.2 : Q.st === 1 ? 2.2 : 3.4) * Math.min(1, d / 2.5 + (d > 8 ? 1 : 0));
+    if (d > 0.4) {
+      const k = Math.min(d, sp * dt) / d;
+      Q.pos.x += dx * k; Q.pos.z += dz * k;
+      Q.yaw += angDiff(Math.atan2(-dx, -dz), Q.yaw) * Math.min(1, dt * 6);
+      Q.moving = true;
+    } else { Q.moving = false; Q.yaw += angDiff(this.player.yaw, Q.yaw) * Math.min(1, dt * 3); }
+    if (d > 40) { Q.pos.x = tx; Q.pos.z = tz; } // left far behind: catch up
+    Q.pos.y = this.fac.groundAt(Q.pos.x, Q.pos.z, Q.pos.y + 0.6, 0.6);
+    Q.sprinting = run && Q.moving;
+    return true;
+  }
+
   // Solo spotter: Ra holds a perch and takes the shots you tag.
   _aiShooter(dt) {
     const A = this.aiShoot, S = this.sentinel, Q = this.partner;
@@ -1736,14 +2033,18 @@ export class CellGame {
     A.holdT = Math.max(0, (A.holdT || 0) - dt);
     A.coverT = Math.max(0, (A.coverT || 0) - dt);
     if (Q.seated) return; // aboard the van
+    // On the approach Ra walks with you (and shoots from wherever he is); then out to the cliff.
+    const walking = this._aiWalk(dt);
+    if (walking) { A.walkEye = { x: Q.pos.x, y: Q.pos.y + (Q.st === 1 ? 1.0 : 1.45), z: Q.pos.z }; }
+    else A.walkEye = null;
     if (A.moveT > 0) {
       A.moveT -= dt;
       Q.avatarHidden = true;
-      if (A.moveT <= 0) { A.perch = A.moveTo; const p = SPOTS.perches[A.perch]; Q.pos.set(p.x, terrainHeight(p.x, p.z), p.z); Q.yaw = p.yaw; Q.avatarHidden = false; this._toast(`Ra: set at ${p.name}.`, 'amber', this.partnerName); }
+      if (A.moveT <= 0) { A.perch = A.moveTo; const p = SPOTS.perches[A.perch]; Q.pos.set(p.x, this.fac.groundAt(p.x, p.z, 200, 0.5), p.z); Q.yaw = p.yaw; Q.avatarHidden = false; this._toast(`Ra: set at ${p.name}.`, 'amber', this.partnerName); }
       return;
     }
-    Q.pos.set(perch.x, terrainHeight(perch.x, perch.z), perch.z);
-    const eye = { x: perch.x, y: Q.pos.y + 1.3, z: perch.z };
+    if (!A.walkEye) { Q.pos.set(perch.x, this.fac.groundAt(perch.x, perch.z, 200, 0.5), perch.z); Q.st = 2; if (!A.aim) Q.yaw += angDiff(perch.yaw, Q.yaw) * Math.min(1, dt * 3); }
+    const eye = A.walkEye || { x: perch.x, y: Q.pos.y + 1.3, z: perch.z };
     // Candidates: anything tagged, anything with eyes on the spotter, drones locked on.
     const me = this.player.pos;
     const cands = [];
@@ -1751,7 +2052,7 @@ export class CellGame {
       if (g.state === 'dead') continue;
       const near = Math.hypot(g.x - me.x, g.z - me.z);
       const threat = (g.state === 'alert' || g.state === 'berserk') && g.target === this.role && near < 45 || (A.coverT > 0 && near < 40);
-      if (g.tagT > 0 || threat) cands.push({ e: g, p: { x: g.x, y: g.y + 1.25, z: g.z }, pri: threat ? 2 : 1 });
+      if ((g.tagT > 0 && !g.autoTag) || threat) cands.push({ e: g, p: { x: g.x, y: g.y + 1.25, z: g.z }, pri: threat ? 2 : 1 });
     }
     for (const d of S.drones) if (d.state !== 'dead' && (d.tagT > 0 || d.aw > 0.6)) cands.push({ e: d, p: { x: d.x, y: d.y, z: d.z }, pri: d.aw > 0.6 ? 3 : 1 });
     cands.sort((a, b) => b.pri - a.pri);
@@ -1866,6 +2167,7 @@ export class CellGame {
     let best = null;
     const opt = (key, label, dur, fn, auto = false) => { if (!best) best = { key, label, dur, fn, auto }; };
     if (!a.alive || a.downed) { this.prompts[role] = a.downed ? { label: 'DOWNED — waiting for a revive', p: 0 } : null; return; }
+    if (this._dragInteract(a, held, null)) return;
     this._vanInteract(a, held, dt, opt);
     const sameFloor = (y) => Math.abs(y - p.y) < 1.6;
     const other = this.agents().find((b) => b.role !== role);
@@ -1896,6 +2198,7 @@ export class CellGame {
       const chief = S.guards.find((g) => g.chief && g.state === 'dead' && g.badge);
       if (chief && Math.hypot(chief.x - p.x, chief.z - p.z) < 2.4 && sameFloor(chief.y)) opt('badge', 'Hold E — take the master badge', 1, () => { ob.badge = true; chief.badge = false; this._toast('Master badge cloned to the team — it opens every rack room. Find the server with the amber beacon.', 'cyan'); });
     }
+    this._dragInteract(a, held, opt);
     const rl = SPOTS.relay;
     if (!ob.relay && Math.hypot(rl.x - p.x, rl.z - p.z) < 2.4 && p.y < 2) opt('relay', 'Hold E — plant network relay', 2.2, () => { ob.relay = true; ob.access = Math.max(ob.access, 2); this.fac.relayPlanted = true; this._toast('Relay planted. The building is on the console: cameras, doors, devices, contacts.', 'cyan'); });
     // Exterior doors. Mechanical locks (maintenance, side) can't be hacked: the spotter has
@@ -1922,6 +2225,29 @@ export class CellGame {
       else if (ob.badge) opt('swipe', `Hold E — swipe the master badge (${rn})`, 0.8, () => { d.unlocked = true; this._toast(`Master badge accepted — ${rn}.`, 'dim'); });
       else opt('badgex', `${rn} — needs the ${cd.name} keycard (search the office drawers)`, 0, null);
       break;
+    }
+    // The roof hatch: a ladder between the roof and the data floor's storage room.
+    {
+      const H = this.fac.hatch, F = BUILDING.f1;
+      if (H && Math.hypot(p.x - H.x, p.z - H.z) < 1.6) {
+        const onRoof = p.y > BUILDING.h - 0.5;
+        const dest = onRoof ? { x: H.x, y: F + 0.02, z: H.z + 1.2 } : p.y > F - 1 && p.y < F + 2 ? { x: H.x, y: H.roofY, z: H.z - 1.3 } : null;
+        if (dest) opt('hatch', onRoof ? 'Hold E \u2014 climb down the hatch' : 'Hold E \u2014 climb up to the roof', 0.8, () => {
+          if (role === this.role) this.player.pos.set(dest.x, dest.y, dest.z); else this._broadcast({ k: 'tp', role, ...dest });
+          this.audio.click();
+        });
+      }
+    }
+    // The elevator: ride it from inside the car, or call it from a landing.
+    {
+      const L = ob.lift, F = BUILDING.f1, moving = Math.abs(L.y - L.to * F) > 0.01;
+      const dx = (SHAFT.door[0] + SHAFT.door[1]) / 2, dz = SHAFT.z1 + 0.8;
+      if (!moving && this.fac.inLift(p.x, p.z, p.y)) opt('lift', L.to ? 'E — elevator \u25BC LOBBY' : 'E — elevator \u25B2 DATA FLOOR', 0, () => { L.to = L.to ? 0 : 1; });
+      else if (Math.hypot(p.x - dx, p.z - dz) < 2 && Math.abs(p.y - (p.y > F - 1 ? F : 0)) < 1.6) {
+        const lv = p.y > F - 1 ? 1 : 0;
+        if (moving) opt('liftx', 'Elevator on its way\u2026', 0, null);
+        else if (L.to !== lv) opt('lift', 'E — call the elevator', 0, () => { L.to = lv; });
+      }
     }
     this._stationOpt(a, opt);
     // The archive server: jack in (signal lock), then extract (drive release). Minigames run
@@ -2207,7 +2533,10 @@ export class CellGame {
       Q.pos.lerp(Q.tpos, Math.min(1, dt * 12));
       Q.yaw += angDiff(Q.tyaw || 0, Q.yaw) * Math.min(1, dt * 12);
     }
-    if (Q.ai && Q.role === 'spotter') { Q.yaw = Math.PI * 0.02; }
+    if (Q.ai && Q.role === 'spotter' && !this.ended && !(this.paused && this.solo) && !this._aiWalk(dt)) {
+      if (!this.approach) { const o = SPOTS.overlook; Q.pos.set(o.x, this.fac.groundAt(o.x, o.z, 200, 0.5), o.z); Q.st = 1; Q.moving = false; }
+      Q.yaw = Math.PI * 0.02;
+    }
     const av = Q.avatar;
     av.setVisible(Q.seen && !Q.avatarHidden && !Q.kia);
     if (!Q.seen) return;
@@ -2232,9 +2561,39 @@ export class CellGame {
     if (showSelf) this.selfAvatar.update(dt, { p: this.player.pos, yaw: this.player.yaw, pitch: 0, st: this.downed ? 2 : 1, moving: false, w: true });
   }
 
+  // The detector going off: buzzer and a red strobe on its arch.
+  _checkpointFx() {
+    this.audio.buzzer && this.audio.buzzer(new THREE.Vector3(0, 2.2, CHECKPOINT.z));
+    this._ckFx = 3;
+  }
+  _liftVisuals(dt) {
+    const L = this.obj.lift, F = this.fac;
+    if (!L) return;
+    const was = F.lift.y;
+    F.setLift(L.y);
+    const moving = Math.abs(L.y - was) > 1e-4;
+    const pos = new THREE.Vector3((SHAFT.x0 + SHAFT.x1) / 2, L.y + 1.4, (SHAFT.z0 + SHAFT.z1) / 2);
+    if (moving && !this._liftMoving) this.audio.startLoop('lift', pos, 'lift', 0.18);
+    if (moving) this.audio.updateLoop('lift', pos);
+    if (!moving && this._liftMoving) { this.audio.stopLoop('lift'); this.audio.chime && this.audio.chime(pos); }
+    this._liftMoving = moving;
+    // Checkpoint arch light: green armed, dark once the CCTV is ours, red while it's alarming.
+    const C = F.checkpoint;
+    if (C) {
+      this._ckFx = Math.max(0, (this._ckFx || 0) - dt);
+      C.led.material.color.set(this._ckFx > 0 ? ((this.t * 8) % 1 < 0.5 ? '#ff2020' : '#400000') : this.obj.cctv ? '#202428' : '#30ff70');
+    }
+  }
+
   _visuals(dt) {
     this._iceClient(dt);
+    this._liftVisuals(dt);
+    this._xrTick(dt);
+    this._abTick(dt);
+    this._devTick(dt);
+    this._binoView(dt);
     this._neuroTick(dt);
+    this._eyesTick(dt);
     this._nvgTick(dt);
     this._spatialTick(dt);
     if (this.ambient) {
@@ -2345,6 +2704,13 @@ export class CellGame {
   _render(dt) {
     const u = this.post.uniforms;
     u.uTime.value = this.t;
+    u.uInked.value = this.look === 'og' ? 0 : 1;
+    u.tDepth.value = this.composer.readBuffer.depthTexture;
+    u.uNear.value = this.camera.near;
+    u.uFar.value = this.camera.far;
+    // Cel shading for the Inked look; re-swept now and then for meshes added since (drops, bodies).
+    this._lookSweep = (this._lookSweep || 0) - dt;
+    if (this._lookSweep <= 0) { this._lookSweep = 1; applyLook(this.scene, this.look); }
     const P = this.player;
     const quad = this.quad && this.quad.active;
     const isr = this.isr.active;
@@ -2427,7 +2793,7 @@ class CellHud {
     document.body.classList.toggle('cell-pip', !!pip);
     root.innerHTML = `
       <canvas id="cell-overlay"></canvas>
-      <div class="c-obj"><div class="c-obj-n"></div><div class="c-obj-t"></div><div class="c-obj-h"></div></div>
+      <div class="c-obj"><div class="c-obj-n"></div><div class="c-obj-t"></div><div class="c-obj-a"></div><div class="c-obj-h"></div></div>
       <div class="c-alarm"><span class="c-al-l">SENTINEL</span><b class="c-al-s">QUIET</b><i><em></em></i></div>
       <div class="c-partner"></div>
       <div class="c-feed"></div>
@@ -2445,13 +2811,13 @@ class CellHud {
       <div class="c-kit"></div>
       <div class="c-req"><span class="c-req-t"></span><button class="c-req-y">\u2713 <small>Y</small></button><button class="c-req-n">\u2715 <small>U</small></button></div>
       <div class="c-intro"><div class="c-intro-k">KESTREL RIDGE // DC-3</div><h1></h1><p class="c-intro-l"></p><p class="c-intro-r"></p></div>
-      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="ghost c-exit">Exit to main menu</button></div></div>
+      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="ghost c-exit">Exit to main menu</button></div></div>
       <div class="c-debrief"></div>`;
     document.body.appendChild(root);
     document.body.classList.add('cell-mode', 'cell-' + game.role);
     const $ = (s) => root.querySelector(s);
     this.el = {
-      overlay: $('#cell-overlay'), objN: $('.c-obj-n'), objT: $('.c-obj-t'), objH: $('.c-obj-h'), alS: $('.c-al-s'), alBar: $('.c-alarm em'), alarm: $('.c-alarm'),
+      overlay: $('#cell-overlay'), objN: $('.c-obj-n'), objT: $('.c-obj-t'), objH: $('.c-obj-h'), objA: $('.c-obj-a'), alS: $('.c-al-s'), alBar: $('.c-alarm em'), alarm: $('.c-alarm'),
       partner: $('.c-partner'), feed: $('.c-feed'), comms: $('.c-comms'), hp: $('.c-hp em'), camo: $('.c-camo em'), camoBox: $('.c-camo'), chips: $('.c-chips'),
       amN: $('.c-am-n'), amR: $('.c-am-r'), amW: $('.c-am-w'), amS: $('.c-am-s'), prompt: $('.c-prompt'), promptT: $('.c-prompt span'), promptB: $('.c-prompt em'),
       flash: $('.c-flash'), keys: $('.c-keys'), dmg: $('.c-dmg'), pause: $('.c-pause'), debrief: $('.c-debrief'),
@@ -2464,13 +2830,13 @@ class CellHud {
     this.ctx = this.el.overlay.getContext('2d');
     this.el.camoBox.style.display = game.role === 'shooter' ? '' : 'none';
     const K = (k, l) => `<b>${k}</b> ${l}`;
-    const shooterKeys = [K('Esc', 'pause'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
-    const spotterKeys = [K('Esc', 'pause'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'quad'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('N', 'NV')];
+    const shooterKeys = [K('Esc', 'pause'), K('3–8', 'request at crosshair'), K('G', 'camo'), K('H', 'deadeye'), K('X', 'lure'), K('T', 'execute'), K('Z', 'rounds menu'), K('M', 'camera dart'), K('SHIFT', 'breath (scoped)'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('1/2', 'rifle/pistol'), K('B', 'suppressor'), K('N', 'NV'), K('TAB', game.operative ? 'tablet (hold: quickhack)' : 'map')];
+    const spotterKeys = [K('Esc', 'pause'), K('X', 'binoculars'), K('1–0', 'command at crosshair'), K('TAB', 'tablet · ISR (hold: quickhack)'), K('Q', 'recon drone'), K('F', 'tag (hold: sync)'), K('E', 'use'), K('V', 'ping (hold: wheel)'), K('Y/U', 'approve/deny'), K('B', 'suppressor'), K('K', 'laser'), K('N', 'NV')];
     shooterKeys.push(K('L', 'light'), K('\u21B5', 'chat'));
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
     if (game.net) { shooterKeys.push(K('M', 'mic'), K('K', 'talk')); spotterKeys.push(K('M', 'mic'), K('K', 'talk')); }
-    this.el.keys.innerHTML = (game.operative ? [...shooterKeys, K('Q', 'quad')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
+    this.el.keys.innerHTML = (game.operative ? [...shooterKeys, K('Q', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
     this.objective(0, OBJECTIVES[0], false);
     // Spotter (and lone operative): picture-in-picture squares for the console and the drone.
     const pipOn = game.role === 'spotter' || game.operative;
@@ -2494,6 +2860,11 @@ class CellHud {
     });
     $('.c-resume').onclick = () => { this.setPause(false); game.input.requestLock(); };
     $('.c-exit').onclick = () => game.exit();
+    const bcBtn = $('.c-bcam');
+    const bcLabel = () => { bcBtn.textContent = `Partner bodycam: ${game.bodycamOn ? 'ON' : 'OFF'}`; };
+    try { game.bodycamOn = localStorage.getItem('draxxed.cellBodycam') === 'on'; } catch {}
+    bcLabel();
+    bcBtn.onclick = () => { game.bodycamOn = !game.bodycamOn; try { localStorage.setItem('draxxed.cellBodycam', game.bodycamOn ? 'on' : 'off'); } catch {} bcLabel(); };
     const voiceBtn = $('.c-voice');
     const voiceLabel = () => { voiceBtn.textContent = `Radio voices: ${game.radio.voiceOn ? 'ON' : 'OFF (text only)'}`; };
     voiceLabel();
@@ -2509,14 +2880,14 @@ class CellHud {
     if (!t) return;
     const bar = document.createElement('div');
     bar.className = 'cell-tbar';
-    const extra = (g.role === 'spotter' || g.operative) ? [['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP'], ['cell-hack', 'HACK']] : [];
-    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-tag', 'TAG'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
+    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP'], ['cell-hack', 'HACK']] : [];
+    const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-tag', 'TAG'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ...(g.role === 'spotter' ? [['cell-bino', 'BINO']] : []), ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
-      ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-quad', 'QUAD'], ['cell-recall', 'RECALL'], ...common]
+      ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-quad', 'DRONE'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-tab', 'MAP'], ...common]
-        : [['cell-tab', 'TABLET'], ['cell-ability', 'QUAD'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
-    bar.innerHTML = pills.map(([a, l]) => `<div class="pill" data-act="${a}">${l}</div>`).join('') + '<div class="pill" id="cell-tpause">❚❚</div>';
+        ? [['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-dart', 'DART'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
+        : [['cell-tab', 'TABLET'], ['cell-ability', 'DRONE'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
+    bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
     bar.querySelector('#cell-tpause').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.setPause(true); }, { passive: false });
     // PING: hold and drag your thumb to pick from the wheel.
@@ -2630,10 +3001,19 @@ class CellHud {
     if (lab !== this._al) { this._al = lab; this.el.alS.textContent = lab; this.el.alarm.dataset.s = lab.toLowerCase(); }
     this.el.alBar.style.width = `${Math.round(S.alarm * 100)}%`;
     if (ob.step !== this._step) { this._step = ob.step; this.objective(ob.step, OBJECTIVES[ob.step], false); }
+    // The approach: pickets left in the draw, while you're still south of the crest.
+    {
+      const left = S.guards.filter((q) => q.picket && q.state !== 'dead' && !q.incap).length;
+      const show = P.pos.z > SPOTS.crest && left > 0 && ob.step === 0;
+      const txt = show ? `APPROACH \u00B7 ${left} PICKET${left > 1 ? 'S' : ''} IN THE DRAW \u2014 DROP THEM QUIET` : '';
+      if (txt !== this._apTxt) { this._apTxt = txt; this.el.objA.textContent = txt; this.el.objA.style.display = txt ? '' : 'none'; }
+      if (this._apLeft > 0 && left === 0 && !this._apClear) { this._apClear = true; g._radio(g.aiPartner ? 'partner' : 'me', "Draw's clear."); }
+      this._apLeft = left;
+    }
     // Partner card.
     const Q = g.partner;
     const qd = Q.seen ? Math.round(Q.pos.distanceTo(P.pos)) : 0;
-    const qs = Q.kia ? 'KIA' : Q.downed ? 'DOWN' : !Q.seen ? 'NO LINK' : Q.ai ? (g.aiShoot && g.aiShoot.moveT > 0 ? 'RELOCATING' : 'AI') : Q.tablet ? 'ON CONSOLE' : Q.quad ? 'FLYING QUAD' : Q.cloak ? 'CLOAKED' : 'OK';
+    const qs = Q.kia ? 'KIA' : Q.downed ? 'DOWN' : !Q.seen ? 'NO LINK' : Q.ai ? (g.aiShoot && g.aiShoot.moveT > 0 ? 'RELOCATING' : 'AI') : Q.tablet ? 'ON CONSOLE' : Q.quad ? 'FLYING DRONE' : Q.cloak ? 'CLOAKED' : 'OK';
     const ph = `<b style="color:${ROLES[Q.role].color}">${esc(Q.name)}</b> <span>${ROLES[Q.role].name}</span> <em>${qs}</em> <span>${qd} m</span>`;
     if (ph !== this._ph) { this._ph = ph; this.el.partner.innerHTML = ph; }
     // Vitals & chips.
@@ -2648,7 +3028,7 @@ class CellHud {
     if (ob.drive === g.role) chips.push('DRIVE');
     if (ob.ifak && ob.ifak[g.role] > 0) chips.push('IFAK');
     if (g.role === 'spotter' && g.ops) chips.push(`BW ${Math.round(g.ops.bw)}`);
-    if (g.role === 'spotter') chips.push(g._quadOut() ? `QUAD ${g.quad.parked ? 'PARKED ' : ''}${Math.round((g.quad.bat / QUAD_BAT) * 100)}%` : g.quadCd > 0 ? `QUAD ${Math.ceil(g.quadCd)}s` : 'QUAD READY');
+    if (g.role === 'spotter') chips.push(g._quadOut() ? `DRONE ${g.quad.parked ? 'PARKED ' : ''}${Math.round((g.quad.bat / QUAD_BAT) * 100)}%` : g.quadCd > 0 ? `DRONE ${Math.ceil(g.quadCd)}s` : 'DRONE READY');
     const ch = chips.map((c) => `<i>${c}</i>`).join('');
     if (ch !== this._ch) { this._ch = ch; this.el.chips.innerHTML = ch; }
     // Ammo.
@@ -2657,7 +3037,7 @@ class CellHud {
     this.el.amR.textContent = '/ ' + w.reserve;
     this.el.amW.textContent = P.def.name + (P.def.slot === 'rifle' ? ' · SUPPRESSED' : '');
     const sec = P.def.slot === 'pistol';
-    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 NIGHT VISION` : '';
+    this.el.amS.textContent = sec ? `${w.mode ? w.mode.toUpperCase() + ' (B) \u00B7 ' : ''}${w.sup ? 'SUPPRESSED' : 'UNSUPPRESSED \u2014 LOUD'}${w.mode ? ' (hold B)' : ' (B)'}` : P.scoped ? `${P.zoom}\u00D7 \u00B7 NIGHT VISION${w.ammo && w.ammo !== 'std' ? ' \u00B7 ' + AMMO_NAME[w.ammo] : ''}` : w.ammo && w.ammo !== 'std' ? `${AMMO_NAME[w.ammo]} ROUNDS (Z: rounds menu)` : '';
     this.el.amS.classList.toggle('loud', sec && !w.sup);
     // Prompt.
     let pr = g.prompts[g.role];
@@ -2686,7 +3066,7 @@ class CellHud {
       this.el.sync.classList.toggle('go', g.syncReady);
       this.el.sync.querySelector('.a').className = 'a' + (g.syncAim ? ' on' : '');
       this.el.sync.querySelector('.b').className = 'b' + (g.syncPartner ? ' on' : '');
-      this.el.sync.querySelector('b').textContent = g.syncReady ? 'SYNC \u2014 FIRE' : g.aiSpot || g.operative ? 'SYNC \u2014 needs a second rifle' : `SYNC \u00B7 ${sm} MARKED`;
+      this.el.sync.querySelector('b').textContent = g.syncReady ? 'SYNC \u2014 FIRE' : g.operative ? 'SYNC \u2014 needs a second rifle' : `SYNC \u00B7 ${sm} MARKED`;
     }
     // PiP squares (~4 Hz).
     if (this.el.pip.style.display !== 'none') {
@@ -2701,7 +3081,7 @@ class CellHud {
     // Ability chips.
     if (g.role === 'shooter') {
       const K = g.kit;
-      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${K.execs ? 'on' : 'cd'}">T EXECUTE \u00D7${K.execs}</i>`;
+      const kh = `<i class="${K.deadeye > 0 ? 'on' : K.deadeyeCd > 0 ? 'cd' : ''}">H DEADEYE ${K.deadeye > 0 ? Math.ceil(K.deadeye) + 's' : K.deadeyeCd > 0 ? Math.ceil(K.deadeyeCd) + 's' : 'READY'}</i><i class="${K.lures ? '' : 'cd'}">X LURE \u00D7${K.lures}</i><i class="${K.execs ? 'on' : 'cd'}">T EXECUTE \u00D7${K.execs}</i><i class="${(P.arms.find((q) => q.ammo && q.ammo !== 'std') ? 'on' : '')}">Z ROUNDS \u00B7 ${AMMO_NAME[(P.arms.find((q) => q.def.slot === 'rifle') || {}).ammo || 'std']}</i>`;
       if (kh !== this._kh) { this._kh = kh; this.el.kit.innerHTML = kh; }
     }
     // Incoming request / call card.
@@ -2814,24 +3194,36 @@ class CellHud {
     }
     // Scope (Halo-style ring with a range readout) or a small crosshair.
     g._neuroHud(c, proj, W, H);
+    g._relayHud(c, proj, W, H);
+    g._binoHud(c, proj, W, H);
+    g._devHud(c, W, H);
+    this._owHud(c, proj);
     g._syncHud(c, proj);
     g._qhHud(c, proj, W, H);
     g._nvgHud(c, W, H);
     if (g.isr.active) this._isrHud(c, W, H);
     else if (scoped) this._scope(c, W, H);
     else if (g.quad && g.quad.active) this._quadHud(c, W, H);
-    else if (!g.downed && !g.kia) {
+    else if (!g.downed && !g.kia && !(g.bino && g.bino.up)) {
       c.strokeStyle = g._reticleHot() ? 'rgba(255,50,60,0.95)' : 'rgba(220,240,255,0.75)';
       c.lineWidth = 1.5;
-      const s = P.def.slot === 'pistol' && P.scopeT > 0.5 ? 3 : 6;
-      c.beginPath(); c.moveTo(W / 2 - s - 4, H / 2); c.lineTo(W / 2 - 4, H / 2); c.moveTo(W / 2 + 4, H / 2); c.lineTo(W / 2 + s + 4, H / 2); c.moveTo(W / 2, H / 2 + 4); c.lineTo(W / 2, H / 2 + s + 4); c.stroke();
+      // The gap opens with the weapon's spread: tight on the sights, wide from the hip.
+      const sp = g._spreadNow();
+      const gap = Math.max(4, Math.min(H * 0.3, (Math.tan(sp / 2) / Math.tan(THREE.MathUtils.degToRad(g.camera.fov / 2))) * H / 2));
+      this._xg = this._xg === undefined ? gap : this._xg + (gap - this._xg) * 0.25;
+      const s = P.def.slot === 'pistol' && P.scopeT > 0.5 ? 4 : 7, q = this._xg;
+      c.beginPath();
+      c.moveTo(W / 2 - s - q, H / 2); c.lineTo(W / 2 - q, H / 2); c.moveTo(W / 2 + q, H / 2); c.lineTo(W / 2 + s + q, H / 2);
+      c.moveTo(W / 2, H / 2 + q); c.lineTo(W / 2, H / 2 + s + q); c.moveTo(W / 2, H / 2 - q); c.lineTo(W / 2, H / 2 - s - q);
+      c.stroke();
+      c.fillStyle = c.strokeStyle; c.fillRect(W / 2 - 1, H / 2 - 1, 2, 2);
     }
   }
 
   _objPoint() {
     const g = this.g, ob = g.obj;
     switch (ob.step) {
-      case 0: return { x: -80, y: 2, z: 11, label: 'FENCE GAP' };
+      case 0: return { x: -80, y: 2, z: this.g.fac.cutZ, label: 'FENCE GAP' };
       case 1: return { x: SPOTS.relay.x, y: 1.5, z: SPOTS.relay.z, label: 'RELAY' };
       case 2: { const c = g.sentinel.guards.find((q) => q.chief && q.state === 'dead' && q.badge); return c ? { x: c.x, y: c.y + 2.6, z: c.z, label: 'MASTER BADGE' } : null; }
       case 3: return null; // search: no marker until someone finds the beacon
@@ -2882,6 +3274,44 @@ class CellHud {
     c.textAlign = 'center';
     if (this._onTarget) { c.strokeStyle = 'rgba(255,60,80,0.95)'; c.beginPath(); c.arc(W / 2, H / 2, R * 0.12, 0, Math.PI * 2); c.stroke(); }
     c.fillText('NIGHT VISION', W / 2, H / 2 + R * 0.86);
+    // Wind: speed and direction across your shot, and a hold-off dot for this range.
+    if (P.def.slot === 'rifle') {
+      const cw = g._crosswind(P.yaw), drift = g._windDrift(P.yaw, this._range || 300);
+      const px = (Math.tan(drift) / Math.tan(THREE.MathUtils.degToRad(g.camera.fov / 2))) * (H / 2);
+      c.fillStyle = 'rgba(255,190,90,0.95)';
+      c.beginPath(); c.arc(W / 2 - px, H / 2, 2.5, 0, Math.PI * 2); c.fill();
+      c.font = '600 12px JetBrains Mono, monospace'; c.textAlign = 'left';
+      c.fillText(`WIND ${Math.abs(cw).toFixed(1)} m/s ${cw > 0.2 ? '\u2192' : cw < -0.2 ? '\u2190' : '\u00B7'}`, W / 2 - R * 0.86, H / 2 + R * 0.62);
+      const B = g.ab && g.ab.breath;
+      if (B) c.fillText(B.on ? `BREATH HELD ${(4 - B.t).toFixed(1)} s` : B.cd > 0 ? `BREATH ${Math.ceil(B.cd)} s` : 'SHIFT: HOLD BREATH', W / 2 - R * 0.86, H / 2 + R * 0.72);
+      if (g.ab && g.ab.ow.on) { c.fillStyle = 'rgba(64,216,232,0.95)'; c.textAlign = 'center'; c.fillText('OVERWATCH LOCK', W / 2, H / 2 - R * 0.8); }
+      c.textAlign = 'center';
+    }
+  }
+
+  // Overwatch rings on the ground (yours and your partner's).
+  _owHud(c, proj) {
+    const g = this.g, rings = [];
+    if (g.ab && g.ab.ow.on && g.ab.ow.at) rings.push([g.ab.ow.at.x, g.ab.ow.at.z, 'rgba(242,179,91,']);
+    const pe = g.partner.ex;
+    if (pe && pe.ow) rings.push([pe.ow[0], pe.ow[1], 'rgba(242,179,91,']);
+    for (const [x, z, col] of rings) {
+      const y = g.fac.groundAt(x, z, 60, 0.5) + 0.2;
+      c.strokeStyle = col + (0.5 + 0.2 * Math.sin(g.t * 3)).toFixed(2) + ')';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      let first = true;
+      for (let i = 0; i <= 24; i++) {
+        const a = (i / 24) * Math.PI * 2, p = proj(x + Math.cos(a) * 14, y, z + Math.sin(a) * 14);
+        if (p.behind) { first = true; continue; }
+        if (first) c.moveTo(p.x, p.y); else c.lineTo(p.x, p.y);
+        first = false;
+      }
+      c.stroke();
+      const p = proj(x, y + 1, z);
+      if (!p.behind) { c.fillStyle = col + '0.9)'; c.font = '600 10px JetBrains Mono, monospace'; c.textAlign = 'center'; c.fillText('OVERWATCH', p.x, p.y); }
+    }
+    c.lineWidth = 1;
   }
 
   _isrHud(c, W, H) {
@@ -2915,10 +3345,23 @@ class CellHud {
     for (const [x, y, sx, sy] of [[m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1]]) { c.beginPath(); c.moveTo(x, y + sy * 40); c.lineTo(x, y); c.lineTo(x + sx * 40, y); c.stroke(); }
     c.font = '600 13px JetBrains Mono, monospace';
     c.textAlign = 'left';
-    c.fillText(`ISR // PREDATOR \u00B7 ${I.mode === 'IR' ? 'IR WHT-HOT' : 'EO'} \u00B7 FOV ${I.fov}\u00B0`, m + 10, m + 20);
+    c.fillText(`ISR // PREDATOR \u00B7 ${I.mode === 'IR' ? 'IR WHT-HOT' : 'EO'} \u00B7 ${I.mag.toFixed(1)}\u00D7 \u00B7 FOV ${I.fov.toFixed(1)}\u00B0`, m + 10, m + 20);
+    // Zoom ladder on the right edge.
+    {
+      const x = W - m - 6, y0 = H / 2 - 90, y1 = H / 2 + 90;
+      c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1);
+      for (let i = 0; i <= 8; i++) { const y = y0 + (y1 - y0) * i / 8; c.moveTo(x - (i % 4 ? 5 : 10), y); c.lineTo(x, y); }
+      c.stroke();
+      const k = Math.log(ISR_FOV.max / I.fov) / Math.log(ISR_FOV.max / ISR_FOV.min);
+      const y = y1 - (y1 - y0) * k;
+      c.beginPath(); c.moveTo(x - 2, y); c.lineTo(x - 16, y - 6); c.lineTo(x - 16, y + 6); c.closePath(); c.fill();
+      c.textAlign = 'right';
+      c.fillText('ZOOM', x, y0 - 10);
+      c.textAlign = 'left';
+    }
     c.fillText(`ALT ${Math.round(I.pos.y)} m \u00B7 SLANT ${Math.round(I.slant())} m \u00B7 SPI ${Math.round(I.spi.x)} ${Math.round(-I.spi.z)}`, m + 10, m + 38);
     c.textAlign = 'right';
-    c.fillText(`MOUSE/DRAG SLEW \u00B7 WHEEL ZOOM \u00B7 N IR/EO \u00B7 F TAG \u00B7 P SWEEP${I.sweepCd > 0 ? ' ' + Math.ceil(I.sweepCd) + 's' : ''} \u00B7 V PING \u00B7 I EXIT`, W - m - 10, H - m - 12);
+    c.fillText(`MOUSE/DRAG SLEW \u00B7 WHEEL / +\u2212 / [ ] / PINCH ZOOM \u00B7 N IR/EO \u00B7 F TAG \u00B7 P SWEEP${I.sweepCd > 0 ? ' ' + Math.ceil(I.sweepCd) + 's' : ''} \u00B7 V PING \u00B7 I EXIT`, W - m - 10, H - m - 12);
     c.textAlign = 'center';
   }
 
@@ -2931,7 +3374,7 @@ class CellHud {
     c.beginPath(); c.arc(W / 2, H / 2, 16, 0, Math.PI * 2); c.stroke();
     c.fillStyle = 'rgba(230,240,255,0.9)';
     c.font = '600 13px JetBrains Mono, monospace';
-    c.fillText(`RECON QUAD · BAT ${Math.ceil(q.bat)} s · HULL ${Math.max(0, q.hp)}`, W / 2, 78);
+    c.fillText(`RECON DRONE · BAT ${Math.ceil(q.bat)} s · HULL ${Math.max(0, q.hp)}`, W / 2, 78);
     c.fillText(`ALT ${(q.y - terrainHeight(q.x, q.z)).toFixed(1)} m · BAT ${Math.round((q.bat / 300) * 100)}% · Q PARK · HOLD Q RECALL`, W / 2, 96);
   }
 }
@@ -2948,3 +3391,6 @@ installNeuro(CellGame);
 installNVG(CellGame);
 installSpatial(CellGame);
 installPhone(CellGame);
+installXRounds(CellGame);
+installAbilities(CellGame);
+installDevices(CellGame);

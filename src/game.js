@@ -30,6 +30,7 @@ import { ViewModel } from './viewmodel.js';
 import { WEAPONS } from './weapons.js';
 import { Supply } from './supply.js';
 import { RULES, rulesLabel } from './rules.js';
+import { applyLook } from './look.js';
 import { PALETTES as PALS } from './atmosphere.js';
 import { AtmosFX } from './atmofx.js';
 import { hazeUniforms as HZ } from './atmosphere.js';
@@ -40,7 +41,10 @@ const ZOOM_GLINT = { 4: 0.32, 5: 0.4, 8: 0.68, 10: 0.85, 12: 1.0, 16: 1.15, 20: 
 const UAV_INTERVAL = 60;
 const PART_NAMES = { head: 'HEADSHOT', torso: 'BODY SHOT', legs: 'LEG SHOT', chicken: 'FLICKED BY THE OVERLORD' };
 
-// Final look: silhouette ink lines from depth, split-tone grade, vignette, grain, damage tint.
+// Final look: ink lines from depth, split-tone grade, vignette, grain, damage tint.
+// uInked picks the look (RULES.look): 1 = Inked (the default; Phantom Overwatch's ink pass: the
+// Laplacian of 1/z catches silhouettes and folds alike, strong, fading past ~120 m, with saturated
+// color and light grain), 0 = OG (silhouettes only, a slightly desaturated filmic grade).
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -52,13 +56,14 @@ const GradeShader = {
     uAmount: { value: 0.35 },
     uDamage: { value: 0 },
     uOutline: { value: 1 },
+    uInked: { value: 1 },
     uThermal: { value: 0 },
     uStatic: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform sampler2D tDepth;
-    uniform float uNear, uFar, uTime, uAmount, uDamage, uOutline, uThermal, uStatic; uniform vec2 uRes;
+    uniform float uNear, uFar, uTime, uAmount, uDamage, uOutline, uInked, uThermal, uStatic; uniform vec2 uRes;
     varying vec2 vUv;
     float lin(vec2 uv) {
       float z = texture2D(tDepth, uv).x * 2.0 - 1.0;
@@ -67,17 +72,30 @@ const GradeShader = {
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
-      // Ink outline where a nearer surface sits in front of something much farther.
-      vec2 px = 1.0 / uRes;
       float d0 = lin(vUv);
-      float dm = 0.0;
-      dm = max(dm, lin(vUv + vec2(px.x, 0.0)) - d0);
-      dm = max(dm, lin(vUv - vec2(px.x, 0.0)) - d0);
-      dm = max(dm, lin(vUv + vec2(0.0, px.y)) - d0);
-      dm = max(dm, lin(vUv - vec2(0.0, px.y)) - d0);
-      float edge = smoothstep(0.06, 0.22, dm / d0) * (1.0 - smoothstep(350.0, 1400.0, d0)) * uOutline;
-      c.rgb = mix(c.rgb, c.rgb * 0.18 + vec3(0.006, 0.005, 0.012), edge * 0.85);
-      // Grade: slight desaturation, cool shadows / warm highlights.
+      if (uInked > 0.5) {
+        // Inked: ink wherever 1/z bends (silhouettes and creases); flat planes have a zero Laplacian.
+        vec2 o = 1.6 / uRes;
+        float wc = 1.0 / d0;
+        float wl = 1.0 / lin(vUv - vec2(o.x, 0.0)), wr = 1.0 / lin(vUv + vec2(o.x, 0.0));
+        float wu = 1.0 / lin(vUv + vec2(0.0, o.y)), wd = 1.0 / lin(vUv - vec2(0.0, o.y));
+        float lap = abs(wl + wr - 2.0 * wc) + abs(wu + wd - 2.0 * wc);
+        float ref = max(wc, max(max(wl, wr), max(wu, wd)));
+        float sky = step(uFar * 0.97, d0);
+        float ink = smoothstep(0.012, 0.03, lap / ref) * (1.0 - sky) * (1.0 - 0.7 * smoothstep(120.0, 900.0, d0)) * uOutline;
+        c.rgb = mix(c.rgb, vec3(0.0045, 0.0045, 0.006), ink * 0.92);
+      } else {
+        // OG: ink only where a nearer surface sits in front of something much farther.
+        vec2 px = 1.0 / uRes;
+        float dm = 0.0;
+        dm = max(dm, lin(vUv + vec2(px.x, 0.0)) - d0);
+        dm = max(dm, lin(vUv - vec2(px.x, 0.0)) - d0);
+        dm = max(dm, lin(vUv + vec2(0.0, px.y)) - d0);
+        dm = max(dm, lin(vUv - vec2(0.0, px.y)) - d0);
+        float edge = smoothstep(0.06, 0.22, dm / d0) * (1.0 - smoothstep(350.0, 1400.0, d0)) * uOutline;
+        c.rgb = mix(c.rgb, c.rgb * 0.18 + vec3(0.006, 0.005, 0.012), edge * 0.85);
+      }
+      // Grade: cool shadows / warm highlights (OG desaturates slightly, Inked keeps color punchy).
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
       if (uThermal > 0.5) {
         // Drone thermal: the world is cold slate, warm bodies and lit windows burn white-orange.
@@ -96,7 +114,7 @@ const GradeShader = {
         gl_FragColor = vec4(th + sc, 1.0);
         return;
       }
-      c.rgb = mix(vec3(l), c.rgb, 0.88);
+      c.rgb = mix(vec3(l), c.rgb, uInked > 0.5 ? 1.12 : 0.88);
       vec3 cool = vec3(0.9, 0.96, 1.12), warm = vec3(1.07, 1.0, 0.9);
       c.rgb *= mix(cool, warm, smoothstep(0.03, 0.6, l));
       // Vignette + damage.
@@ -107,7 +125,7 @@ const GradeShader = {
       c.rgb = mix(c.rgb, vec3(0.5, 0.02, 0.04), uDamage * (1.0 - v) * 0.85);
       // Film grain.
       float g = hash(vUv * uRes + fract(uTime) * 91.7) - 0.5;
-      c.rgb += g * 0.018 * (0.25 + l);
+      c.rgb += g * (uInked > 0.5 ? 0.006 : 0.018) * (0.25 + l);
       gl_FragColor = c;
     }`,
 };
@@ -229,9 +247,30 @@ export class Game {
     this.hud.show(true);
     this._resize();
     addEventListener('resize', () => this._resize());
+    this.look = null;
+    this.lookSweep = 0;
+    this._syncLook(0);
     this.clock = new THREE.Clock();
     this.frameTimes = [];
     this.renderer.setAnimationLoop(() => this._frame());
+  }
+
+  // Graphics look (host's RULES.look, see look.js). Follows the rules if they change, and now and
+  // then re-sweeps the scene so meshes added since (avatars, chickens, drops) get the same shading.
+  _syncLook(dt) {
+    const look = RULES.look === 'og' ? 'og' : 'inked';
+    this.lookSweep -= dt;
+    if (look === this.look && (look === 'og' || this.lookSweep > 0)) return;
+    if (look !== this.look) {
+      this.look = look;
+      const inked = look === 'inked';
+      if (this.bloom) this.bloom.strength = inked ? 0.33 : 0.55;
+      // Grass stays out of the ink: inked, every clump would turn into a black dash.
+      const grass = this.world.grass && this.world.grass.mesh;
+      if (grass) { grass.material.depthWrite = !inked; grass.renderOrder = inked ? 2 : 0; }
+    }
+    this.lookSweep = 1;
+    applyLook(this.scene, look);
   }
 
   // -------------------------------------------------------------------------
@@ -1126,11 +1165,13 @@ export class Game {
       u.uNear.value = this.camera.near;
       u.uFar.value = this.camera.far;
       u.uTime.value = this.now;
+      u.uInked.value = this.look === 'og' ? 0 : 1;
       u.uThermal.value = this.tools.thermalActive() && !replaying ? 1 : 0;
       u.uStatic.value = this.tools.feed > 0 && !replaying ? 1 : 0;
       u.uRes.value.set(this.renderer.domElement.width, this.renderer.domElement.height);
     }
     if (this.sandbox) this.sandbox.update(dt);
+    this._syncLook(dt);
     // Touch toggles: breath releases itself when you unscope or run out of air.
     this.input.isScoped = P.scoped;
     if (this.input.breathLatched && (!P.scoped || P.breathLock > 0)) this.input.breathLatched = false;

@@ -1,7 +1,7 @@
 // Sniper Cell — ISR overwatch: a high-altitude MALE drone (Predator / Reaper class) flying a
 // wide orbit around Kestrel Ridge. Everyone can spot it as a speck with blinking nav lights
 // (and an IR beacon in night vision). The spotter (or a lone operative) can take its sensor:
-//   mouse / drag   slew the sensor point          wheel / +−  zoom (4 steps)
+//   mouse / drag   slew the sensor point          wheel / +− / pinch  zoom (continuous)
 //   N              IR (white-hot) ⇄ EO             F           tag what's under the cross
 //   V              pings & requests at the cross   I / Esc     back to first person
 //   P              ping sweep: a circle on the ground that marks every unit inside it
@@ -12,7 +12,8 @@ import { glowTexture } from '../textures.js';
 import { lam } from './facility.js';
 
 export const ORBIT = { x: 0, z: -10, r: 460, alt: 330, speed: 42 };
-const ZOOMS = [32, 16, 8, 3.5];
+// Continuous sensor zoom: field of view in degrees, widest to tightest.
+export const ISR_FOV = { max: 40, min: 1.8, start: 16 };
 
 export function buildUAV() {
   const g = new THREE.Group();
@@ -52,14 +53,36 @@ export class ISR {
     this.pos = new THREE.Vector3();
     this.active = false;
     this.mode = 'IR';
-    this.zi = 1;
+    this.fovT = ISR_FOV.start; // target
+    this._fov = ISR_FOV.start; // eased
     this.spi = new THREE.Vector3(0, 0, -18);
-    this.cam = new THREE.PerspectiveCamera(ZOOMS[1], 16 / 10, 1, 6000);
+    this.cam = new THREE.PerspectiveCamera(ISR_FOV.start, 16 / 10, 1, 6000);
+    this._pinch();
     this.update(0);
   }
 
   get fov() {
-    return ZOOMS[this.zi];
+    return Math.round(this._fov * 10) / 10;
+  }
+  // Magnification relative to the widest view.
+  get mag() {
+    return ISR_FOV.max / this._fov;
+  }
+  // k > 1 zooms in, k < 1 out.
+  zoomBy(k) {
+    this.fovT = THREE.MathUtils.clamp(this.fovT / k, ISR_FOV.min, ISR_FOV.max);
+  }
+
+  // Two-finger pinch anywhere on screen while the sensor is up.
+  _pinch() {
+    let d0 = 0, f0 = 0;
+    const dist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    addEventListener('touchstart', (e) => { if (this.active && e.touches.length === 2) { d0 = dist(e); f0 = this.fovT; } }, { passive: true });
+    addEventListener('touchmove', (e) => {
+      if (!this.active || e.touches.length !== 2 || !d0) return;
+      this.fovT = THREE.MathUtils.clamp(f0 * d0 / Math.max(10, dist(e)), ISR_FOV.min, ISR_FOV.max);
+    }, { passive: true });
+    addEventListener('touchend', (e) => { if (e.touches.length < 2) d0 = 0; }, { passive: true });
   }
 
   update(dt) {
@@ -77,13 +100,15 @@ export class ISR {
     const t = this.g.t;
     U.userData.nav.forEach((s, i) => (s.visible = Math.sin(t * 3 + i) > 0.6));
     U.userData.ir.visible = (t * 1.2) % 1 < 0.12;
+    // Ease the optics toward the target (log space, so every step feels the same).
+    this._fov = Math.exp(THREE.MathUtils.lerp(Math.log(this._fov), Math.log(this.fovT), Math.min(1, dt * 7)));
     this._aim(this.cam);
   }
 
   _aim(cam) {
     cam.position.copy(this.pos).add(new THREE.Vector3(0, -1, 0));
     cam.lookAt(this.spi);
-    cam.fov = this.fov;
+    cam.fov = this._fov;
     cam.updateProjectionMatrix();
   }
 
@@ -109,10 +134,13 @@ export class ISR {
     // Touch / keys: WASD also slews.
     this.spi.addScaledVector(right, act.mx * dist * 0.004 * this.fov / 16 * 60 * dt).addScaledVector(fwd, -act.my * dist * 0.004 * this.fov / 16 * 60 * dt);
     this.spi.x = THREE.MathUtils.clamp(this.spi.x, -170, 170);
-    this.spi.z = THREE.MathUtils.clamp(this.spi.z, -145, 200);
+    this.spi.z = THREE.MathUtils.clamp(this.spi.z, -145, 320);
     this.spi.y = this.g.fac.groundAt(this.spi.x, this.spi.z, 60, 0.5);
-    if (act.zoomIn || I.pressed('Equal')) this.zi = Math.min(ZOOMS.length - 1, this.zi + 1);
-    if (act.zoomOut || I.pressed('Minus')) this.zi = Math.max(0, this.zi - 1);
+    if (act.zoomIn || I.pressed('Equal') || I.pressed('cell-zin')) this.zoomBy(1.4);
+    if (act.zoomOut || I.pressed('Minus') || I.pressed('cell-zout')) this.zoomBy(1 / 1.4);
+    // Held keys / buttons: a smooth continuous zoom.
+    if (I.held('BracketRight') || I.held('T:cell-zin')) this.zoomBy(1 + dt * 1.6);
+    if (I.held('BracketLeft') || I.held('T:cell-zout')) this.zoomBy(1 / (1 + dt * 1.6));
     if (I.pressed('KeyN') || I.pressed('cell-nv')) this.mode = this.mode === 'IR' ? 'EO' : 'IR';
   }
 
@@ -120,7 +148,7 @@ export class ISR {
   apply(camera) {
     camera.position.copy(this.cam.position);
     camera.quaternion.copy(this.cam.quaternion);
-    camera.fov = this.fov;
+    camera.fov = this._fov;
     camera.updateProjectionMatrix();
   }
 

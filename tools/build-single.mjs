@@ -1,4 +1,4 @@
-// Builds dist/draxxed-sklounst.html: the whole game in one file that runs when opened directly (file://).
+// Builds dist/sniper-cell.html: the whole game in one file that runs when opened directly (file://).
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -54,5 +54,5 @@ html = html
   .replace('<script src="vendor/peerjs.min.js"></script>', () => `<script>${esc(peer)}</script>`)
   .replace(/<script type="module" src="src\/main\.js(\?[^"]*)?"><\/script>/, () => `<script>${esc(js)}</script>`);
 mkdirSync(r('dist'), { recursive: true });
-writeFileSync(r('dist/draxxed-sklounst.html'), html);
-console.log(`dist/draxxed-sklounst.html  ${(html.length / 1024).toFixed(0)} KB`);
+writeFileSync(r('dist/sniper-cell.html'), html);
+console.log(`dist/sniper-cell.html  ${(html.length / 1024).toFixed(0)} KB`);

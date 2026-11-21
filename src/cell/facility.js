@@ -3,23 +3,34 @@
 // a cliff the shooter can work from. Everything here is axis-aligned boxes, so collision,
 // line of sight and bullets share one cheap model:
 //   solid  blocks movement      sight  blocks vision      shot  stops bullets
-// Units are metres; +x east, +z south, y up. Players spawn on the cliff (z ≈ 125) looking north.
+// Units are metres; +x east, +z south, y up. The van drops the cell in a wooded draw south of
+// the ridge (z ≈ 276); they walk north up the draw, over the crest (z ≈ 148) and out to the cliff.
 import * as THREE from 'three';
 import { withHaze } from '../atmosphere.js';
 import { segBox, clamp, smoothstep, fbm, mulberry32 } from '../util.js';
 
-export const BOUNDS = { x0: -175, x1: 175, z0: -150, z1: 205 };
+export const BOUNDS = { x0: -175, x1: 175, z0: -150, z1: 335 };
 export const FENCE = { x: 80, z: 60 };
-export const BUILDING = { x0: -36, x1: 36, z0: -40, z1: 0, h: 7.6, f1: 3.8 }; // two storeys; upper floor at f1
+// A tall block: a lobby floor at ground level and the data floor high up at f1, with the shell
+// of empty storeys between (the stair tower and the elevator run through them). h is the roof.
+export const BUILDING = { x0: -36, x1: 36, z0: -40, z1: 0, h: 27.8, f1: 24, g: 3.6 };
+// The stair tower (switchback flights, 3 m each) and the elevator shaft.
+export const TOWER = { x0: -35.6, x1: -28.4, z0: -17.8, z1: -12.8, flight: 3, laneA: [-17.8, -15.4], laneB: [-15.2, -12.8], west: -34.4, east: -29.9 };
+export const SHAFT = { x0: -7.6, x1: -3.6, z0: -17.8, z1: -13.8, door: [-6.6, -4.6], speed: 4 };
+// The lobby security checkpoint (a walk-through metal detector just inside the front doors).
+export const CHECKPOINT = { x0: -0.9, x1: 0.9, z: -3.8 };
 export const CLIFF = { y: 22, z: 104 };
 
 // Named places the mission and the AI use.
 export const SPOTS = {
-  insert: [{ x: 4, z: 128 }, { x: -6, z: 131 }],
+  insert: [{ x: 6.9, z: 276 }, { x: 5.1, z: 276 }], // the drop-off in the draw (shooter, spotter)
+  overlook: { x: -6, z: 131 }, // where an AI spotter sets up once you're over the crest
+  crest: 150, // north of this you're over the hill and the approach is behind you
   perches: [
     { id: 'cliff', name: 'SOUTH CLIFF', x: 2, z: 110.5, yaw: 0 },
     { id: 'east', name: 'EAST KNOLL', x: 128, z: -72, yaw: Math.PI / 2 + 0.5 },
     { id: 'west', name: 'WEST KNOLL', x: -136, z: -28, yaw: -Math.PI / 2 },
+    { id: 'roof', name: 'TOWER ROOF', x: 0, z: -1.6, yaw: Math.PI },
   ],
   relay: { x: 33.2, z: -6, y: 1.1 },
   server: { x: 30, z: -35.6, y: 1.1 },
@@ -30,11 +41,26 @@ export const SPOTS = {
   droneBay: { x: -52, z: 30 },
 };
 
+// Drop points the cell can choose in the menu. Each sets where the van comes in (vx, from z0
+// to z1), where you and your partner start, and whether there's an approach to walk.
+export const DROPS = {
+  draw: { name: 'TREE LINE', desc: 'The wooded draw south of the ridge. Walk in under the trees, clear the pickets, crest the hill.', van: [6, 336, 298], insert: [{ x: 6.9, z: 276 }, { x: 5.1, z: 276 }], approach: true },
+  ridge: { name: 'RIDGE', desc: 'Straight onto the plateau above the cliff. No approach: the compound is right below you.', van: [6, 196, 143], insert: [{ x: 6.9, z: 121 }, { x: 5.1, z: 121 }], approach: false },
+  // HALO jumps from a transport onto the knolls either side of the valley (Ra lands on the perch).
+  roof: { name: 'TOWER ROOF', desc: 'HALO straight onto the tower roof, then down the service hatch onto the data floor. Fast, high, nowhere to run.', air: true, roof: true, from: [0.25, 1], insert: [{ x: -2, z: -14 }, { x: 1.5, z: -12 }], perch: 3, overlook: { x: 10, z: -8 }, approach: false },
+  west: { name: 'WEST KNOLL', desc: 'HALO jump from a transport, canopies onto the west knoll. Long view over the west fence.', air: true, from: [-1, 0.35], insert: [{ x: -133, z: -27 }, { x: -134.5, z: -23.5 }], perch: 2, overlook: { x: -131, z: -21 }, approach: false },
+  east: { name: 'EAST KNOLL', desc: 'HALO jump from a transport, canopies onto the east knoll. Overlooks the dock and the exfil track.', air: true, from: [1, -0.25], insert: [{ x: 126, z: -70 }, { x: 127.5, z: -66.5 }], perch: 1, overlook: { x: 124, z: -64 }, approach: false },
+};
+export function setInsertion(kind) {
+  const D = DROPS[kind] || DROPS.draw;
+  SPOTS.insert = D.insert.map((p) => ({ ...p }));
+  SPOTS.overlook = D.overlook ? { ...D.overlook } : { x: -6, z: 131 };
+  SPOTS.drop = kind in DROPS ? kind : 'draw';
+  return D;
+}
+
 // Rack-room keycards: one per door, each with a coloured tag that matches the door's reader.
 export const CARDS = {
-  dha: { name: 'RED', color: '#ff3a3a' },
-  noc: { name: 'ORANGE', color: '#ff9a20' },
-  vault: { name: 'YELLOW', color: '#ffe040' },
   dhb: { name: 'GREEN', color: '#40ff70' },
   srv: { name: 'BLUE', color: '#40a0ff' },
   arch: { name: 'VIOLET', color: '#c060ff' },
@@ -42,29 +68,46 @@ export const CARDS = {
 
 export const ROOMS = [
   // Ground floor
-  { id: 'staging', name: 'STAGING / STAIRS', x0: -36, z0: -18, x1: -8, z1: 0, tier: 1, floor: 0, y0: 0 },
-  { id: 'lobby', name: 'ENTRY LOBBY', x0: -8, z0: -18, x1: 8, z1: 0, tier: 1, floor: 0, y0: 0 },
+  { id: 'staging', name: 'STAGING / STAIR TOWER', x0: -36, z0: -18, x1: -8, z1: 0, tier: 1, floor: 0, y0: 0 },
+  { id: 'lobby', name: 'LOBBY / CHECKPOINT', x0: -8, z0: -18, x1: 8, z1: 0, tier: 1, floor: 0, y0: 0 },
   { id: 'security', name: 'SECURITY / CCTV', x0: 8, z0: -18, x1: 22, z1: 0, tier: 1, floor: 0, y0: 0 },
-  { id: 'electrical', name: 'ELECTRICAL / STAIRS', x0: 22, z0: -18, x1: 36, z1: 0, tier: 1, floor: 0, y0: 0 },
+  { id: 'electrical', name: 'ELECTRICAL', x0: 22, z0: -18, x1: 36, z1: 0, tier: 1, floor: 0, y0: 0 },
   { id: 'corridor', name: 'MAIN CORRIDOR', x0: -36, z0: -22, x1: 36, z1: -18, tier: 1, floor: 0, y0: 0 },
-  { id: 'dha', name: 'DATA HALL A', x0: -36, z0: -40, x1: -6, z1: -22, tier: 2, floor: 0, y0: 0, racks: true },
-  { id: 'noc', name: 'CORE NETWORK', x0: -6, z0: -40, x1: 12, z1: -22, tier: 2, floor: 0, y0: 0, racks: true },
-  { id: 'vault', name: 'COLD VAULT', x0: 12, z0: -40, x1: 36, z1: -22, tier: 2, floor: 0, y0: 0, racks: true },
-  // Upper floor
-  { id: 'offices', name: 'OFFICES / STAIRS', x0: -36, z0: -18, x1: -8, z1: 0, tier: 1, floor: 1, y0: 3.8 },
-  { id: 'break', name: 'BREAK ROOM', x0: -8, z0: -18, x1: 8, z1: 0, tier: 1, floor: 1, y0: 3.8 },
-  { id: 'comms', name: 'COMMS ROOM', x0: 8, z0: -18, x1: 22, z1: 0, tier: 1, floor: 1, y0: 3.8 },
-  { id: 'storage', name: 'STORAGE / STAIRS', x0: 22, z0: -18, x1: 36, z1: 0, tier: 1, floor: 1, y0: 3.8 },
-  { id: 'corridor2', name: 'UPPER CORRIDOR', x0: -36, z0: -22, x1: 36, z1: -18, tier: 1, floor: 1, y0: 3.8 },
-  { id: 'dhb', name: 'DATA HALL B', x0: -36, z0: -40, x1: -6, z1: -22, tier: 2, floor: 1, y0: 3.8, racks: true },
-  { id: 'srv', name: 'SERVER ROOM C', x0: -6, z0: -40, x1: 12, z1: -22, tier: 2, floor: 1, y0: 3.8, racks: true },
-  { id: 'arch', name: 'ARCHIVE', x0: 12, z0: -40, x1: 36, z1: -22, tier: 2, floor: 1, y0: 3.8, racks: true },
+  { id: 'mail', name: 'MAILROOM / LOADING', x0: -36, z0: -40, x1: -6, z1: -22, tier: 1, floor: 0, y0: 0 },
+  { id: 'guard', name: 'GUARD ROOM', x0: -6, z0: -40, x1: 12, z1: -22, tier: 1, floor: 0, y0: 0 },
+  { id: 'plant', name: 'PLANT ROOM', x0: 12, z0: -40, x1: 36, z1: -22, tier: 1, floor: 0, y0: 0 },
+  // The data floor, high up (stairs or elevator).
+  { id: 'offices', name: 'OFFICES / STAIRS', x0: -36, z0: -18, x1: -8, z1: 0, tier: 1, floor: 1, y0: 24 },
+  { id: 'break', name: 'BREAK ROOM / ELEVATOR', x0: -8, z0: -18, x1: 8, z1: 0, tier: 1, floor: 1, y0: 24 },
+  { id: 'comms', name: 'COMMS ROOM', x0: 8, z0: -18, x1: 22, z1: 0, tier: 1, floor: 1, y0: 24 },
+  { id: 'storage', name: 'STORAGE', x0: 22, z0: -18, x1: 36, z1: 0, tier: 1, floor: 1, y0: 24 },
+  { id: 'corridor2', name: 'DATA FLOOR CORRIDOR', x0: -36, z0: -22, x1: 36, z1: -18, tier: 1, floor: 1, y0: 24 },
+  { id: 'dhb', name: 'DATA HALL B', x0: -36, z0: -40, x1: -6, z1: -22, tier: 2, floor: 1, y0: 24, racks: true },
+  { id: 'srv', name: 'SERVER ROOM C', x0: -6, z0: -40, x1: 12, z1: -22, tier: 2, floor: 1, y0: 24, racks: true },
+  { id: 'arch', name: 'ARCHIVE', x0: 12, z0: -40, x1: 36, z1: -22, tier: 2, floor: 1, y0: 24, racks: true },
   { id: 'barracks', name: 'BARRACKS', x0: 46, z0: 14, x1: 70, z1: 30, tier: 0, solid: true },
 ];
 
 // ---------------------------------------------------------------------------
 // Terrain
 // ---------------------------------------------------------------------------
+// The approach: a wooded draw winding south from the ridge to the drop-off. Its floor sits
+// ~11 m below the plateau, hemmed in by forested sides; a low crest just behind the cliff top
+// hides the compound until you're over it.
+export const DRAW = { z0: 150, z1: 300 };
+export function drawX(z) {
+  return 4 + 16 * Math.sin((z - 160) / 30) * smoothstep(160, 190, z) * (1 - smoothstep(250, 285, z));
+}
+function approachH(x, z) {
+  if (z < 128) return 0;
+  const off = Math.abs(x - drawX(z));
+  const crest = 3 * smoothstep(128, 146, z) * (1 - smoothstep(150, 168, z));
+  const drop = -11 * smoothstep(150, 186, z);
+  const walls = (9 + 10 * fbm(z * 0.02 + 1.7, x * 0.02, 2)) * smoothstep(12, 46, off) * smoothstep(150, 182, z);
+  const end = smoothstep(330, 390, z) * 30;
+  return crest + drop + walls + end;
+}
+
 function bump(x, z, cx, cz, r, h) {
   const d2 = ((x - cx) ** 2 + (z - cz) ** 2) / (r * r);
   return d2 > 4 ? 0 : h * Math.exp(-d2);
@@ -80,7 +123,7 @@ export function terrainHeight(x, z) {
   const cliff = steep + (gentle - steep) * trail;
   h = Math.max(h, 0) * (1 - smoothstep(90, 104, z)) + cliff + (z > 108 ? (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2 * smoothstep(108, 120, z) : 0);
   // A lip on the cliff edge, then the plateau climbing into the hills behind.
-  h += bump(x, z, 2, 108.5, 3, 0.6) + smoothstep(160, 205, z) * 30;
+  h += bump(x, z, 2, 108.5, 3, 0.6) + approachH(x, z);
   // Knolls east and west (alternate perches), and mountains hemming in the valley.
   h += bump(x, z, 128, -72, 16, 12) + bump(x, z, -136, -28, 15, 10);
   h += smoothstep(120, 175, Math.abs(x)) * 34 * (0.7 + 0.6 * fbm(z * 0.02, x * 0.01, 2));
@@ -126,10 +169,15 @@ function mergeBoxes(list, material) {
 // Facility
 // ---------------------------------------------------------------------------
 export class Facility {
-  constructor(scene, quality = 'medium', seed = 7) {
+  // opts.layout: 'standard' (the built map) or 'random' (yard cover, light poles and the west
+  // fence cut placed from the game's seed, so both players get the same compound).
+  constructor(scene, quality = 'medium', seed = 7, opts = {}) {
     this.scene = scene;
     this.quality = quality;
     this.rng = mulberry32((seed | 0) + 1013);
+    this.layout = opts.layout === 'random' ? 'random' : 'standard';
+    this.lrng = mulberry32((seed | 0) * 7 + 5);
+    this.cutZ = this.layout === 'random' ? [-36, -22, -6, 11, 40][Math.floor(this.lrng() * 5)] : 11;
     this.boxes = [];
     this.doors = {};
     this.lightSources = []; // { x, y, z, r, zone }
@@ -293,7 +341,7 @@ export class Facility {
     const { x: X, z: Z } = FENCE;
     seg(-X, Z, -7, Z); seg(7, Z, X, Z); // south, gate gap
     seg(-X, -Z, X, -Z);
-    seg(-X, -Z, -X, 7); seg(-X, 15, -X, Z); // west, cut at z 7..15
+    seg(-X, -Z, -X, this.cutZ - 4); seg(-X, this.cutZ + 4, -X, Z); // west, the cut (z 7..15 on the standard map)
     seg(X, -Z, X, -27); seg(X, -19, X, Z); // east, service gap at z -27..-19
     // Gate: posts, booth, barrier arm (decorative).
     this.box(-7.5, 0, Z - 0.4, -6.5, 4, Z + 0.4, '#4a4e56');
@@ -315,7 +363,8 @@ export class Facility {
       this._light(x - sx * 1.6, 8.6, z - sz * 1.6, 30, 'yard', '#fff1cf', true, { x: -sx, z: -sz });
     }
     // Light poles around the yard.
-    for (const [x, z] of [[-45, 42], [45, 42], [-58, -48], [30, -50], [0, 30], [62, -8], [-62, 4]]) {
+    const poles = this.layout === 'random' ? this._randomSpots(7, 2) : [[-45, 42], [45, 42], [-58, -48], [30, -50], [0, 30], [62, -8], [-62, 4]];
+    for (const [x, z] of poles) {
       this.deco(new THREE.CylinderGeometry(0.12, 0.16, 8, 6), x, 4, z, '#50545c');
       this._light(x, 8, z, 17, 'yard', '#ffc98a', true);
     }
@@ -341,6 +390,36 @@ export class Facility {
     }
     return L;
   }
+  // A wall-mounted panel light in the stair tower (counts for visibility like the room panels).
+  _towerLight(x, y, z) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 1.2), new THREE.MeshBasicMaterial({ color: '#dfe8f5' }));
+    m.position.set(x, y, z);
+    this.root.add(m);
+    this.lightSources.push({ id: this.lightSources.length, x, y, z, r: 7, zone: 'floor', room: 'staging', floor: 0, interior: true, kind: 'panel', fx: [m], color: '#dfe8f5', broken: false, offT: 0, on: true });
+  }
+
+  // Elevator car at height y: move the car floor and roof; a landing door is open (not solid)
+  // only while the car is level with it.
+  setLift(y) {
+    const L = this.lift;
+    if (!L) return;
+    L.y = y;
+    const mv = (b, y0, y1) => { b.min[1] = y0; b.max[1] = y1; if (b.mesh) b.mesh.position.y = (y0 + y1) / 2; };
+    mv(L.car, y - 0.27, y + 0.02);
+    mv(L.roof, y + 2.7, y + 2.85);
+    for (const d of L.doors) {
+      const here = Math.abs(y - d.y) < 0.05;
+      d.b.solid = d.b.sight = d.b.shot = !here;
+      d.b.mesh.visible = !here;
+      if (d.ind) d.ind.material.color.set(here ? '#30ffd0' : '#ff9a20');
+    }
+  }
+  // Is a point inside the elevator car?
+  inLift(x, z, y) {
+    const S = SHAFT, L = this.lift;
+    return !!L && x > S.x0 && x < S.x1 && z > S.z0 && z < S.z1 && Math.abs(y - L.y) < 1.2;
+  }
+
   _groundForPool(x, z) {
     let y = terrainHeight(x, z);
     if (x > BUILDING.x0 && x < BUILDING.x1 && z > BUILDING.z0 && z < BUILDING.z1) y = Math.max(y, 0);
@@ -350,12 +429,15 @@ export class Facility {
   _building() {
     const { x0, x1, z0, z1, h, f1 } = BUILDING;
     const wall = '#5a5f66', inner = '#41454c', trim = '#2d3036';
-    const G = 3.6; // ground-floor ceiling (the upper slab runs 3.6 – 3.8)
-    // Ground slab, upper slab with two stairwell holes, roof.
+    const G = BUILDING.g; // ground-floor ceiling
+    // Ground slab; the lobby ceiling and the data-floor slab, both with holes for the stair
+    // tower and the elevator shaft; the roof. The storeys between are an empty shell.
     this.box(x0, -0.2, z0, x1, 0.02, z1, '#3a3d42', { solid: false, sight: false, shot: false });
     this.deco(new THREE.BoxGeometry(x1 - x0, 0.02, z1 - z0), (x0 + x1) / 2, 0.03, (z0 + z1) / 2, '#2f3237');
-    this.stairHoles = [{ x0: -34.4, x1: -27.5, z0: -17.8, z1: -15.3 }, { x0: 23.2, x1: 30, z0: -2.3, z1: -0.25 }];
-    this._slab(x0, x1, z0, z1, G, f1, this.stairHoles, '#34373d');
+    this.stairHoles = [{ x0: TOWER.x0, x1: TOWER.x1, z0: TOWER.z0, z1: TOWER.z1 }];
+    const holes = [...this.stairHoles, { x0: SHAFT.x0 - 0.2, x1: SHAFT.x1 + 0.2, z0: SHAFT.z0, z1: SHAFT.z1 + 0.2 }];
+    this._slab(x0, x1, z0, z1, G, G + 0.2, holes, '#34373d');
+    this._slab(x0, x1, z0, z1, f1 - 0.2, f1, holes, '#34373d');
     this.box(x0 - 0.4, h, z0 - 0.4, x1 + 0.4, h + 0.5, z1 + 0.4, '#3b3f45', { solid: true });
     this.deco(new THREE.BoxGeometry(x1 - x0 + 1.2, 0.5, 0.6), 0, h + 0.75, z1 + 0.1, trim);
     this.deco(new THREE.BoxGeometry(x1 - x0 + 1.2, 0.5, 0.6), 0, h + 0.75, z0 - 0.1, trim);
@@ -373,6 +455,32 @@ export class Facility {
       g.position.set((a + b) / 2, y, z1 + 0.02);
       this.root.add(g);
     }
+    // The storeys in between: rows of dark office glass, a few lit, and a floor band per level,
+    // so the block reads as a tall tower from outside.
+    {
+      const dark = new THREE.MeshLambertMaterial({ color: '#1a2633', emissive: '#0a1420' });
+      const lit = new THREE.MeshBasicMaterial({ color: '#8fb6d6' });
+      const warm = new THREE.MeshBasicMaterial({ color: '#d8c49a' });
+      const rng = mulberry32(4242);
+      for (let y = G + 1.4; y < f1 - 2; y += 3.4) {
+        this.deco(new THREE.BoxGeometry(x1 - x0 + 0.7, 0.22, 0.35), 0, y - 0.95, z1 + 0.05, trim);
+        this.deco(new THREE.BoxGeometry(x1 - x0 + 0.7, 0.22, 0.35), 0, y - 0.95, z0 - 0.05, trim);
+        for (let x = x0 + 2; x < x1 - 1.5; x += 4) for (const [zz, nz] of [[z1 + 0.27, 1], [z0 - 0.27, -1]]) {
+          const r = rng();
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.5), r < 0.1 ? lit : r < 0.16 ? warm : dark);
+          m.position.set(x + 1.5, y, zz);
+          if (nz < 0) m.rotation.y = Math.PI;
+          this.root.add(m);
+        }
+        for (let z = z0 + 2; z < z1 - 1.5; z += 4) for (const [xx, nx] of [[x0 - 0.27, -1], [x1 + 0.27, 1]]) {
+          const r = rng();
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.5), r < 0.1 ? lit : r < 0.16 ? warm : dark);
+          m.position.set(xx, y, z + 1.5);
+          m.rotation.y = nx * Math.PI / 2;
+          this.root.add(m);
+        }
+      }
+    }
     // ---- Interior walls, per floor ----
     for (const [y0, y1, up] of [[0, G, false], [f1, h, true]]) {
       const gate = (a, b) => ({ a, b, y1: y0 + 2.6 });
@@ -385,28 +493,102 @@ export class Facility {
       this.wallZ(-6, -40, -22, y0, y1, [], inner, 0.3);
       this.wallZ(12, -40, -22, y0, y1, [], '#4a3f44', 0.5);
     }
-    // Stairwell railings around the holes upstairs (waist high; shots and sight pass).
-    for (const H of this.stairHoles) {
-      this.box(H.x0, f1, H.z0 - 0.08, H.x1, f1 + 1.0, H.z0, '#5b6068', { sight: false, shot: false });
-      this.box(H.x0 - 0.08, f1, H.z0, H.x0, f1 + 1.0, H.z1, '#5b6068', { sight: false, shot: false });
-    }
-    // Stairs: 13 risers of 0.29 m. West flight climbs east along the staging room's north wall;
-    // east flight climbs east along the electrical room's south wall.
-    const flight = (xa, z0s, z1s) => {
-      for (let i = 0; i < 13; i++) {
-        const top = Math.min(f1, (i + 1) * (f1 / 13));
-        this.box(xa + i * 0.5, 0, z0s, xa + (i + 1) * 0.5, top, z1s, i % 2 ? '#4a4e55' : '#454950');
+    // ---- The stair tower: switchback flights of 3 m in two lanes, landings at each end, from
+    // the lobby floor all the way up to the data floor. Walled in between the floors and lit.
+    {
+      const T = TOWER, n = 10, run = (T.east - T.west) / n;
+      for (let y = 0; y < f1 - 0.1; y += T.flight * 2) {
+        // Lane A climbs east, lane B climbs back west.
+        for (let i = 0; i < n; i++) {
+          const ta = y + (i + 1) * (T.flight / n), tb = y + T.flight + (i + 1) * (T.flight / n);
+          this.box(T.west + i * run, ta - 0.3, T.laneA[0], T.west + (i + 1) * run, ta, T.laneA[1], i % 2 ? '#4a4e55' : '#454950');
+          this.box(T.east - (i + 1) * run, tb - 0.3, T.laneB[0], T.east - i * run, tb, T.laneB[1], i % 2 ? '#4a4e55' : '#454950');
+        }
+        // East landing (top of A), west landing (top of B).
+        this.box(T.east, y + T.flight - 0.3, T.z0, T.x1, y + T.flight, T.z1, '#3f434a');
+        if (y + T.flight * 2 < f1 - 0.1) this.box(T.x0, y + T.flight * 2 - 0.3, T.z0, T.west, y + T.flight * 2, T.z1, '#3f434a');
+        // A centre rail between the lanes (waist high, doesn't block sight).
+        this.box(T.west, y + 0.3, T.laneA[1], T.east, y + T.flight + 1.0, T.laneB[0], '#2b2e33', { solid: true, sight: false, shot: false });
+        // A light on each landing.
+        this._towerLight(T.x1 - 0.8, y + T.flight + 2.6, (T.z0 + T.z1) / 2);
       }
-    };
-    flight(-34, -17.75, -15.4);
-    flight(23.5, -2.2, -0.3);
+      // The top landing on the data floor is the floor slab itself (west end, open to the south).
+      this.box(T.x0, f1 - 0.2, T.z0, T.west, f1, T.z1, '#3f434a');
+      // Tower walls between the lobby ceiling and the data floor.
+      this.box(T.x1 + 0.0, G, T.z0 - 0.2, T.x1 + 0.25, f1, T.z1 + 0.25, inner);
+      this.box(T.x0 - 0.4, G, T.z1, T.x1 + 0.25, f1, T.z1 + 0.25, inner);
+      // Railings round the hole on the data floor, leaving the west end open as the exit.
+      this.box(T.x1, f1, T.z0, T.x1 + 0.08, f1 + 1.0, T.z1, '#5b6068', { sight: false, shot: false });
+      this.box(T.west, f1, T.z1, T.x1, f1 + 1.0, T.z1 + 0.08, '#5b6068', { sight: false, shot: false });
+    }
+    // ---- The elevator: a shaft from the lobby up to the data floor, doors facing south. ----
+    {
+      const S = SHAFT, sh = '#3a3e45';
+      this.box(S.x0 - 0.2, 0, S.z0 - 0.2, S.x0, h, S.z1 + 0.2, sh);
+      this.box(S.x1, 0, S.z0 - 0.2, S.x1 + 0.2, h, S.z1 + 0.2, sh);
+      this.box(S.x0, G, S.z0 - 0.2, S.x1, f1, S.z0, sh);
+      // South face: a doorway at each served floor.
+      const [da, db] = S.door;
+      for (const [y0, y1] of [[2.6, f1], [f1 + 2.6, h]]) this.box(S.x0, y0, S.z1, S.x1, y1, S.z1 + 0.2, sh);
+      for (const y of [0, f1]) { this.box(S.x0, y, S.z1, da, y + 2.6, S.z1 + 0.2, sh); this.box(db, y, S.z1, S.x1, y + 2.6, S.z1 + 0.2, sh); }
+      // The car (a moving floor) and a door at each landing that's shut unless the car is there.
+      this.lift = { y: 0, car: this.box(S.x0 + 0.05, -0.25, S.z0 + 0.05, S.x1 - 0.05, 0.02, S.z1 - 0.05, '#555a62', { mesh: true }), doors: [] };
+      for (const [lv, y] of [[0, 0], [1, f1]]) {
+        const d = this.box(da, y, S.z1 + 0.04, db, y + 2.6, S.z1 + 0.16, '#8a8f97', { mesh: true, kind: 'door' });
+        this.lift.doors.push({ lv, y, b: d });
+        // Floor indicator over the doors.
+        const ind = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.04), new THREE.MeshBasicMaterial({ color: '#30ffd0' }));
+        ind.position.set((da + db) / 2, y + 2.85, S.z1 + 0.24);
+        this.root.add(ind);
+        this.lift.doors[this.lift.doors.length - 1].ind = ind;
+      }
+      // Car roof (the car is a cage you can't climb out of mid-ride).
+      this.lift.roof = this.box(S.x0 + 0.05, 2.7, S.z0 + 0.05, S.x1 - 0.05, 2.85, S.z1 - 0.05, '#4a4e55', { mesh: true });
+      this.setLift(0);
+    }
+    // ---- The roof: a parapet round the edge and a service hatch with a ladder down into the
+    // data floor's storage room. ----
+    {
+      const rh = h + 0.5, hx = 24.5, hz = -16.2;
+      for (const [a0, b0, a1, b1] of [[x0 - 0.4, z0 - 0.4, x1 + 0.4, z0 - 0.1], [x0 - 0.4, z1 + 0.1, x1 + 0.4, z1 + 0.4], [x0 - 0.4, z0 - 0.4, x0 - 0.1, z1 + 0.4], [x1 + 0.1, z0 - 0.4, x1 + 0.4, z1 + 0.4]]) this.box(a0, rh, b0, a1, rh + 1.0, b1, '#3b3f45', { sight: false, shot: false });
+      this.box(hx - 0.8, rh, hz - 0.8, hx + 0.8, rh + 0.25, hz + 0.8, '#4a4f56', { solid: false });
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 1.4), lam('#565b62'));
+      lid.position.set(hx, rh + 0.6, hz - 1.1);
+      lid.rotation.x = -1.1;
+      this.root.add(lid);
+      const hole = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#050607' }));
+      hole.position.set(hx, rh + 0.26, hz);
+      this.root.add(hole);
+      // The ladder in the storage room below.
+      for (const sx of [-0.25, 0.25]) this.deco(new THREE.BoxGeometry(0.05, h - f1, 0.05), hx + sx, (f1 + h) / 2, hz - 0.6, '#6b7078');
+      for (let y = f1 + 0.3; y < h; y += 0.35) this.deco(new THREE.BoxGeometry(0.5, 0.03, 0.03), hx, y, hz - 0.6, '#6b7078');
+      this.hatch = { x: hx, z: hz, roofY: rh };
+      const rl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: '#ff3040' }));
+      rl.position.set(x1 - 1, rh + 1.2, z0 + 1);
+      this.root.add(rl);
+    }
+    // ---- The lobby checkpoint: a walk-through metal detector with rope barriers either side
+    // (step round the ends of the barriers to skip it). ----
+    {
+      const C = CHECKPOINT;
+      this.box(C.x0 - 0.25, 0, C.z - 0.25, C.x0, 2.3, C.z + 0.25, '#7d838c');
+      this.box(C.x1, 0, C.z - 0.25, C.x1 + 0.25, 2.3, C.z + 0.25, '#7d838c');
+      this.box(C.x0 - 0.25, 2.3, C.z - 0.25, C.x1 + 0.25, 2.5, C.z + 0.25, '#7d838c', { solid: false });
+      for (const [a, b] of [[-5, C.x0 - 0.25], [C.x1 + 0.25, 5]]) this.box(a, 0, C.z - 0.05, b, 0.95, C.z + 0.05, '#9a2a2a', { sight: false, shot: false });
+      const led = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.06), new THREE.MeshBasicMaterial({ color: '#30ff70' }));
+      led.position.set(0, 2.42, C.z + 0.27);
+      this.root.add(led);
+      this.checkpoint = { ...C, led };
+      // A desk for the officer who works it.
+      this.box(2.6, 0, -6, 4.4, 1.05, -5.2, '#2f3a46');
+    }
     // ---- Doors ----
     this.door('front', 'elec', 1, -2, -0.15, 2, 0.15);
     this.door('maint', 'mech', 0, x0 - 0.15, -11, x0 + 0.15, -9);
     this.door('side', 'mech', 0, x1 - 0.15, -11, x1 + 0.15, -9);
     this.door('dock', 'dock', 1, x1 - 0.2, -22, x1 + 0.2, -18, '#59544a', 4);
-    // Keycard doors on every rack room, both floors.
-    const rk = [['dha', -22, -19.5, 0], ['noc', 1.8, 4.2, 0], ['vault', 23.5, 26, 0], ['dhb', -22, -19.5, f1], ['srv', 1.8, 4.2, f1], ['arch', 23.5, 26, f1]];
+    // Keycard doors on the data floor's three rack rooms.
+    const rk = [['dhb', -22, -19.5, f1], ['srv', 1.8, 4.2, f1], ['arch', 23.5, 26, f1]];
     for (const [room, a, b, y] of rk) {
       const d = this.door('badge-' + room, 'badge', 2, a, -22.25, b, -21.75, '#6a5a3a', 2.6, y);
       d.room = room;
@@ -444,14 +626,20 @@ export class Facility {
       // Each row is a run of individual cabinets (for the hidden target).
       for (let x = xa + 0.31; x < xb; x += 0.62) this.racks.push({ room, floor, x, z: zz + 0.52, zb: zz - 0.52, y0: y + 0.3, y1: y + 2.1, x0: x - 0.3, x1: x + 0.3 });
     };
-    for (const floor of [0, 1]) {
-      const A = floor ? 'dhb' : 'dha', N = floor ? 'srv' : 'noc', V = floor ? 'arch' : 'vault';
+    // Ground floor north: mailroom shelving, guard-room lockers, chillers in the plant room.
+    for (let r = 0; r < 3; r++) this.box(-32 + r * 8, 0, -38.6, -27 + r * 8, 2.0, -37.6, '#3d3a33');
+    this.box(-20, 0, -31, -14, 0.9, -29, '#4b4436');
+    for (let i = 0; i < 7; i++) this.box(-4 + i * 1.1, 0, -39.4, -3.1 + i * 1.1, 2.0, -38.7, '#3b4450');
+    this.box(2, 0, -32, 8, 0.78, -30, '#3b3f46');
+    for (const [x, z] of [[17, -34], [24, -34], [31, -34], [17, -27.5], [31, -27.5]]) this.box(x - 2, 0, z - 1.4, x + 2, 2.2, z + 1.4, '#4a5058');
+    for (const floor of [1]) {
+      const A = 'dhb', N = 'srv', V = 'arch';
       for (let r = 0; r < 4; r++) { rackRow(A, floor, -34, -24, -37.5 + r * 4); rackRow(A, floor, -21, -9, -37.5 + r * 4); }
       for (let r = 0; r < 3; r++) rackRow(N, floor, -4, 10, -37 + r * 4.5);
       for (let r = 0; r < 3; r++) { rackRow(V, floor, 14, 22, -37.5 + r * 4.2); rackRow(V, floor, 26, 34, -37.5 + r * 4.2); }
     }
     this._rackLeds();
-    // The archive server: one cabinet somewhere in the six rack rooms, marked by a slow amber beacon.
+    // The archive server: one cabinet somewhere in the data floor's three rack rooms, marked by a slow amber beacon.
     const pick = this.racks[Math.floor(this.rng() * this.racks.length)];
     this.target = { x: pick.x, y: pick.y0 + 0.9, z: pick.z + 0.05, room: pick.room, floor: pick.floor, rack: pick };
     this.beacon = new THREE.Group();
@@ -476,13 +664,13 @@ export class Facility {
       this.root.add(face);
       this.devices.push({ id: this.devices.length + 1, kind, x, y: y + hh / 2, z, floor, face, base: new THREE.Color(glowC), t: 0 });
     };
-    dev('vending', -6.6, -15.5, 1, 1.0, 1.9, 0.8, '#3a2a3a', '#ff5fd0');
-    dev('vending', -5.4, -15.5, 1, 1.0, 1.9, 0.8, '#2a2f3a', '#40c8ff');
+    dev('vending', -6.6, -2.2, 1, 1.0, 1.9, 0.8, '#3a2a3a', '#ff5fd0');
+    dev('vending', -5.4, -2.2, 1, 1.0, 1.9, 0.8, '#2a2f3a', '#40c8ff');
     dev('coffee', 4, -16.6, 1, 0.6, 1.1, 0.5, '#2e2a26', '#ffb060');
     dev('printer', 13, -2, 1, 1.0, 1.0, 0.7, '#4a4d52', '#80ffb0');
     dev('speaker', -20, -0.8, 1, 0.6, 0.6, 0.3, '#2a2c30', '#ff8040');
     dev('printer', -30, -1, 0, 1.0, 1.0, 0.7, '#4a4d52', '#80ffb0');
-    dev('vending', -6.6, -3, 0, 1.0, 1.9, 0.8, '#3a2a3a', '#ffd040');
+    dev('vending', -6.6, -1.6, 0, 1.0, 1.9, 0.8, '#3a2a3a', '#ffd040');
     dev('tv', 15, -0.6, 0, 1.6, 1.2, 0.15, '#1a1c20', '#5080ff');
     dev('speaker', 0, -21.4, 0, 0.6, 0.6, 0.3, '#2a2c30', '#ff8040');
     dev('fan', -15, -39.2, 0, 1.4, 1.4, 0.6, '#3a3f44', '#60ff90');
@@ -505,10 +693,10 @@ export class Facility {
       this.root.add(m);
       st('drawer', x, dz + 0.6, floor, { mesh: m, home: m.position.clone(), card: null });
     }
-    // Keycards: one per rack room, hidden in random drawers (the rest hold junk).
+    // Keycards: one per rack room on the data floor, hidden in random drawers (the rest hold junk).
     const drawers = this.stations.filter((q) => q.kind === 'drawer');
     const pool = drawers.slice();
-    for (const room of ['dha', 'noc', 'vault', 'dhb', 'srv', 'arch']) { const i = Math.floor(this.rng() * pool.length); pool.splice(i, 1)[0].card = room; }
+    for (const room of ['dhb', 'srv', 'arch']) { const i = Math.floor(this.rng() * pool.length); pool.splice(i, 1)[0].card = room; }
     // Storage shelving: ammo cans and kit on each shelf (upstairs storage).
     for (const [x, z] of [[26, -12], [31, -8], [27, -5]]) {
       const g = new THREE.Group();
@@ -609,40 +797,7 @@ export class Facility {
 
   _yard() {
     const H = BUILDING.h;
-    // HVAC units on the north side and the generator yard to the west: cover.
-    for (let x = -30; x <= 26; x += 9) {
-      this.box(x, 0, -46.5, x + 5, 2.4, -42.5, '#5c6168');
-      this.deco(new THREE.CylinderGeometry(1.2, 1.2, 0.2, 16), x + 2.5, 2.5, -44.5, '#2a2d33');
-    }
-    this.box(-62, 0, -32, -50, 2.8, -26, '#4f5a4b');
-    this.box(-62, 0, -22, -54, 2.2, -16, '#4f5a4b');
-    for (const z of [-8, -1]) {
-      const g = new THREE.CylinderGeometry(1.6, 1.6, 7, 14).rotateX(Math.PI / 2);
-      this.deco(g, -57, 1.7, z, '#6b6e70');
-      this.box(-58.7, 0, z - 3.5, -55.3, 3.3, z + 3.5, null);
-    }
-    // Shipping containers and trucks in the south yard.
-    const cont = (x, z, w, d, col) => {
-      this.box(x - w / 2, 0, z - d / 2, x + w / 2, 2.6, z + d / 2, col);
-      for (let i = 0; i < Math.max(w, d) / 0.6; i++) {
-        const u = -Math.max(w, d) / 2 + i * 0.6 + 0.3;
-        if (w > d) this.deco(new THREE.BoxGeometry(0.08, 2.4, d + 0.04), x + u, 1.3, z, shade(col, 0.82));
-        else this.deco(new THREE.BoxGeometry(w + 0.04, 2.4, 0.08), x, 1.3, z + u, shade(col, 0.82));
-      }
-    };
-    cont(-42, 26, 12, 2.5, '#6a3a2c');
-    cont(-26, 40, 2.5, 12, '#2c4a6a');
-    cont(28, 34, 12, 2.5, '#3f5a3a');
-    cont(-60, 46, 12, 2.5, '#6a5a2c');
-    cont(36, 46, 2.5, 6, '#5a2c36');
-    cont(-12, 48, 6, 2.5, '#4a4a4a');
-    const truck = (x, z) => {
-      this.box(x - 1.3, 0.5, z - 4, x + 1.3, 3.1, z + 1.4, '#3a3d33');
-      this.box(x - 1.25, 0.4, z + 1.4, x + 1.25, 2.6, z + 3.8, '#2f3329');
-      for (const [wx, wz] of [[-1.3, -3], [1.3, -3], [-1.3, 2.8], [1.3, 2.8]]) this.deco(new THREE.CylinderGeometry(0.5, 0.5, 0.35, 10).rotateZ(Math.PI / 2), x + wx, 0.5, z + wz, '#151617');
-    };
-    truck(14, 18);
-    truck(-14, 16);
+    if (this.layout === 'random') this._randomYard(); else this._standardYard();
     // Barracks: reinforcements muster here. Hack the door panel to lock them in for a while,
     // or C4 it for good.
     this.box(46, 0, 14, 70, 4.2, 30, '#565b52');
@@ -665,12 +820,6 @@ export class Facility {
     dpanel.position.set(-48.2, 1.4, 26.96);
     this.root.add(dpanel);
     this.stations.push({ id: 'bay', kind: 'bay', x: -48.2, z: 25.8, y: 0, floor: 0, panel: dpanel });
-    // Sandbag nests near the gate and the dock.
-    for (const [x, z, ry] of [[-14, 54, 0], [64, -22, Math.PI / 2], [-66, 12, Math.PI / 2]]) {
-      const w = 4, d = 0.9;
-      if (ry) this.box(x - d / 2, 0, z - w / 2, x + d / 2, 1.1, z + w / 2, '#5a5442');
-      else this.box(x - w / 2, 0, z - d / 2, x + w / 2, 1.1, z + d / 2, '#5a5442');
-    }
     // Landing zone marker (lit once the drive is out).
     const lz = SPOTS.lz;
     const ring = new THREE.Mesh(new THREE.RingGeometry(lz.r - 0.5, lz.r, 40).rotateX(-Math.PI / 2), glowMat('#30ffb0', 0.0));
@@ -678,6 +827,121 @@ export class Facility {
     this.root.add(ring);
     this.lzRing = ring;
     void H;
+  }
+
+  // The built map's yard: HVAC, generators, containers, trucks, sandbag nests.
+  _standardYard() {
+    // HVAC units on the north side and the generator yard to the west: cover.
+    for (let x = -30; x <= 26; x += 9) {
+      this.box(x, 0, -46.5, x + 5, 2.4, -42.5, '#5c6168');
+      this.deco(new THREE.CylinderGeometry(1.2, 1.2, 0.2, 16), x + 2.5, 2.5, -44.5, '#2a2d33');
+    }
+    this.box(-62, 0, -32, -50, 2.8, -26, '#4f5a4b');
+    this.box(-62, 0, -22, -54, 2.2, -16, '#4f5a4b');
+    for (const z of [-8, -1]) {
+      const g = new THREE.CylinderGeometry(1.6, 1.6, 7, 14).rotateX(Math.PI / 2);
+      this.deco(g, -57, 1.7, z, '#6b6e70');
+      this.box(-58.7, 0, z - 3.5, -55.3, 3.3, z + 3.5, null);
+    }
+    // Shipping containers and trucks in the south yard.
+    const cont = (this._cont = (x, z, w, d, col) => {
+      this.box(x - w / 2, 0, z - d / 2, x + w / 2, 2.6, z + d / 2, col);
+      for (let i = 0; i < Math.max(w, d) / 0.6; i++) {
+        const u = -Math.max(w, d) / 2 + i * 0.6 + 0.3;
+        if (w > d) this.deco(new THREE.BoxGeometry(0.08, 2.4, d + 0.04), x + u, 1.3, z, shade(col, 0.82));
+        else this.deco(new THREE.BoxGeometry(w + 0.04, 2.4, 0.08), x, 1.3, z + u, shade(col, 0.82));
+      }
+    });
+    cont(-42, 26, 12, 2.5, '#6a3a2c');
+    cont(-26, 40, 2.5, 12, '#2c4a6a');
+    cont(28, 34, 12, 2.5, '#3f5a3a');
+    cont(-60, 46, 12, 2.5, '#6a5a2c');
+    cont(36, 46, 2.5, 6, '#5a2c36');
+    cont(-12, 48, 6, 2.5, '#4a4a4a');
+    const truck = (this._truck = (x, z) => {
+      this.box(x - 1.3, 0.5, z - 4, x + 1.3, 3.1, z + 1.4, '#3a3d33');
+      this.box(x - 1.25, 0.4, z + 1.4, x + 1.25, 2.6, z + 3.8, '#2f3329');
+      for (const [wx, wz] of [[-1.3, -3], [1.3, -3], [-1.3, 2.8], [1.3, 2.8]]) this.deco(new THREE.CylinderGeometry(0.5, 0.5, 0.35, 10).rotateZ(Math.PI / 2), x + wx, 0.5, z + wz, '#151617');
+    });
+    truck(14, 18);
+    truck(-14, 16);
+    // Sandbag nests near the gate and the dock.
+    for (const [x, z, ry] of [[-14, 54, 0], [64, -22, Math.PI / 2], [-66, 12, Math.PI / 2]]) {
+      const w = 4, d = 0.9;
+      if (ry) this.box(x - d / 2, 0, z - w / 2, x + d / 2, 1.1, z + w / 2, '#5a5442');
+      else this.box(x - w / 2, 0, z - d / 2, x + w / 2, 1.1, z + d / 2, '#5a5442');
+    }
+  }
+
+  // Places inside the wire where something can stand without blocking a road, a door, a guard
+  // route, the barracks / drone bay, a tower or the fence cut. r: clearance from route points.
+  _yardFree(x0, z0, x1, z1, r = 3.5) {
+    const X = FENCE.x - 4, Z = FENCE.z - 4;
+    if (x0 < -X || x1 > X || z0 < -Z || z1 > Z) return false;
+    const rects = [[-42, -46, 42, 6], [40, 8, 76, 36], [-62, 17, -42, 37], [-10, 38, 10, 62], [6, 50, 15, 60], [34, -30, 82, -14], [-82, this.cutZ - 6, -60, this.cutZ + 6]];
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const tx = sx * (FENCE.x - 7), tz = sz * (FENCE.z - 7); rects.push([tx - 5, tz - 5, tx + 5, tz + 5]); }
+    for (const [a, b, c, d] of rects) if (x1 > a && x0 < c && z1 > b && z0 < d) return false;
+    const pts = [[-66, 48], [-40, 50], [-20, 52], [0, 54], [22, 50], [50, 44], [68, 40], [72, 6], [74, -23], [66, -52], [40, -52], [10, -54], [-20, -52], [-44, -52], [-68, -50], [-70, -24], [-72, this.cutZ], [-68, 32], [-44, 10], [-44, -10], [-44, -36], [44, -10], [42, -20], [44, -36], [0, 6], [-20, 8], [20, 8], [0, 28], [30, 20], [-30, 18], [40, 4], [42, 22], [-52, 22], [-60, 46], [60, 44], [-74, 0], [74, 0], [-72, -50], [72, -50], [72, 50], [-72, 50], [0, 52], [0, -52]];
+    for (const [px, pz] of pts) { const cx = Math.max(x0, Math.min(px, x1)), cz = Math.max(z0, Math.min(pz, z1)); if (Math.hypot(px - cx, pz - cz) < r) return false; }
+    for (const q of this._placed || []) if (x1 + 1.5 > q[0] && x0 - 1.5 < q[2] && z1 + 1.5 > q[1] && z0 - 1.5 < q[3]) return false;
+    return true;
+  }
+  _randomSpots(n, half) {
+    const out = [];
+    for (let k = 0; k < 400 && out.length < n; k++) {
+      const x = (this.lrng() * 2 - 1) * (FENCE.x - 5), z = (this.lrng() * 2 - 1) * (FENCE.z - 5);
+      if (!this._yardFree(x - half, z - half, x + half, z + half, 2.5)) continue;
+      (this._placed = this._placed || []).push([x - half, z - half, x + half, z + half]);
+      out.push([x, z]);
+    }
+    return out;
+  }
+  // A random yard: the same kinds of cover as the built map, scattered from the seed.
+  _randomYard() {
+    this._placed = this._placed || [];
+    const R = this.lrng, cols = ['#6a3a2c', '#2c4a6a', '#3f5a3a', '#6a5a2c', '#5a2c36', '#4a4a4a'];
+    // Make the helpers from the standard yard without placing its pieces.
+    const cont = (x, z, w, d, col) => {
+      this.box(x - w / 2, 0, z - d / 2, x + w / 2, 2.6, z + d / 2, col);
+      for (let i = 0; i < Math.max(w, d) / 0.6; i++) {
+        const u = -Math.max(w, d) / 2 + i * 0.6 + 0.3;
+        if (w > d) this.deco(new THREE.BoxGeometry(0.08, 2.4, d + 0.04), x + u, 1.3, z, shade(col, 0.82));
+        else this.deco(new THREE.BoxGeometry(w + 0.04, 2.4, 0.08), x, 1.3, z + u, shade(col, 0.82));
+      }
+    };
+    const kinds = [
+      ['cont', 7], ['truck', 2], ['hvac', 4], ['gen', 2], ['bags', 4], ['crates', 5],
+    ];
+    for (const [kind, n] of kinds) for (let c = 0; c < n; c++) {
+      for (let k = 0; k < 120; k++) {
+        const x = (R() * 2 - 1) * (FENCE.x - 6), z = (R() * 2 - 1) * (FENCE.z - 6), turn = R() < 0.5;
+        let w, d;
+        if (kind === 'cont') { const L = R() < 0.6 ? 12 : 6; [w, d] = turn ? [L, 2.5] : [2.5, L]; }
+        else if (kind === 'truck') { w = 2.6; d = 7.8; }
+        else if (kind === 'hvac') { w = 5; d = 4; }
+        else if (kind === 'gen') { [w, d] = turn ? [7, 3.4] : [3.4, 7]; }
+        else if (kind === 'bags') { [w, d] = turn ? [4, 0.9] : [0.9, 4]; }
+        else { w = 1.6 + R() * 1.4; d = 1.6 + R(); }
+        if (!this._yardFree(x - w / 2, z - d / 2, x + w / 2, z + d / 2)) continue;
+        this._placed.push([x - w / 2, z - d / 2, x + w / 2, z + d / 2]);
+        if (kind === 'cont') cont(x, z, w, d, cols[Math.floor(R() * cols.length)]);
+        else if (kind === 'truck') {
+          this.box(x - 1.3, 0.5, z - 4, x + 1.3, 3.1, z + 1.4, '#3a3d33');
+          this.box(x - 1.25, 0.4, z + 1.4, x + 1.25, 2.6, z + 3.8, '#2f3329');
+          for (const [wx, wz] of [[-1.3, -3], [1.3, -3], [-1.3, 2.8], [1.3, 2.8]]) this.deco(new THREE.CylinderGeometry(0.5, 0.5, 0.35, 10).rotateZ(Math.PI / 2), x + wx, 0.5, z + wz, '#151617');
+        } else if (kind === 'hvac') {
+          this.box(x - w / 2, 0, z - d / 2, x + w / 2, 2.4, z + d / 2, '#5c6168');
+          this.deco(new THREE.CylinderGeometry(1.2, 1.2, 0.2, 16), x, 2.5, z, '#2a2d33');
+        } else if (kind === 'gen') {
+          const g = new THREE.CylinderGeometry(1.6, 1.6, 7, 14).rotateX(Math.PI / 2);
+          if (turn) g.rotateY(Math.PI / 2);
+          this.deco(g, x, 1.7, z, '#6b6e70');
+          this.box(x - w / 2, 0, z - d / 2, x + w / 2, 3.3, z + d / 2, null);
+        } else if (kind === 'bags') this.box(x - w / 2, 0, z - d / 2, x + w / 2, 1.1, z + d / 2, '#5a5442');
+        else { const hh = 1.2 + R() * 1.4; this.box(x - w / 2, 0, z - d / 2, x + w / 2, hh, z + d / 2, '#4b4436'); }
+        break;
+      }
+    }
   }
 
   _vegetation() {
@@ -690,8 +954,9 @@ export class Facility {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     let i = 0, guard = 0;
     while (i < n && guard++ < 6000) {
-      const x = BOUNDS.x0 + rng() * (BOUNDS.x1 - BOUNDS.x0), z = BOUNDS.z0 + rng() * (BOUNDS.z1 - BOUNDS.z0);
+      const x = BOUNDS.x0 + rng() * (BOUNDS.x1 - BOUNDS.x0), z = BOUNDS.z0 + rng() * (205 - BOUNDS.z0);
       if (Math.abs(x) < FENCE.x + 8 && Math.abs(z) < FENCE.z + 8) continue;
+      if (z > DRAW.z0 - 6) continue; // the draw has its own forest
       if (Math.abs(x) < 9 && z > 60 && z < 100) continue; // road
       if (Math.hypot(x - SPOTS.lz.x, z - SPOTS.lz.z) < 16 || (x > 80 && Math.abs(z + 18) < 6)) continue;
       if (Math.abs(x - 2) < 14 && z > 104 && z < 136) continue; // the perch and insertion stay clear
@@ -705,24 +970,99 @@ export class Facility {
     }
     it.count = ic.count = i;
     this.root.add(it, ic);
+    this._drawForest(trunk, crown);
+  }
+
+  // The draw: a dark tree line down both sides, a few stands on the floor to move between, and
+  // the drop-off lane kept clear for the van. Crowns block sight (see ray), so the trees are cover.
+  _drawForest(trunk, crown) {
+    const rng = mulberry32(911);
+    const n = this.quality === 'low' ? 170 : 340;
+    const it = new THREE.InstancedMesh(trunk, lam('#251d16'), n);
+    const ic = new THREE.InstancedMesh(crown, lam('#112019'), n);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+    this.foliage = [];
+    let i = 0, guard = 0;
+    while (i < n && guard++ < 8000) {
+      const z = DRAW.z0 - 4 + rng() * (325 - DRAW.z0), xc = drawX(z);
+      // Mostly the tree line (8–34 m off the floor's centre), some scattered on the floor.
+      const side = rng() < 0.5 ? -1 : 1;
+      const off = rng() < 0.82 ? 8 + Math.pow(rng(), 0.7) * 28 : rng() * 8;
+      const x = xc + side * off;
+      if (z > 266 && Math.abs(x - 6) < 7) continue; // the van's lane and the drop-off
+      if (z < 156 && Math.abs(x - 2) < 16) continue; // the crest path stays open
+      if (this.foliage.some((f) => Math.hypot(f.x - x, f.z - z) < 2.6)) continue;
+      const h = terrainHeight(x, z);
+      const sc = 0.8 + rng() * 0.9;
+      m.compose(p.set(x, h - 0.2, z), q.setFromAxisAngle(s.set(0, 1, 0), rng() * 6), s.set(sc, sc * (0.85 + rng() * 0.4), sc));
+      it.setMatrixAt(i, m);
+      ic.setMatrixAt(i, m);
+      this.foliage.push({ x, z, y0: h + 1.6 * sc, y1: h + 7.6 * sc, r: 1.25 * sc });
+      i++;
+    }
+    it.count = ic.count = i;
+    this.root.add(it, ic);
+    // A grid so sight rays only test the trees near them.
+    this.folGrid = new Map();
+    for (const f of this.foliage) { const k = Math.floor(f.x / 10) + ':' + Math.floor(f.z / 10); if (!this.folGrid.has(k)) this.folGrid.set(k, []); this.folGrid.get(k).push(f); }
+    this._outpost();
+  }
+
+  // A picket's observation post in the draw: sandbags, a camo net on poles, an ammo crate.
+  _outpost() {
+    const z = 230, x = drawX(z) + 6, y = terrainHeight(x, z);
+    this.outpost = { x, z, y };
+    const bag = '#3b382c', net = '#1d2a1c';
+    this.box(x - 2.2, y - 0.3, z + 1.1, x + 2.2, y + 0.85, z + 1.7, bag, { sight: false });
+    this.box(x - 2.2, y - 0.3, z - 1.4, x - 1.6, y + 0.85, z + 1.1, bag, { sight: false });
+    for (const [px, pz] of [[-2, -1.2], [2, -1.2], [-2, 1.5], [2, 1.5]]) this.box(x + px - 0.06, y - 0.2, z + pz - 0.06, x + px + 0.06, y + 2.1, z + pz + 0.06, '#2b241b', { sight: false, shot: false });
+    this.box(x - 2.4, y + 2.1, z - 1.5, x + 2.4, y + 2.22, z + 1.8, net, { solid: false, shot: false });
+    this.box(x + 0.6, y - 0.1, z - 0.9, x + 1.4, y + 0.45, z - 0.4, '#3a3f2a', {});
+  }
+
+  // Tree crowns between a and b? (Sight only; only trees in the draw are counted.)
+  _foliageHit(a, b) {
+    if (!this.folGrid || (a.z < DRAW.z0 - 8 && b.z < DRAW.z0 - 8)) return false;
+    const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1;
+    const steps = Math.max(1, Math.ceil(Math.sqrt(L2) / 10));
+    const seen = new Set();
+    for (let s = 0; s <= steps; s++) {
+      const cx = a.x + dx * s / steps, cz = a.z + dz * s / steps;
+      for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+        const L = this.folGrid.get((Math.floor(cx / 10) + ox) + ':' + (Math.floor(cz / 10) + oz));
+        if (!L) continue;
+        for (const f of L) {
+          if (seen.has(f)) continue;
+          seen.add(f);
+          const t = Math.max(0, Math.min(1, ((f.x - a.x) * dx + (f.z - a.z) * dz) / L2));
+          const px = a.x + dx * t - f.x, pz = a.z + dz * t - f.z;
+          if (px * px + pz * pz > f.r * f.r) continue;
+          // Ignore a tree right at either end (you can see someone leaning on one).
+          if (t * Math.sqrt(L2) < 1.5 || (1 - t) * Math.sqrt(L2) < 1.5) continue;
+          const y = a.y + (b.y - a.y) * t;
+          if (y > f.y0 && y < f.y1) return true;
+        }
+      }
+    }
+    return false;
   }
 
   // ---- navigation graph for guards (two storeys: nodes carry a floor height) ----------
   _nav() {
     const F = BUILDING.f1, I = 0.02;
     const out = [
-      [-66, 48], [-40, 50], [-20, 52], [0, 54], [22, 50], [50, 44], [68, 40], [72, 6], [74, -23], [66, -52], [40, -52], [10, -54], [-20, -52], [-44, -52], [-68, -50], [-70, -24], [-72, 11], [-68, 32],
+      [-66, 48], [-40, 50], [-20, 52], [0, 54], [22, 50], [50, 44], [68, 40], [72, 6], [74, -23], [66, -52], [40, -52], [10, -54], [-20, -52], [-44, -52], [-68, -50], [-70, -24], [-72, this.cutZ], [-68, 32],
       [-44, 10], [-44, -10], [-44, -36], [44, -10], [42, -20], [44, -36], [0, 6], [-20, 8], [20, 8], [0, 28], [30, 20], [-30, 18], [40, 4], [42, 22],
-      [-52, 22], [-90, 11], [0, 68], [86, -23], [0, 88], [-90, 50], [90, 30], [100, -60], [-100, -40], [110, -16],
+      [-52, 22], [-90, this.cutZ], [0, 68], [86, -23], [0, 88], [-90, 50], [90, 30], [100, -60], [-100, -40], [110, -16],
     ].map(([x, z]) => [x, z, null]);
     const g0 = [
       [-34, -10], [-22, -9], [-22.7, -16.6], [-22.7, -20], [0, -9], [0, -16.5], [-33, -20], [-12, -20], [0, -20], [3, -20], [15, -20], [24.7, -20], [29, -20], [34, -20],
       [15, -9], [15, -16.5], [9.5, -13], [29, -9], [29, -16.5], [34, -10], [-20.7, -23.6], [-21, -31], [-30, -24], [-12, -24], [3, -23.6], [3, -31], [24.7, -23.8], [18, -27], [30, -28], [24, -31],
-      [-35, -14.5], [-33.6, -16.6], [22.8, -3.2], [23, -1.2],
+      [-33, -10.5], [22.8, -3.2], [23, -1.2],
     ].map(([x, z]) => [x, z, I]);
     const g1 = [
       [-33, -20], [-20, -20], [-10, -20], [0, -20], [3, -20], [15, -20], [24.7, -20], [34, -20],
-      [-22.7, -16.6], [-20, -9], [-30, -9], [-26.5, -16.6], [0, -16.5], [0, -8], [15, -16.5], [15, -9], [29, -16.5], [29, -9], [31.2, -1.2], [33, -4],
+      [-22.7, -16.6], [-20, -9], [-30, -9], [-26.5, -16.6], [0, -16.5], [0, -8], [-34, -9.5], [15, -16.5], [15, -9], [29, -16.5], [29, -9], [31.2, -1.2], [33, -4],
       [-20.7, -23.6], [-21, -31], [-30, -24], [-12, -24], [3, -23.6], [3, -31], [24.7, -23.8], [18, -27], [30, -28], [24, -31],
     ].map(([x, z]) => [x, z, F]);
     const pts = [...out, ...g0, ...g1];
@@ -734,13 +1074,26 @@ export class Facility {
       if (d > 48) continue;
       if (this.walkable(A.x, A.z, B.x, B.z, 0.4, Math.max(A.y, B.y) > 2 ? F : 0)) { A.n.push(b); B.n.push(a); }
     }
-    // The two flights of stairs link the floors.
-    const link = (ax, az, bx, bz) => {
-      const A = this.nav.find((n) => n.x === ax && n.z === az && n.y < 1), B = this.nav.find((n) => n.x === bx && n.z === bz && n.y > 2);
-      if (A && B) { A.n.push(B.i); B.n.push(A.i); }
+    // The stair tower: a chain of nodes up the switchback flights (guards don't use the lift).
+    const T = TOWER, za = (T.laneA[0] + T.laneA[1]) / 2, zb = (T.laneB[0] + T.laneB[1]) / 2;
+    const xw = (T.x0 + T.west) / 2, xe = (T.east + T.x1) / 2;
+    const chain = [];
+    for (let y = 0; y < F - 0.1; y += T.flight * 2) chain.push([xw, za, y], [xe, za, y + T.flight], [xe, zb, y + T.flight], [xw, zb, y + T.flight * 2]);
+    chain.push([xw, T.z1 + 1.4, F]);
+    let prev = null;
+    for (const [x, z, y] of chain) {
+      const n = { i: this.nav.length, x, z, y: y < 0.1 ? I : y, n: [] };
+      this.nav.push(n);
+      if (prev) { prev.n.push(n.i); n.n.push(prev.i); }
+      prev = n;
+    }
+    const first = this.nav[this.nav.length - chain.length], last = prev;
+    const hook = (node, y) => {
+      const near = this.nav.filter((q) => q !== node && Math.abs(q.y - y) < 0.6 && this.insideBuilding(q.x, q.z) && !chain.some((c) => c[0] === q.x && c[1] === q.z && c[2] === q.y)).sort((a, b) => Math.hypot(a.x - node.x, a.z - node.z) - Math.hypot(b.x - node.x, b.z - node.z));
+      for (const q of near.slice(0, 3)) if (this.walkable(node.x, node.z, q.x, q.z, 0.3, y > 2 ? F : 0)) { node.n.push(q.i); q.n.push(node.i); }
     };
-    link(-33.6, -16.6, -26.5, -16.6);
-    link(23, -1.2, 31.2, -1.2);
+    hook(first, 0);
+    hook(last, F);
   }
 
   // Clear walking line at a floor height (doors count as passable; guards open them).
@@ -888,7 +1241,7 @@ export class Facility {
   }
 
   los(a, b) {
-    return !this.ray(a, b, 'sight');
+    return !this.ray(a, b, 'sight') && !this._foliageHit(a, b);
   }
 
   insideBuilding(x, z, y = 0) {

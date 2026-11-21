@@ -391,8 +391,9 @@ export class ViewModel {
     return g.userData.muzzle.getWorldPosition(out);
   }
 
-  fired() {
+  fired(strength = 1) {
     this.kick = 1;
+    this.kickS = strength;
   }
 
   // st: { def, scopeT, speed, sprint, bobPhase, cycleT, reloadT, reloadDur, reloadEmpty, switchT, slot }
@@ -439,7 +440,7 @@ export class ViewModel {
     rot.z += 0.25 * sk;
 
     // Recoil.
-    const k = this.kick * this.kick;
+    const k = this.kick * this.kick * (this.kickS || 1);
     pos.z += k * (pistol ? 0.04 : 0.07);
     rot.x += k * (pistol ? 0.22 : 0.09);
 
@@ -511,6 +512,32 @@ export class ViewModel {
     }
     if (!U.bolt && rack > 0) rot.z -= 0.05 * rack;
 
+    // Suppressor off / on: weapon canted up and in, support hand to the muzzle, the can turns
+    // and comes away into the hand (off), or comes up from the pouch and threads on (on).
+    const su = st.supU || 0, can = st.supCan;
+    let supReach = 0;
+    if (su > 0 && can) {
+      const hold = smoothstep(0, 0.16, su) * (1 - smoothstep(0.86, 1, su));
+      rot.y -= 0.42 * hold;
+      rot.x += 0.12 * hold;
+      pos.x -= 0.04 * hold;
+      pos.y += 0.03 * hold;
+      pos.z += 0.03 * hold;
+      if (!can.userData.home) can.userData.home = can.position.clone();
+      const H = can.userData.home;
+      // tw: threads turning; out: can travelling between muzzle and pouch (0 = on the muzzle).
+      let tw, out;
+      if (st.supTo) { out = 1 - smoothstep(0.2, 0.48, su); tw = smoothstep(0.5, 0.78, su); }
+      else { tw = smoothstep(0.24, 0.52, su); out = smoothstep(0.55, 0.82, su); }
+      can.position.copy(H);
+      can.position.z -= 0.025 * (st.supTo ? 1 - tw : tw) + 0.08 * out;
+      can.position.x -= 0.22 * out * out;
+      can.position.y -= 0.3 * out * out;
+      can.rotation.z = (st.supTo ? tw : -tw) * Math.PI * 3;
+      rot.z += Math.sin(tw * Math.PI * 5) * 0.025 * (tw > 0 && tw < 1 ? 1 : 0);
+      supReach = st.supTo ? smoothstep(0.1, 0.22, su) * (1 - smoothstep(0.8, 0.94, su)) : smoothstep(0.08, 0.24, su) * (1 - smoothstep(0.82, 0.96, su));
+    } else if (can && can.userData.home) { can.position.copy(can.userData.home); can.rotation.z = 0; }
+
     this.holder.position.copy(pos);
     this.holder.rotation.copy(rot);
     this.holder.updateMatrixWorld(true);
@@ -533,6 +560,7 @@ export class ViewModel {
       const legs = toRoot(U.bipod.mount).add(new THREE.Vector3(0, -0.035 - 0.06 * (st.bipodT || 0), 0.03));
       handL.lerp(legs, reach);
     }
+    if (supReach > 0) handL.lerp(toRoot(can).add(new THREE.Vector3(-0.012, -0.022, 0.01)), supReach);
     if (rack > 0 && !U.bolt) handL.lerp(toRoot(U.slide || U.gripL).add(new THREE.Vector3(0, 0.02, 0.06)), rack);
     const fR = fwd.clone().add(new THREE.Vector3(0, -0.25, 0)).normalize();
     const fL = pistol ? fwd.clone().add(new THREE.Vector3(0.4, -0.15, 0)).normalize() : fwd.clone().add(new THREE.Vector3(0.15, 0.25, 0)).normalize();

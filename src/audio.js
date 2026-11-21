@@ -128,11 +128,27 @@ export class Audio {
   }
 
   // Your own rifle: loud, close, with the valley echoing it back.
-  shotLocal(suppressed = false, pistol = false) {
+  // heavy: a hand-cannon (the M50): a deeper, longer boom with a sharp crack on top.
+  shotLocal(suppressed = false, pistol = false, heavy = false) {
     if (!this.ctx) return;
     const t = this.now;
     const bus = this.ctx.createGain();
-    bus.gain.value = suppressed ? 0.35 : pistol ? 0.55 : 1;
+    bus.gain.value = suppressed ? (heavy ? 0.5 : 0.35) : heavy ? 0.95 : pistol ? 0.55 : 1;
+    if (heavy) {
+      bus.connect(this.master);
+      bus.connect(this.reverb);
+      this._noiseBurst(bus, t, 0.05, 'highpass', 2600, 0.7, 1.3, 0.03); // crack
+      this._noiseBurst(bus, t, 0.6, 'bandpass', 1100, 0.7, 1.0, 0.22);
+      this._noiseBurst(bus, t, 1.1, 'lowpass', 380, 0.7, 1.2, 0.6);
+      this._thump(bus, t, 48, 1.5, 0.5);
+      this._thump(bus, t + 0.02, 90, 0.6, 0.18);
+      // A metallic ring from the frame as it settles.
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(1850, t); o.frequency.exponentialRampToValueAtTime(1500, t + 0.4);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      o.connect(g).connect(bus); o.start(t); o.stop(t + 0.5);
+      return;
+    }
     bus.connect(this.master);
     bus.connect(this.reverb);
     this._noiseBurst(bus, t, 0.5, 'bandpass', 1800, 0.6, 1.1, 0.18);
@@ -352,6 +368,45 @@ export class Audio {
   }
 
   // Night vision: the reach (cloth rustle), the mount click, and the tubes whining up (or down).
+  // EMP discharge: a crackling electric snap and a falling whine.
+  zap(pos) {
+    if (!this.ctx) return;
+    const t = this.now, p = this._panner(pos, 18);
+    this._noiseBurst(p, t, 0.35, 'highpass', 3000, 0.8, 0.5, 0.25);
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(1800, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.5);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(g).connect(p); o.start(t); o.stop(t + 0.6);
+  }
+  // Elevator arrival: a two-note chime at the car.
+  chime(pos) {
+    if (!this.ctx) return;
+    const t = this.now, p = this._panner(pos, 10);
+    for (const [f, dt] of [[880, 0], [660, 0.32]]) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + dt); g.gain.exponentialRampToValueAtTime(0.12, t + dt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dt + 0.9);
+      o.connect(g).connect(p); o.start(t + dt); o.stop(t + dt + 1);
+    }
+  }
+  // Metal-detector alarm: a harsh two-tone buzz.
+  buzzer(pos) {
+    if (!this.ctx) return;
+    const t = this.now, p = this._panner(pos, 25);
+    for (let i = 0; i < 6; i++) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'square'; o.frequency.value = i % 2 ? 620 : 830;
+      g.gain.setValueAtTime(0.0001, t + i * 0.22); g.gain.exponentialRampToValueAtTime(0.14, t + i * 0.22 + 0.01); g.gain.setValueAtTime(0.14, t + i * 0.22 + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.22 + 0.21);
+      o.connect(g).connect(p); o.start(t + i * 0.22); o.stop(t + i * 0.22 + 0.23);
+    }
+  }
+  // One thread of a suppressor turning: a small metallic tick, the last one a firm seat.
+  supThread(k) {
+    if (!this.ctx) return;
+    const t = this.now;
+    this._noiseBurst(this.master, t, 0.018, 'bandpass', 5200 + 900 * k, 4, k >= 1 ? 0.12 : 0.05, 0.012);
+    if (k >= 1) this._noiseBurst(this.master, t + 0.01, 0.03, 'bandpass', 2600, 2, 0.08, 0.02);
+  }
   nvgReach() {
     if (!this.ctx) return;
     this._noiseBurst(this.master, this.now, 0.18, 'bandpass', 1800, 0.7, 0.05, 0.12);
@@ -434,6 +489,19 @@ export class Audio {
     if (this.loops[key]) return;
     const ctx = this.ctx;
     const p = this._panner(pos, 12);
+    // 'lift': an elevator car running: a low cable hum and a soft rumble.
+    if (type === 'lift') {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noise; src.loop = true;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 96;
+      const og = ctx.createGain(); og.gain.value = 0.25;
+      const g = ctx.createGain(); g.gain.value = gain;
+      src.connect(lp).connect(g); o.connect(og).connect(g); g.connect(p);
+      src.start(0, Math.random()); o.start();
+      this.loops[key] = { p, oscs: [src, o], g };
+      return;
+    }
     // 'rotor': a soft quadcopter whoosh (filtered air with a gentle blade pulse, no tones).
     if (type === 'rotor') {
       const src = ctx.createBufferSource();
@@ -501,7 +569,7 @@ export class Audio {
     const l = this.loops && this.loops[key];
     if (!l) return;
     l.oscs.forEach((o) => o.stop());
-    l.lfo.stop();
+    if (l.lfo) l.lfo.stop();
     l.p.disconnect();
     delete this.loops[key];
   }
