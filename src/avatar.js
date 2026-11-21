@@ -799,7 +799,7 @@ export class Avatar {
     cap.add(capPatch);
     head.add(cap);
     this.hats.cap = cap;
-    // Comms headset: flat dark earth cups, black band, boom and mic.
+    // Comms headset: flat dark earth cups and band; black boom, mic and ear cushions.
     const hs = (this.headset = new THREE.Group());
     const hsFde = '#6b5d45';
     for (const sx of [-1, 1]) {
@@ -811,7 +811,7 @@ export class Avatar {
       hsPad.position.set(sx * 0.098, -0.005, 0.005);
       hs.add(hsPad);
     }
-    const hsBand = mesh(new THREE.TorusGeometry(0.122, 0.009, 6, 18, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI / 2), '#1b1c1e');
+    const hsBand = mesh(new THREE.TorusGeometry(0.122, 0.009, 6, 18, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI / 2), hsFde);
     hsBand.rotation.set(0, 0, 0);
     hsBand.position.set(0, 0.0, 0.03);
     hsBand.rotation.z = Math.PI / 2;
