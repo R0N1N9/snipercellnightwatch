@@ -367,8 +367,9 @@ export const KitMethods = {
         for (const g of near) g.tagT = 14;
         return near.length ? null : 'NOTHING THERE';
       }
-      const why = O.use('quad');
-      if (!why) this._addPin({ x: at.x, z: at.z, label: 'DRONE →', by: this.role });
+      // Human: the quad flies itself to the spot and holds there, marking.
+      const why = this._quadTo(at);
+      if (!why) this._addPin({ x: at.x, z: at.z, label: 'QUAD →', by: this.role });
       return why;
     }
     if (k === 'sweep') return this._isrSweep(at);

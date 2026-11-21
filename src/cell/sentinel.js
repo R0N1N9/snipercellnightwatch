@@ -321,7 +321,7 @@ export function buildCamera() {
 // Simulation
 // ---------------------------------------------------------------------------
 export class Sentinel {
-  constructor(game, { diff = 'operative', seed = 1, sim = true, mission = 'nightwatch' } = {}) {
+  constructor(game, { diff = 'operative', seed = 1, sim = true, mission = 'nightwatch', pickets = true } = {}) {
     this.game = game;
     this.fac = game.fac;
     this.scene = game.scene;
@@ -350,7 +350,8 @@ export class Sentinel {
     this.hunt = { shooter: { seen: -99, lkp: null, broke: true }, spotter: { seen: -99, lkp: null, broke: true } };
     this.lastBackup = -99;
     if (mission === 'nightwatch') this._populateNW(); else this._populate();
-    this._pickets(mission === 'nightwatch');
+    if (pickets) this._pickets(mission === 'nightwatch');
+    else this.pickets = 0;
     this._cameras();
   }
 

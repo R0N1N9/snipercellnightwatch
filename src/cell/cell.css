@@ -364,3 +364,26 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 #cell-tablet .ct-ghost.on { display: block; }
 #cell-tablet .ct-ghost.over { color: #fff; border-color: #ffd040; background: rgba(60, 46, 0, 0.9); }
 #cell-tablet .ct-pay button { touch-action: none; }
+
+/* Menu: the NightWatch briefing map and the staging preview replace the duel's map. */
+.cell-brief, .cell-stage { display: none; }
+.menu-card.cell-open ~ .brief:not(.cell-brief):not(.cell-stage), .menu-card.stage-open ~ .brief:not(.cell-brief):not(.cell-stage) { display: none; }
+.menu-card.cell-open ~ .cell-brief { display: flex; }
+.menu-card.stage-open ~ .cell-stage { display: flex; }
+.cell-brief .brief-head span:first-child, .cell-stage .brief-head span:first-child { color: #00ffe0; }
+.cell-brief #cell-map { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.cell-drops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 10px; }
+.cell-drops button { text-align: left; background: rgba(0, 30, 34, 0.5); border: 1px solid rgba(0, 255, 224, 0.3); color: #cfefff; padding: 8px 10px; font-family: var(--mono); cursor: pointer; }
+.cell-drops button b { display: block; color: #00ffe0; font-size: 13px; letter-spacing: 0.12em; }
+.cell-drops button span { display: block; font-size: 11px; color: var(--ink-dim); margin-top: 3px; line-height: 1.3; }
+.cell-drops button.on { background: rgba(0, 255, 224, 0.16); border-color: #00ffe0; }
+.cell-drops button.on b::after { content: ' \2713'; }
+.cell-drops .note { grid-column: 1 / -1; font-size: 11px; color: var(--ink-dim); font-family: var(--mono); }
+.cell-stage .brief-head em { font-style: normal; color: #fff; }
+.stage-tabs { display: flex; gap: 6px; padding-bottom: 8px; }
+.stage-tabs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--ink-dim); padding: 6px; font-family: var(--mono); letter-spacing: 0.14em; cursor: pointer; }
+.stage-tabs button.on[data-r="shooter"] { color: #f2b35b; border-color: #f2b35b; background: rgba(242, 179, 91, 0.1); }
+.stage-tabs button.on[data-r="spotter"] { color: #40d8e8; border-color: #40d8e8; background: rgba(64, 216, 232, 0.1); }
+.stage-prev { background: radial-gradient(ellipse at 50% 75%, #1b2030 0%, #0d0e17 70%); }
+.stage-prev canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage-desc { font-size: 12px; color: var(--ink-dim); margin: 8px 0 0; line-height: 1.4; }

@@ -69,10 +69,8 @@ export class Cinema {
     });
     this.van = buildVan();
     g.scene.add(this.van);
-    this.vx = 6;
-    // Down the draw from the south to the drop-off (the walk-out ends at SPOTS.insert).
-    this.vz0 = 336;
-    this.vz1 = 298;
+    // The chosen drop point: down the draw, or up onto the ridge (the walk-out ends at SPOTS.insert).
+    [this.vx, this.vz0, this.vz1] = g.drop.van;
     this.title.textContent = '';
     this._voiced = new Set();
     this.vs = new VanSound(g.audio);
@@ -125,6 +123,7 @@ export class Cinema {
       else if (t < 9) { const u = ease((t - 7.6) / 1.4); x = lerp(doorX, frontX, u); z = lerp(vz - 0.4, vz - 4.2, u); yaw = Math.atan2(-(frontX - doorX), 4) ; moving = true; }
       else if (t < 11) { x = frontX; z = vz - 4.2; yaw = 0; st = 0; }
       else { const u = Math.min(1, (t - 11) / 4.5); x = frontX; z = lerp(vz - 4.2, vz - 22, u); yaw = 0; moving = true; }
+      A.hidden = t < 6.4; // in the van until the doors open
       A.p.set(x, terrainHeight(x, z), z);
       A.av.setVisible(!A.hidden);
       A.av.update(dt, { p: A.p, yaw, pitch: t > 9 && t < 11 ? -0.05 : 0, st, moving, w });
@@ -146,19 +145,21 @@ export class Cinema {
       cam.fov = 42;
     } else if (t < 9) {
       // Close on the doors as they come out.
-      cam.position.set(vx - 1.2, vy + 1.5, vz - 6.5);
+      // Centred on the van, so both operators are the same distance from the lens.
+      cam.position.set(vx, vy + 1.5, vz - 7.5);
       cam.lookAt(vx, vy + 1.1, vz - 0.5);
       cam.fov = 48;
     } else if (t < 11) {
       // Gear-up: facing them, van lights behind.
       const fz = vz - 4.2;
-      cam.position.set(vx + 0.6, terrainHeight(vx, fz - 3.2) + 1.45, fz - 3.2 - (t - 9) * 0.25);
-      cam.lookAt(vx, terrainHeight(vx, fz) + 1.35, fz);
+      cam.position.set(vx, terrainHeight(vx, fz - 4.6) + 1.45, fz - 4.6 - (t - 9) * 0.25);
+      cam.lookAt(vx, terrainHeight(vx, fz) + 1.2, fz);
       cam.fov = 40;
     } else {
       // Walking out together up the draw, into the trees toward the ridge.
+      // Behind the pair, centred between them (not over one shoulder).
       const ahead = S.p;
-      cam.position.set(vx + 0.4, ahead.y + 1.9, ahead.z + 3.6);
+      cam.position.set(vx, ahead.y + 1.9, ahead.z + 4.8);
       cam.lookAt(vx, ahead.y + 0.6, ahead.z - 40);
       cam.fov = 52;
     }
