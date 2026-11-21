@@ -210,7 +210,7 @@ export class Hud {
     }
     const sw = document.getElementById('pill-swap');
     if (sw) {
-      const lbl = g.player.slot === 0 ? 'PISTOL' : 'RIFLE';
+      const lbl = g.player.slot === 0 ? 'SECONDARY' : 'PRIMARY'; // names the weapon you'd swap to
       if (sw.textContent !== lbl) sw.textContent = lbl;
       const pf = document.getElementById('pill-feed');
       pf.classList.toggle('live', T.feedWindow > 0 || T.feed > 0);
