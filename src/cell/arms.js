@@ -126,6 +126,48 @@ export function buildMagnum() {
   return g;
 }
 
+// P-9 service pistol (first person): a dark grey polymer frame with a rail and a raked,
+// textured grip, a black metal slide with cocking serrations, two green rear night-sight dots
+// and a red front dot. A size down from the M50.
+export function buildP9() {
+  const g = new THREE.Group();
+  const { box, anchor } = kit(g);
+  const frameM = new THREE.MeshLambertMaterial({ color: '#3b3e43', emissive: '#3b3e43', emissiveIntensity: 0.14 });
+  const gripM = new THREE.MeshLambertMaterial({ color: '#2f3236', emissive: '#2f3236', emissiveIntensity: 0.12 });
+  const slideM = new THREE.MeshStandardMaterial({ color: '#141518', metalness: 0.75, roughness: 0.38, emissive: '#0d0e10', emissiveIntensity: 0.4 });
+  const dark = new THREE.MeshLambertMaterial({ color: '#111214' });
+  box(0.032, 0.026, 0.165, frameM, 0, -0.006, -0.064); // frame / dust cover
+  box(0.026, 0.008, 0.06, frameM, 0, -0.022, -0.11); // accessory rail
+  box(0.034, 0.112, 0.052, gripM, 0, -0.068, 0.006, 0.2); // grip
+  for (let i = 0; i < 5; i++) box(0.035, 0.004, 0.046, frameM, 0, -0.035 - i * 0.02, 0.006 + i * 0.004, 0.2);
+  box(0.03, 0.008, 0.012, frameM, 0, -0.026, -0.045); // trigger guard front
+  box(0.006, 0.02, 0.006, dark, 0, -0.03, -0.022); // trigger
+  box(0.03, 0.022, 0.012, frameM, 0, 0.0, 0.03); // beavertail
+  const slide = new THREE.Group();
+  const sl = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.034, 0.195), slideM); slide.add(sl);
+  for (let i = 0; i < 6; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.031, 0.026, 0.003), dark); c.position.set(0, -0.001, 0.062 + i * 0.006); slide.add(c); }
+  const port = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.004, 0.03), dark); port.position.set(0.006, 0.0175, -0.005); slide.add(port);
+  // Night sights: red dot up front, two green dots either side of the rear notch.
+  const fs = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.01, 0.008), dark); fs.position.set(0, 0.022, -0.09); slide.add(fs);
+  const fd = new THREE.Mesh(new THREE.SphereGeometry(0.0032, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff2a2a' })); fd.position.set(0, 0.023, -0.085); slide.add(fd);
+  for (const sx of [-0.0072, 0.0072]) {
+    const rs = new THREE.Mesh(new THREE.BoxGeometry(0.0075, 0.011, 0.008), dark); rs.position.set(sx, 0.022, 0.088); slide.add(rs);
+    const rd = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), new THREE.MeshBasicMaterial({ color: '#30ff60' })); rd.position.set(sx, 0.023, 0.0925); slide.add(rd);
+  }
+  const bore = new THREE.Mesh(new THREE.CylinderGeometry(0.0055, 0.0055, 0.01, 8).rotateX(Math.PI / 2), dark); bore.position.set(0, 0.002, -0.098); slide.add(bore);
+  slide.position.set(0, 0.024, -0.066);
+  g.add(slide);
+  const magG = new THREE.Group();
+  magG.add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.013, 0.05), dark));
+  magG.position.set(0, -0.124, 0.02);
+  g.add(magG);
+  g.userData = {
+    gripR: anchor(0, -0.072, 0.02), gripL: anchor(-0.023, -0.077, 0.005), muzzle: anchor(0, 0.026, -0.17),
+    slide, slideHome: slide.position.clone(), mag: magG, magHome: magG.position.clone(), sight: 0.047,
+  };
+  return g;
+}
+
 // A combat knife for takedowns, held low in the right hand.
 export function buildKnife() {
   const g = new THREE.Group();

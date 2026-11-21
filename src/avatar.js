@@ -1197,6 +1197,9 @@ export class Avatar {
     const ap = AIM_POS[st];
     this.aim.position.set(ap[0], ap[1], ap[2]);
     this.aim.rotation.x = s.pitch;
+    // Low ready (staging): weapon down in front, canted off to the side.
+    this.aim.rotation.y = s.lowReady ? (s.w ? 0.25 : 0.55) : 0;
+    this.aim.rotation.z = s.lowReady ? (s.w ? 0.1 : 0.35) : 0;
     this._pistolOut = !!s.w;
     this._prone = (s.st | 0) === 2;
     this.rifle.visible = !s.w && !this._pollo;

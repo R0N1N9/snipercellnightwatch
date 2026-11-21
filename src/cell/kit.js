@@ -81,9 +81,9 @@ export const KitMethods = {
     }
     // Downed: V / PING / HELP calls for a pickup on your position.
     this._helpCd = Math.max(0, (this._helpCd || 0) - dt);
-    if (this.downed && !this.kia && (I.pressed('KeyV') || I.pressed('cell-ping') || I.pressed('cell-help'))) this._pickupCall();
+    if (this.downed && !this.kia && (I.pressed('KeyQ') || I.pressed('cell-ping') || I.pressed('cell-help'))) this._pickupCall();
     // Ping wheel: V / middle mouse / PING (touch). Tap = smart ping, hold = wheel.
-    const held = (I.held('KeyV') || this._mmb || I.held('T:cell-ping')) && !tab && live;
+    const held = (I.held('KeyQ') || this._mmb || I.held('T:cell-ping')) && !tab && live;
     if (held) {
       this._pingT = (this._pingT || 0) + dt;
       if (!this.wheel.open && (this._pingT > 0.22 || this._mmb)) this._openWheel();
@@ -93,6 +93,8 @@ export const KitMethods = {
       else if (live) this._smartPing();
       this._pingT = 0;
     }
+    // V / KNIFE: a knife strike on whoever is in arm's reach in front of you.
+    if ((I.pressed('KeyV') || I.pressed('cell-knife')) && live && !tab) this._melee();
     // Approve / deny the top request, or acknowledge the last call.
     if (I.pressed('KeyY') || I.pressed('cell-yes')) this._answerTop(true);
     if (I.pressed('KeyU') || I.pressed('cell-no')) this._answerTop(false);
@@ -128,14 +130,77 @@ export const KitMethods = {
   },
 
   // ---- DEADEYE: weak points glow through the dark for a few seconds -------------------
+  // DEADEYE (Splinter Cell style): H, then sweep the crosshair over up to three enemies to mark
+  // them; pull the trigger and Ra drops the KR-50 to his left hand, draws the M50 and puts a
+  // round in each marked head in quick succession. The window closes after a few seconds.
   _deadeye() {
     const K = this.kit;
     this._hint && this._hint('deadeye');
+    if (this.deSeq) return;
+    if (K.deadeye > 0) { K.deadeye = 0; K.deMarks = []; this.hud.flash('DEADEYE OFF', 'dim', 0.6); return; }
     if (K.deadeyeCd > 0) { this.hud.flash(`DEADEYE ${Math.ceil(K.deadeyeCd)} s`, 'red'); return; }
     K.deadeye = KIT.deadeye.dur;
-    K.deadeyeCd = KIT.deadeye.cd;
+    K.deMarks = [];
     this.sfx.ui(true);
-    this.hud.flash('DEADEYE', 'cyan');
+    this.hud.flash('DEADEYE \u2014 MARK UP TO 3, THEN FIRE', 'cyan', 1.2);
+  },
+  // Per frame. Returns true while the sequence owns the trigger.
+  _deadeyeStep(dt, act, live) {
+    const K = this.kit, P = this.player, S = this.sentinel;
+    const D = this.deSeq;
+    if (D) {
+      D.t += dt;
+      act.mx = act.my = 0; act.lookX = act.lookY = 0; act.sprint = false; act.scope = false;
+      // Draw the M50 (0.35 s), then each target: swing onto the head (0.22 s) and fire.
+      if (D.phase === 'draw') { D.switchT = Math.max(0, 0.35 - D.t); if (D.t > 0.35) { D.phase = 'aim'; D.t = 0; } return true; }
+      if (D.phase === 'aim') {
+        const g = S.byId(D.ids[D.i]);
+        if (!g || g.state === 'dead') { D.i++; D.t = 0; if (D.i >= D.ids.length) { D.phase = 'holster'; } return true; }
+        const o = P.eyePos(new THREE.Vector3()), h = guardCapsules(g)[0].a, v = h.clone().sub(o);
+        const yaw = Math.atan2(-v.x, -v.z), pitch = Math.atan2(v.y, Math.hypot(v.x, v.z));
+        const k = Math.min(1, dt * 16);
+        P.yaw += Math.atan2(Math.sin(yaw - P.yaw), Math.cos(yaw - P.yaw)) * k;
+        P.pitch += (pitch - P.pitch) * k;
+        if (D.t > 0.22) {
+          P.yaw = yaw; P.pitch = pitch;
+          const end = o.clone().add(v.normalize().multiplyScalar(o.distanceTo(h) + 0.3));
+          this.audio.shotLocal(true, true, true);
+          this.viewmodel.fired(1.9);
+          this.camKick = (this.camKick || 0) + 0.05;
+          this._tracer(this.viewmodel.muzzleWorld(new THREE.Vector3()), h, '#ffe0a0', 0.05);
+          this.audio.hitConfirm(true);
+          this.hud.hitMarker(true);
+          if (this.isHost) this._applyHit(g.id, 999, 'deadeye', { x: P.pos.x, z: P.pos.z }, this.role, true, o.distanceTo(h));
+          else this.send({ t: 'hit', id: g.id, dmg: 999, how: 'deadeye', from: { x: P.pos.x, z: P.pos.z }, head: true, dist: o.distanceTo(h) });
+          this._noise(P.pos, 14, false, true);
+          void end;
+          D.i++; D.t = 0;
+          if (D.i >= D.ids.length) D.phase = 'holster';
+        }
+        return true;
+      }
+      // Holster the M50, the KR-50 comes back up.
+      D.switchT = Math.min(0.35, D.t);
+      if (D.t > 0.45) { this.deSeq = null; K.deadeyeCd = KIT.deadeye.cd; }
+      return true;
+    }
+    if (!(K.deadeye > 0) || this.role !== 'shooter' && !this.operative) return false;
+    // Marking: whatever the crosshair crosses (guards in the clear, up to three).
+    K.deMarks = (K.deMarks || []).filter((id) => { const g = S.byId(id); return g && g.state !== 'dead'; });
+    if (live && K.deMarks.length < 3) {
+      const e = this._crosshairEnemy();
+      if (e && e.kind === 'g' && !K.deMarks.includes(e.id)) { K.deMarks.push(e.id); this.audio.ping && this.audio.ping(); }
+    }
+    if (live && (act.fire) && K.deMarks.length) {
+      this.deSeq = { t: 0, ids: K.deMarks.slice(), i: 0, phase: 'draw', switchT: 0.35 };
+      K.deadeye = 0; K.deMarks = [];
+      P.scopeT = 0; P.scoped = false;
+      this.sfx.ui(true);
+      return true;
+    }
+    if (K.deadeye <= dt && K.deMarks.length) K.deMarks = [];
+    if (K.deadeye <= dt && !this.deSeq) K.deadeyeCd = Math.max(K.deadeyeCd, KIT.deadeye.cd * 0.5);
+    return false;
   },
 
   // ---- LURE: a thrown noise-maker that pulls patrols off their route ------------------
@@ -648,6 +713,17 @@ export const KitMethods = {
   // ---- HUD overlay pieces -------------------------------------------------------------
   _kitDraw(c, W, H, proj) {
     const K = this.kit;
+    // DEADEYE marks: numbered diamonds over the heads you've swept.
+    for (const [i, id] of (K.deMarks || []).entries()) {
+      const g = this.sentinel.byId(id);
+      if (!g || g.state === 'dead') continue;
+      const h = guardCapsules(g)[0].a, p = proj(h.x, h.y + 0.35, h.z);
+      if (p.behind) continue;
+      c.fillStyle = 'rgba(255,40,50,0.9)'; c.strokeStyle = '#ffffff'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(p.x, p.y - 11); c.lineTo(p.x + 9, p.y); c.lineTo(p.x, p.y + 11); c.lineTo(p.x - 9, p.y); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#ffffff'; c.font = '700 11px JetBrains Mono, monospace'; c.textAlign = 'center'; c.fillText(String(i + 1), p.x, p.y + 4);
+    }
+    if (K.deadeye > 0) { c.fillStyle = 'rgba(255,90,100,0.95)'; c.font = '700 13px JetBrains Mono, monospace'; c.textAlign = 'center'; c.fillText(`DEADEYE \u00B7 ${(K.deMarks || []).length}/3 MARKED \u00B7 ${(K.deMarks || []).length ? 'FIRE TO EXECUTE' : 'SWEEP THE CROSSHAIR'} \u00B7 ${Math.ceil(K.deadeye)} s`, W / 2, H * 0.72); }
     // DEADEYE: heads and bulwark sight-ports glow, through the dark (not through walls).
     if (K.deadeye > 0) {
       const o = this.camera.position;

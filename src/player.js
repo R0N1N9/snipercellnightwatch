@@ -192,7 +192,7 @@ export class LocalPlayer {
 
   startReload() {
     const w = this.w;
-    if (this.sprinting || this.reloadT > 0 || this.switchT > 0 || w.reserve <= 0 || w.mag >= w.def.mag) return false;
+    if ((this.sprinting && !this.keepReload) || this.reloadT > 0 || this.switchT > 0 || w.reserve <= 0 || w.mag >= w.def.mag) return false;
     this.reloadEmpty = w.chamber === 0;
     this.reloadDur = this.reloadEmpty ? w.def.reloadEmpty : w.def.reload;
     this.reloadT = this.reloadDur;
@@ -379,7 +379,7 @@ export class LocalPlayer {
     if (sprinting) speed = PLAYER.sprint;
     // Sprinting: weapon at carry, no shooting, and an in-progress reload is abandoned.
     this.sprinting = sprinting && canMove;
-    if (this.sprinting && this.reloadT > 0) this.reloadT = 0;
+    if (this.sprinting && this.reloadT > 0 && !this.keepReload) this.reloadT = 0;
     if (this.scoped) speed *= 0.5;
     if (this.wounded) speed *= 0.75;
     if (this.speedMul) speed *= this.speedMul;

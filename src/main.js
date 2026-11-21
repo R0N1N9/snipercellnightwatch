@@ -239,7 +239,19 @@ $('in-sens').oninput = (e) => {
 $('in-invert').onchange = (e) => store.set('invert', (settings.invertY = e.target.checked));
 $('in-toggle').onchange = (e) => store.set('toggle', (settings.scopeToggle = e.target.checked));
 
+// NightWatch screens (and loading into it) say INFILTRATION and carry the op's own line;
+// everything else is the TACTICAL DUEL.
+let loadingCell = false;
+const CELL_PANELS = new Set(['panel-cell', 'panel-staging']);
+function setModeHeader(cell) {
+  $('kicker-mode').textContent = cell ? '// INFILTRATION' : '// TACTICAL DUEL';
+  const tl = $('tagline');
+  if (cell) { if (!tl.dataset.duel) tl.dataset.duel = tl.textContent; tl.textContent = 'Night op at the Kestrel Ridge data center: break in, upload the malware, pull the archive drive, and get it out.'; tl.classList.add('cell-tag'); }
+  else if (tl.dataset.duel) { tl.textContent = tl.dataset.duel; delete tl.dataset.duel; tl.classList.remove('cell-tag'); }
+}
 function showPanel(id) {
+  if (id !== 'panel-loading') loadingCell = false;
+  setModeHeader(CELL_PANELS.has(id) || (id === 'panel-loading' && loadingCell) || (id === 'panel-host' && $('panel-cell').classList.contains('hosting')));
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
   document.querySelector('.menu-card').classList.toggle('cell-open', id === 'panel-cell');
   document.querySelector('.menu-card').classList.toggle('stage-open', id === 'panel-staging');
@@ -252,6 +264,7 @@ let cellMapMod = null, cellMapRaf = 0, cellMapHit = null;
 async function cellBrief() {
   cellMapMod = cellMapMod || (await import('./cell/menumap.js'));
   const { DROPS } = await import('./cell/facility.js');
+  if (!DROPS[cellSet.insert]) { cellSet.insert = 'draw'; store.set('cellInsert', 'draw'); }
   const box = $('cell-drops');
   const paint = () => {
     box.innerHTML = Object.entries(DROPS).map(([k, D]) => `<button data-drop="${k}" class="${cellSet.insert === k ? 'on' : ''}"><b>${D.name}${k === 'draw' ? ' \u00B7 DEFAULT' : ''}</b><span>${D.desc}</span></button>`).join('') + '<p class="note">Tap a drop point on the map or here. Hosting: your pick applies to both of you.</p>';
@@ -285,7 +298,7 @@ async function stagePreview(role) {
   document.querySelectorAll('#stage-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.r === stageRole));
   $('stage-who').textContent = `${stageRole.toUpperCase()} \u00B7 ${cellName(stageRole)}`;
   $('stage-desc').textContent = DESC[stageRole];
-  showPreview($('stage-prev'), cellLook(stageRole), stageRole === 'spotter');
+  showPreview($('stage-prev'), cellLook(stageRole), stageRole === 'spotter', true);
 }
 document.querySelectorAll('#stage-tabs button').forEach((b) => (b.onclick = () => stagePreview(b.dataset.r)));
 document.querySelectorAll('.back').forEach((b) => (b.onclick = () => {
@@ -704,7 +717,7 @@ $('panel-staging').addEventListener('click', (e) => {
   renderStaging();
 });
 const cellSet = { role: store.get('cellRole', 'shooter'), diff: store.get('cellDiff', 'operative'), names: store.get('cellNames', {}), mission: store.get('cellMission', 'nightwatch'), insert: store.get('cellInsert', 'draw'), layout: store.get('cellLayout', 'standard') };
-const MISSION_DESC = { nightwatch: 'Sentinel: SENTINEL\u2019s augmented night garrison \u2014 cowardly officers, shielded juggernauts with energy blades, bulwarks behind hard-light walls, beam-rifle snipers on the towers.', infiltration: 'Infiltration: the original op against a crew of human security guards.' };
+const MISSION_DESC = { nightwatch: 'Sentinel: SENTINEL\u2019s augmented night garrison \u2014 cowardly officers, shielded juggernauts with energy blades, bulwarks behind hard-light walls, beam-rifle snipers on the towers.', infiltration: 'Spec Ops: the original op against a crew of human security guards.' };
 const cellName = (role) => ((cellSet.names[role] || '').trim() || CELL_CALL[role]).replace(/[<>&"]/g, '').slice(0, 16);
 function syncCell() {
   document.querySelectorAll('#panel-cell .cell-role').forEach((b) => b.classList.toggle('on', b.dataset.role === cellSet.role));
@@ -737,6 +750,7 @@ $('btn-cell').onclick = () => { $('panel-cell').classList.remove('hosting'); syn
 syncCell();
 
 async function startCell(mode, opts = {}) {
+  loadingCell = true;
   if (game || director) return;
   showPanel('panel-loading');
   $('loading-text').textContent = 'Inserting at Kestrel Ridge\u2026';
@@ -746,7 +760,7 @@ async function startCell(mode, opts = {}) {
   const c = opts.cell || { role: cellSet.role, diff: cellSet.diff, mission: cellSet.mission, insert: cellSet.insert, layout: cellSet.layout, seed: (Math.random() * 1e6) | 0 };
   // The guest plays whichever role the host didn't take.
   const role = mode === 'operative' ? 'shooter' : mode === 'guest' ? (c.role === 'shooter' ? 'spotter' : 'shooter') : c.role;
-  game = new CellGame({ mode, net: opts.net || null, role, diff: c.diff, seed: c.seed, mission: c.mission || 'nightwatch', insert: ['ridge', 'west', 'east', 'roof'].includes(c.insert) ? c.insert : 'draw', layout: c.layout === 'random' ? 'random' : 'standard', look: c.look === 'og' || c.look === 'inked' ? c.look : settings.rules.look, quality, settings: { ...settings, cellLoadout }, audio, name: cellName(role), partnerName: opts.partnerName || CELL_CALL[role === 'shooter' ? 'spotter' : 'shooter'] });
+  game = new CellGame({ mode, net: opts.net || null, role, diff: c.diff, seed: c.seed, mission: c.mission || 'nightwatch', insert: ['north', 'west', 'east', 'roof'].includes(c.insert) ? c.insert : 'draw', layout: c.layout === 'random' ? 'random' : 'standard', look: c.look === 'og' || c.look === 'inked' ? c.look : settings.rules.look, quality, settings: { ...settings, cellLoadout }, audio, name: cellName(role), partnerName: opts.partnerName || CELL_CALL[role === 'shooter' ? 'spotter' : 'shooter'] });
   if (opts.hello) game.hello = opts.hello;
   window.__game = game;
   document.body.classList.toggle('touch', game.input.touch);

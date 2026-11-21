@@ -4,7 +4,7 @@
 //   position) · SYNC shots (both rifles on marked heads → the light goes green).
 import * as THREE from 'three';
 import { ROOMS, BUILDING } from './facility.js';
-import { guardCapsules } from './sentinel.js';
+import { guardCapsules, angDiff } from './sentinel.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
 
 const SUP_DUR = 1.25;
@@ -61,6 +61,40 @@ export const Kit2 = {
     w.mode = M[(M.indexOf(w.mode) + 1) % M.length];
     this.hud.flash(w.mode.toUpperCase(), 'cyan', 0.7);
     this.audio.click();
+  },
+
+  // V / KNIFE: a knife strike on whoever's in arm's reach in front of you. From behind or on
+  // someone who hasn't clocked you, it's a silent takedown; head-on it's a heavy wound.
+  _melee() {
+    const P = this.player, S = this.sentinel;
+    if (this.knifeT > 0 || this.downed) return;
+    let best = null, bd = 2.3;
+    for (const g of S.guards) {
+      if (g.state === 'dead' || Math.abs(g.y - P.pos.y) > 1.2) continue;
+      const dx = g.x - P.pos.x, dz = g.z - P.pos.z, d = Math.hypot(dx, dz);
+      if (d > bd) continue;
+      if (Math.abs(angDiff(Math.atan2(-dx, -dz), P.yaw)) > 1.0) continue;
+      best = g; bd = d;
+    }
+    this._knife();
+    if (!best) return;
+    this.payload('melee', { id: best.id, x: P.pos.x, z: P.pos.z, yaw: P.yaw, by: this.role });
+  },
+  // Host: resolve a knife strike.
+  _meleeHit(target, by) {
+    by = target.by || by;
+    const S = this.sentinel, g = S.byId(target.id);
+    if (!g || g.state === 'dead') return;
+    const behind = Math.abs(angDiff(Math.atan2(-(target.x - g.x), -(target.z - g.z)), g.yaw + (g.look || 0))) > 1.9;
+    const unaware = g.state === 'patrol' || g.state === 'post' || g.state === 'sus' || g.stagger > 0;
+    if (behind || unaware) {
+      S.damage(g.id, 999, 'takedown', null, 'head');
+      this._killFeed(g, 'takedown', by, false, 0);
+      if (g.chief) this._toast(this.mission === 'nightwatch' ? 'The Overseer is down. Take its badge.' : 'Site Chief is down. Take his badge.', 'amber');
+    } else {
+      S.damage(g.id, 150, 'melee', { x: target.x, z: target.z }, 'torso');
+      g.stagger = Math.max(g.stagger || 0, 0.8);
+    }
   },
 
   // Knife takedown: a quick stab from low right.

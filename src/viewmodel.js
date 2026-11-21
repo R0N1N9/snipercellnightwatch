@@ -561,6 +561,8 @@ export class ViewModel {
       handL.lerp(legs, reach);
     }
     if (supReach > 0) handL.lerp(toRoot(can).add(new THREE.Vector3(-0.012, -0.022, 0.01)), supReach);
+    // A caller can take the support hand elsewhere (Deadeye: it holds the lowered rifle).
+    if (st.leftHand) handL = st.leftHand.clone();
     if (rack > 0 && !U.bolt) handL.lerp(toRoot(U.slide || U.gripL).add(new THREE.Vector3(0, 0.02, 0.06)), rack);
     const fR = fwd.clone().add(new THREE.Vector3(0, -0.25, 0)).normalize();
     const fL = pistol ? fwd.clone().add(new THREE.Vector3(0.4, -0.15, 0)).normalize() : fwd.clone().add(new THREE.Vector3(0.15, 0.25, 0)).normalize();

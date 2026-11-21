@@ -268,7 +268,8 @@ export const Phone = {
     };
   },
   _cmdWheelOk() {
-    return !((this.qh && this.qh.on) || this.tablet.visible || this.isr.active || (this.quad && this.quad.active) || this.mini.open || this.downed || this.kia || this.paused || this.ended || (this.wheel && this.wheel.open) || (this.cine && this.cine.active));
+    // Never while scoped: that thumb is aiming.
+    return !(this.player.scoped || this.player.scopeT > 0.1 || (this.bino && this.bino.on && this.bino.k > 0.1) || (this.qh && this.qh.on) || this.tablet.visible || this.isr.active || (this.quad && this.quad.active) || this.mini.open || this.downed || this.kia || this.paused || this.ended || (this.wheel && this.wheel.open) || (this.cine && this.cine.active));
   },
 
   // Spotter, outside the tablet: number keys 1–9 fire that console command straight at the
