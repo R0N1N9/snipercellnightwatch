@@ -24,7 +24,7 @@ export const P9 = {
 };
 
 export const PERKS = {
-  shooter: { lures: { name: 'EXTRA LURES', desc: '5 lures instead of 3.' }, mags: { name: 'EXTRA MAGS', desc: '+2 magazines for every weapon.' }, camo: { name: 'FAST CAMO', desc: 'Active camo recharges 50% faster.' } },
+  shooter: { lures: { name: 'EXTRA STICKIES', desc: '5 sticky grenades instead of 3.' }, mags: { name: 'EXTRA MAGS', desc: '+2 magazines for every weapon.' }, camo: { name: 'FAST CAMO', desc: 'Active camo recharges 50% faster.' } },
   spotter: { bandwidth: { name: 'BANDWIDTH', desc: 'Console bandwidth regenerates 40% faster.' }, drops: { name: 'LOGISTICS', desc: '+2 supply drops for the team.' }, armor: { name: 'LIGHT ARMOR', desc: 'Take 20% less damage.' } },
 };
 export const DEFAULT_LOADOUT = {

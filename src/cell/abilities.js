@@ -16,8 +16,8 @@ import * as THREE from 'three';
 export const HINTS = {
   deadeye: ['DEADEYE (H)', 'The three closest enemies in your line of sight are marked automatically. Pull the trigger: Ra drops the rifle to his left hand, draws the M50 and drops all three, one after another. 60 s cooldown.'],
   execute: ['MARK & EXECUTE (T)', 'Mark enemies (Q), then press T: Ra snaps through every marked target in line of sight, one suppressed shot each. Earn charges with silent takedowns.'],
-  lure: ['LURE (X)', 'Throw a noise-maker. Patrols walk over to check it, off their route and into your sights.'],
-  camo: ['ACTIVE CAMO (G)', 'Breaks line of sight: guards, cameras and drones can\u2019t see you past arm\u2019s length. Moving drains it; hold still and it slowly recharges even while on. Firing breaks it.'],
+  lure: ['STICKY GRENADE (X)', 'Throw it overhand. It sticks to the first enemy (or surface) it hits and blows two seconds later. Loud. Supply crates carry one more.'],
+  camo: ['ACTIVE CAMO (F)', 'Breaks line of sight: guards, cameras and drones can\u2019t see you past arm\u2019s length. Moving drains it; hold still and it slowly recharges even while on. Firing breaks it.'],
   rounds: ['ROUNDS (Z)', 'Pick a magazine: Standard goes through bodies; Explosive sticks and blows; Penetrator punches through walls and shields; EMP kills electronics and radios.'],
   ghillie: ['GHILLIE FREEZE', 'Prone and dead still: you all but vanish past ~15 m. Move or fire and it breaks.'],
   breath: ['BREATH CONTROL (SHIFT)', 'Hold SHIFT on the scope: the view slows and stops swaying for a few seconds. Watch the wind readout and aim at the hold-off dot.'],
@@ -26,7 +26,7 @@ export const HINTS = {
   dart: ['CAMERA DART (9)', 'Fires a tiny camera into whatever you hit. It marks enemies in front of it and shows up as a feed on the tablet.'],
   drag: ['BODY DRAG (press E)', 'Press E on a body to grab his collar, then back up to drag him at a walk. Press E again to put it down somewhere dark, out of a patrol’s path.'],
   bino: ['THERMAL BINOCULARS (X)', 'Raise them (right click / SCOPE): every enemy in the viewfinder is marked, at any range, and shows hot red.'],
-  drone: ['RECON DRONE (G)', 'G to launch, G to park it (it keeps marking), hold G to recall. Enemies inside its red cone are marked.'],
+  drone: ['RECON DRONE (F)', 'F to launch, F to park it (it keeps marking), hold F to recall. Enemies inside its red cone are marked.'],
   laser: ['LASER SIGHT (`)', 'A visible red laser from your weapon. Handy for showing your partner a target; guards can catch it too. The ` key (or LASER) toggles it.'],
 };
 

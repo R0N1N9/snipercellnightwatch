@@ -1287,7 +1287,7 @@ export class Facility {
     return this.lightSources.some((L) => L.room === id && L.on);
   }
 
-  // Turn lights off for a while (cut lights, EMP) — or for good (shot out).
+  // Turn lights off for a while (take out the lights, EMP) — or for good (shot out).
   lightsOff(pred, dur) {
     for (const L of this.lightSources) if (pred(L)) L.offT = Math.max(L.offT || 0, dur);
     this._syncLights();
