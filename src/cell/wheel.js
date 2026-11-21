@@ -19,15 +19,21 @@ export const WHEEL = [
   { k: 'drone', label: 'DRONE', group: 'req', icon: '✦' },
 ];
 
+// items: the options ({ k, label, group, icon }); opts.id / opts.centre (the idle label) /
+// opts.fallback (what close() returns with nothing picked).
 export class Wheel {
-  constructor() {
+  constructor(items = WHEEL, opts = {}) {
+    const WHEEL = (this.list = items);
+    this.centre = opts.centre || 'PING';
+    this.fallback = opts.fallback === undefined ? 'look' : opts.fallback;
     const el = (this.el = document.createElement('div'));
-    el.id = 'cell-wheel';
+    el.id = opts.id || 'cell-wheel';
+    el.className = 'cell-wheel';
     const n = WHEEL.length;
     el.innerHTML = '<div class="cw-ring"></div>' + WHEEL.map((o, i) => {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2;
       return `<div class="cw-item cw-${o.group}" data-i="${i}" style="--x:${Math.cos(a).toFixed(3)};--y:${Math.sin(a).toFixed(3)}"><i>${o.icon}</i><b>${o.label}</b></div>`;
-    }).join('') + '<div class="cw-centre"><b class="cw-sel">PING</b><span class="cw-sub"></span></div>';
+    }).join('') + `<div class="cw-centre"><b class="cw-sel">${this.centre}</b><span class="cw-sub"></span></div>`;
     document.body.appendChild(el);
     this.items = [...el.querySelectorAll('.cw-item')];
     this.sel = -1;
@@ -45,7 +51,7 @@ export class Wheel {
     this.el.style.top = y + 'px';
     this.el.classList.add('on');
     this.el.querySelector('.cw-sub').textContent = sub;
-    this.items.forEach((it, i) => { it.querySelector('b').textContent = labels[WHEEL[i].k] || WHEEL[i].label; it.classList.remove('sel'); });
+    this.items.forEach((it, i) => { it.querySelector('b').textContent = labels[this.list[i].k] || this.list[i].label; it.classList.remove('sel'); });
     this._paint();
   }
 
@@ -66,12 +72,12 @@ export class Wheel {
     if (d < 26) { this.sel = -1; this._paint(); return; }
     let a = Math.atan2(this.dy, this.dx) + Math.PI / 2;
     if (a < 0) a += Math.PI * 2;
-    this.sel = Math.round((a / (Math.PI * 2)) * WHEEL.length) % WHEEL.length;
+    this.sel = Math.round((a / (Math.PI * 2)) * this.list.length) % this.list.length;
     this._paint();
   }
   _paint() {
     this.items.forEach((it, i) => it.classList.toggle('sel', i === this.sel));
-    this.el.querySelector('.cw-sel').textContent = this.sel >= 0 ? this.items[this.sel].querySelector('b').textContent : 'PING';
+    this.el.querySelector('.cw-sel').textContent = this.sel >= 0 ? this.items[this.sel].querySelector('b').textContent : this.centre;
   }
 
   // Close and return the chosen option ('look' when nothing was picked).
@@ -79,7 +85,7 @@ export class Wheel {
     if (!this.open) return null;
     this.open = false;
     this.el.classList.remove('on');
-    return this.sel >= 0 ? WHEEL[this.sel].k : 'look';
+    return this.sel >= 0 ? this.list[this.sel].k : this.fallback;
   }
   cancel() {
     this.open = false;

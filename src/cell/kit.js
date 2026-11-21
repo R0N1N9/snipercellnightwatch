@@ -371,6 +371,7 @@ export const KitMethods = {
       if (!why) this._addPin({ x: at.x, z: at.z, label: 'DRONE →', by: this.role });
       return why;
     }
+    if (k === 'sweep') return this._isrSweep(at);
     const p = PAYLOAD[k];
     if (!p) return 'UNKNOWN';
     return O.use(k, p.aim ? at : null);

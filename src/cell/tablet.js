@@ -63,7 +63,7 @@ export class Tablet {
     // Payload / request buttons.
     if (spot) {
       this.parts.pay.innerHTML = '<div class="ct-h">PAYLOADS</div>' + PAYLOADS.map((p) => `<button data-k="${p.k}" title="${p.desc}"><i>${p.key}</i><b>${p.name}</b><em class="c"></em><em class="w">${p.bw ? p.bw + ' BW' : ''}</em></button>`).join('');
-      this.parts.pay.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) this._pick(b.dataset.k); });
+      this.parts.pay.addEventListener('click', (e) => { if (this._dropped) { this._dropped = false; return; } const b = e.target.closest('[data-k]'); if (b) this._pick(b.dataset.k); });
       this.parts.hold.innerHTML = '<button class="ct-crack" style="display:none"></button><button class="ct-fight">HOLD — FIGHT TRACE</button><div class="ct-perch"></div>';
       const hold = (sel, key) => {
         const b = $(sel);
@@ -75,7 +75,7 @@ export class Tablet {
       hold('.ct-fight', 'fighting');
     } else {
       this.parts.pay.innerHTML = `<div class="ct-h">REQUEST FROM ${esc(game.partnerName)} \u2014 pick, then tap the map</div>` + REQUESTS.map(([k, l]) => `<button data-r="${k}"><b>${l}</b></button>`).join('');
-      this.parts.pay.addEventListener('click', (e) => { const b = e.target.closest('[data-r]'); if (!b) return; this.reqSel = this.reqSel === b.dataset.r ? null : b.dataset.r; this.dirty = true; });
+      this.parts.pay.addEventListener('click', (e) => { if (this._dropped) { this._dropped = false; return; } const b = e.target.closest('[data-r]'); if (!b) return; this.reqSel = this.reqSel === b.dataset.r ? null : b.dataset.r; this.dirty = true; });
       this.parts.hold.style.display = 'none';
     }
     // Incoming requests (spotter): SEND / DENY.
@@ -97,7 +97,11 @@ export class Tablet {
       this.g.wheel.show(cx, cy, this.g._wheelSub(), this.g._wheelLabels());
       if (drag) drag.wheel = true;
     };
+    const ptrs = new Set();
     cv.addEventListener('pointerdown', (e) => {
+      ptrs.add(e.pointerId);
+      // A second finger: that's a pinch, not a pan or a tap.
+      if (ptrs.size > 1) { drag = null; clearTimeout(this._lp); return; }
       cv.setPointerCapture(e.pointerId);
       drag = { x: e.clientX, y: e.clientY, vx: this.view.x, vz: this.view.z, moved: false, btn: e.button, t: performance.now() };
       if (e.button === 2) openWheel(e.clientX, e.clientY);
@@ -112,6 +116,7 @@ export class Tablet {
       if (Math.hypot(dx, dy) > 6) drag.moved = true;
       if (drag.moved) { this.view.x = drag.vx - dx / this.view.s; this.view.z = drag.vz - dy / this.view.s; }
     });
+    for (const ev of ['pointerup', 'pointercancel']) cv.addEventListener(ev, (e) => ptrs.delete(e.pointerId));
     cv.addEventListener('pointerup', (e) => {
       if (!drag) return;
       const d = drag;
@@ -124,7 +129,19 @@ export class Tablet {
       this._click(p, e.clientX - r.left, e.clientY - r.top);
     });
     // Pinch to zoom the map (two fingers); cancels any one-finger drag.
-    const zoomMap = (s) => (this.view.s = Math.min(14, Math.max(1.2, s)));
+    // Zoom the map about a screen point (the cursor, or between your fingers), so what's
+    // under it stays put.
+    const zoomMap = (sc, cx, cy) => {
+      const r = cv.getBoundingClientRect();
+      const px = cx === undefined ? r.width / 2 : cx - r.left, py = cy === undefined ? r.height / 2 : cy - r.top;
+      const before = this._toWorld(px, py);
+      this.view.s = Math.min(14, Math.max(1.2, sc));
+      const after = this._toWorld(px, py);
+      this.view.x += before.x - after.x;
+      this.view.z += before.z - after.z;
+      this.dirty = true;
+    };
+    this._zoomMap = zoomMap;
     this._pinchOn(cv, () => this.view.s, zoomMap, () => { drag = null; clearTimeout(this._lp); });
     // Live feed zoom: wheel / pinch / the ＋ － buttons; double-tap resets.
     this.feedZoom = 1;
@@ -135,7 +152,12 @@ export class Tablet {
     fc.addEventListener('wheel', (e) => { e.preventDefault(); fz(this.feedZoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)); }, { passive: false });
     fc.addEventListener('dblclick', () => fz(1));
     this._pinchOn(fc, () => this.feedZoom, fz);
-    cv.addEventListener('wheel', (e) => { e.preventDefault(); this.view.s = Math.min(14, Math.max(1.2, this.view.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); }, { passive: false });
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); zoomMap(this.view.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY); }, { passive: false });
+    // Double-tap / double-click the map: zoom in there.
+    cv.addEventListener('dblclick', (e) => zoomMap(this.view.s * 1.8, e.clientX, e.clientY));
+    // Drag a payload (or, for the shooter, a request) out of the side panel and drop it on the
+    // map: it goes off at that spot. Non-aimed payloads go off wherever you drop them on the map.
+    this._dnd(el, cv);
     addEventListener('keydown', (e) => {
       if (!this.visible) return;
       if (e.code === 'Escape') { this.close(); return; }
@@ -317,12 +339,63 @@ export class Tablet {
     }
   }
 
+  _dnd(el, cv) {
+    let D = null;
+    const ghost = document.createElement('div');
+    ghost.className = 'ct-ghost';
+    el.appendChild(ghost);
+    this.parts.pay.addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('[data-k],[data-r]');
+      if (!b) return;
+      D = { k: b.dataset.k || b.dataset.r, req: !b.dataset.k, x: e.clientX, y: e.clientY, on: false, id: e.pointerId, label: (b.querySelector('b') || b).textContent };
+    });
+    addEventListener('pointermove', (e) => {
+      if (!D || e.pointerId !== D.id) return;
+      if (!D.on && Math.hypot(e.clientX - D.x, e.clientY - D.y) > 10) { D.on = true; ghost.textContent = D.label; ghost.classList.add('on'); this.dragK = D.k; }
+      if (!D.on) return;
+      e.preventDefault();
+      ghost.style.left = e.clientX + 'px';
+      ghost.style.top = e.clientY + 'px';
+      const r = cv.getBoundingClientRect(), over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      ghost.classList.toggle('over', over);
+      this.dragAt = over ? { px: e.clientX - r.left, py: e.clientY - r.top } : null;
+      this.dirty = true;
+    }, { passive: false });
+    const up = (e) => {
+      if (!D || e.pointerId !== D.id) return;
+      const d = D;
+      D = null;
+      ghost.classList.remove('on', 'over');
+      this.dragK = null; this.dragAt = null; this.dirty = true;
+      if (!d.on) return; // a plain tap: the click handler picks it
+      this._dropped = true;
+      setTimeout(() => (this._dropped = false), 400);
+      const r = cv.getBoundingClientRect();
+      if (e.type === 'pointercancel' || e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { this._say('DROP IT ON THE MAP', false); return; }
+      const px = e.clientX - r.left, py = e.clientY - r.top, p = this._toWorld(px, py);
+      if (d.req) { this.reqSel = d.k; this._click(p, px, py); return; }
+      const P = PAYLOAD[d.k];
+      if (!P) return;
+      if (!P.aim) { this._pick(d.k); return; }
+      this.selected = d.k;
+      this._click(p, px, py);
+      this.selected = null;
+    };
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
+  }
+
   // Two-finger pinch on an element: get() the current scale, set(scale), onStart() when it begins.
   _pinchOn(elm, get, set, onStart) {
     let d0 = 0, s0 = 1;
     const dist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     elm.addEventListener('touchstart', (e) => { if (e.touches.length === 2) { d0 = dist(e); s0 = get(); onStart && onStart(); } }, { passive: true });
-    elm.addEventListener('touchmove', (e) => { if (e.touches.length === 2 && d0) { e.preventDefault(); set(s0 * dist(e) / Math.max(10, d0)); } }, { passive: false });
+    elm.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 2 || !d0) return;
+      e.preventDefault();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      set(s0 * dist(e) / Math.max(10, d0), cx, cy);
+    }, { passive: false });
     elm.addEventListener('touchend', (e) => { if (e.touches.length < 2) d0 = 0; }, { passive: true });
   }
 
@@ -537,10 +610,10 @@ export class Tablet {
         c.fillRect(a.x - 2, a.y - 2, 4, 4);
         continue;
       }
-      const lab = { shelf: 'AMMO', fridge: 'FOOD', comms: ob2.commsDown ? 'COMMS \u2715' : 'COMMS', cctv: ob2.cctv ? 'CCTV \u2713' : 'CCTV' }[q.kind];
+      const lab = { shelf: 'AMMO', fridge: 'FOOD', barracks: 'BARRACKS', bay: 'DRONE BAY', comms: ob2.commsDown ? 'COMMS \u2715' : 'COMMS', cctv: ob2.cctv ? 'CCTV \u2713' : 'CCTV' }[q.kind];
       c.fillStyle = q.kind === 'comms' || q.kind === 'cctv' ? '#30ffd0' : '#80ff90';
       c.beginPath(); c.arc(a.x, a.y, 3, 0, Math.PI * 2); c.fill();
-      if (s > 2.5 && !this.mini) c.fillText(lab, a.x, a.y + 11);
+      if (s > 2.5 && !this.mini && lab) c.fillText(lab, a.x, a.y + 11);
     }
     // IoT devices (hackable distractions) and dark / shot-out lights.
     for (const D of fac.devices) {
@@ -647,6 +720,16 @@ export class Tablet {
     if (qd) { const a = T(qd.x, qd.z); c.strokeStyle = '#40d8e8'; c.strokeRect(a.x - 4, a.y - 4, 8, 8); c.fillStyle = '#40d8e8'; c.fillText('QUAD', a.x, a.y - 8); }
     if (g.medevac) { const a = T(g.medevac.x, g.medevac.z); c.fillStyle = '#40ffb0'; c.fillText('+MEDEVAC', a.x, a.y); }
     // Aimed payload preview.
+    // Dragging a payload over the map: the same preview, at your finger.
+    if (this.dragK && this.dragAt) {
+      const p0 = PAYLOAD[this.dragK] || { name: (this.dragK || '').toUpperCase(), r: 3 };
+      c.strokeStyle = '#ffd040';
+      c.setLineDash([4, 4]);
+      c.beginPath(); c.arc(this.dragAt.px, this.dragAt.py, (p0.r || 3) * s, 0, Math.PI * 2); c.stroke();
+      c.setLineDash([]);
+      c.fillStyle = '#ffd040';
+      c.fillText(p0.name + ' — release to drop', this.dragAt.px, this.dragAt.py - (p0.r || 3) * s - 6);
+    }
     if (this.selected && this.mouse) {
       const p0 = PAYLOAD[this.selected];
       c.strokeStyle = '#00ffe0';
