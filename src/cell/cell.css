@@ -430,7 +430,8 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 .tag.cell-tag { font-size: 0.82em; line-height: 1.35; }
 
 /* Touch ability buttons: a small grid on the left with a recharge bar along each one's bottom. */
-#touch .cell-abil { position: fixed; display: grid; gap: 6px; z-index: 6; --ab: 50px; }
+#touch .cell-abil { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 6; --ab: 50px; }
+#touch .cell-abil .ab { position: fixed !important; }
 #touch .cell-abil .ab { position: relative; width: var(--ab); height: var(--ab); border-radius: 50%; border: 1.5px solid rgba(0, 255, 224, 0.55); background: rgba(2, 10, 14, 0.62); display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
 #touch .cell-abil .ab span { font: 600 8px var(--mono, monospace); letter-spacing: 0.06em; color: var(--cell, #00ffe0); margin-top: -6px; }
 #touch .cell-abil .ab em { position: absolute; top: 5px; font: normal 8px var(--mono, monospace); color: #e8f6f8; }
@@ -468,3 +469,10 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 /* Phones: the middle strip folds into the wheel; only USE, pause and the context buttons stay. */
 body.cell-compact #touch .cell-tbar .pill:not(.keep) { display: none !important; }
 .stg-note { font-size: 11px; opacity: 0.7; margin: 6px 0 0; }
+
+/* USE pops up beside FIRE only when there's something to interact with. */
+#touch .cell-usebtn { position: fixed; z-index: 7; border-color: rgba(255, 208, 64, 0.8) !important; color: #ffd040; animation: usepop 0.18s ease-out; }
+@keyframes usepop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Touch: the TABLET button (with ISR inside) replaces the console / ISR preview squares. */
+body.touch #cell-hud .c-pip { display: none !important; }
+body.touch #cell-hud.has-pip .c-partner { top: 14px; }

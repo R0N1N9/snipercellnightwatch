@@ -75,7 +75,6 @@ export const KitMethods = {
     if (live && !tab && !quad && shooterKit) {
       if (I.pressed('KeyH') || I.pressed('cell-deadeye')) this._deadeye();
       if (I.pressed('KeyX') || I.pressed('cell-lure')) this._throwLure();
-      if (I.pressed('KeyT') || I.pressed('cell-exec')) this._execute();
       if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._ammoMenu();
       if (this.xr && this.xr.menu) for (let i = 1; i <= 4; i++) if (I.pressed('Digit' + i)) { this._ammoPick(['std', 'xr', 'pen', 'emp'][i - 1]); act.slot1 = act.slot2 = false; }
     }
@@ -752,7 +751,7 @@ export const KitMethods = {
       }
     }
     // Execute marks: brackets on the targets you can snap to right now.
-    if (this.role === 'shooter' && K.execs > 0 && !(this.quad && this.quad.active)) {
+    if (false) { // Execute was removed
       this._execList = (this._execListT = (this._execListT || 0) - 1 / 60) <= 0 ? ((this._execListT = 0.2), this._execTargets()) : this._execList || [];
       c.strokeStyle = '#ff3048';
       c.lineWidth = 2;

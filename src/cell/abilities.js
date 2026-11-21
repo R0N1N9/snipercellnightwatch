@@ -78,7 +78,6 @@ export const Abilities = {
       if (B.t >= BREATH.dur) { B.on = false; B.cd = BREATH.cd; B.t = 0; }
     } else if (B.on) { B.on = false; B.cd = Math.max(B.cd, BREATH.cd * (B.t / BREATH.dur)); B.t = 0; }
     act.breath = B.on;
-    if (live && shooterKit && (I.pressed(this.role === 'shooter' ? 'Digit0' : 'Digit9') || I.pressed('cell-dart'))) this._fireDart();
     if (I.pressed('Backquote') || I.pressed('cell-laser')) { this.laserOn = !this.laserOn; this.hud.flash(this.laserOn ? 'LASER ON' : 'LASER OFF', 'dim', 0.7); if (this.laserOn) this._hint('laser'); }
   },
 
