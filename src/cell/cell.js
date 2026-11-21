@@ -110,6 +110,8 @@ const BRIEF = {
   ],
 };
 const TOUCH = typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 1 || /iPad|iPhone|Android/.test(navigator.userAgent)) && matchMedia('(pointer: coarse)').matches;
+// Binocular zoom steps (vertical FOV, degrees): wheel / ZOOM buttons step through them.
+const BINO_FOV = [24, 13, 7, 3.6];
 const QUAD_BAT = 300; // seconds of flight (half rate while flying, quarter while parked)
 
 // ---------------------------------------------------------------------------
@@ -615,7 +617,6 @@ export class CellGame {
     const spotSmg = this.role === 'spotter' && L.spotter.primary === 'smg';
     P.arms = this.role === 'shooter' ? [mk(KR50, true), mk(L.shooter.secondary === 'mag50' ? MAGNUM : SMG, true)] : spotSmg ? [mk(SMG, true), mk(P9, true)] : [mk(P9, true)];
     P.slot = 0;
-    if (this.role === 'spotter' && !spotSmg && this.bino) this.bino.on = true; // binoculars in hand to start
   }
 
   _look(role) {
@@ -1250,8 +1251,19 @@ export class CellGame {
     this._abInput(dt, I, act, live && !tab && !quad);
     // Spotter's binoculars: X (or BINO) to swap from the P-9; scope raises them.
     if ((this.role === 'spotter' || this.operative) && (I.pressed('KeyX') || I.pressed('cell-bino')) && live && !tab && !quad && (this.role === 'spotter' || !this.operative)) this._binoToggle();
-    // Spotter: fire through the raised binoculars (or the SWARM button) calls the nano swarm.
-    if (this.role === 'spotter' && live && !tab && !quad && ((this.bino.on && this.bino.up && act.fire) || I.pressed('cell-swarm'))) this._swarmCall();
+    // Binocular zoom: mouse wheel, +/-, or the touch ZOOM buttons while they're raised.
+    if (this.bino.on && this.bino.up) {
+      const B = this.bino, zi = B.zi ?? 1;
+      if (act.zoomIn && zi < BINO_FOV.length - 1) { B.zi = zi + 1; this.audio.click(); }
+      else if (act.zoomOut && zi > 0) { B.zi = zi - 1; this.audio.click(); }
+      act.zoomIn = act.zoomOut = false;
+    }
+    // Spotter: through the raised binoculars, fire marks the enemy under the crosshair for the
+    // nano drones; SWARM (or E) sends them.
+    if (this.role === 'spotter' && live && !tab && !quad && this.nano) {
+      if (this.bino.on && this.bino.up && act.fire) { const t = this._nanoAt(innerWidth / 2, innerHeight / 2); if (t) this._nanoMark(t.id); else this.hud.flash('NO TARGET UNDER THE CROSSHAIR', 'dim', 0.6); }
+      if (I.pressed('cell-swarm') || (this.bino.on && this.bino.up && I.pressed('KeyE'))) this._nanoSend();
+    }
     if (this.bino.on) { act.fire = false; act.fireHeld = false; act.reload = false; if (P.def.slot !== 'pistol' && P.arms.some((w) => w.def.slot === 'pistol')) this._binoToggle(false); }
     if (this.bino.on && this.knifeEq) this.knifeEq = false; // X raised the binoculars
     this._wpnInput(dt, I, act, live && !tab && !quad && !isr && !this.mini.open);
@@ -1335,7 +1347,7 @@ export class CellGame {
       this.camera.rotation.set(P.pitch + k + sw.y, P.yaw + ky - sw.x, -ky * 0.6);
       this.camKick = k * Math.exp(-dt * 11);
       this.camKickYaw = ky * Math.exp(-dt * 11);
-      this.camera.fov = this.bino && this.bino.on ? P.fov() + (13 - P.fov()) * this.bino.k : P.fov();
+      this.camera.fov = this.bino && this.bino.on ? P.fov() + (BINO_FOV[this.bino.zi ?? 1] - P.fov()) * this.bino.k : P.fov();
     }
     this.camera.updateProjectionMatrix();
     // First-person weapon.
@@ -3001,7 +3013,7 @@ class CellHud {
       ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
       : g.role === 'shooter'
         ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
-        : [['cell-ability', 'DRONE', 'drone'], ['cell-swarm', 'SWARM', 'swarm'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
+        : [['cell-ability', 'DRONE', 'drone'], ...(g._hasBino && !g._hasBino() ? [] : [['cell-swarm', 'SWARM', 'swarm']]), ['cell-isr', 'ISR', 'isr'], ['cell-hack', '📱 HACK', 'hack']];
     const ab = document.createElement('div');
     ab.className = 'cell-abil';
     ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
@@ -3036,7 +3048,7 @@ class CellHud {
         if (g.quadCd > 0) { this._qcdMax = Math.max(this._qcdMax || 0, g.quadCd); f = 1 - g.quadCd / this._qcdMax; st = 'cd'; n = Math.ceil(g.quadCd) + 's'; }
         else { this._qcdMax = 0; f = (out && g.quad ? g.quad.bat : g.quadBat ?? 300) / 300; st = out ? 'on' : ''; }
       } else if (b.k === 'isr') { const cd = g.isr.sweepCd || 0; f = 1 - cd / 25; st = g.isr.active ? 'on' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
-      else if (b.k === 'swarm') { const cd = g.swarmCd || 0; f = 1 - cd / 45; st = cd > 0 ? 'cd' : g.ops && g.ops.bw < 35 ? 'cd' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
+      else if (b.k === 'swarm' && g.nano) { const N = g.nano; f = N.ch < 3 ? (N.ch + N.rl / 15) / 3 : 1; st = N.marks.length ? 'on' : N.ch ? '' : 'cd'; n = '\u00D7' + N.ch; }
       else if (b.k === 'hack') { f = g.ops ? g.ops.bw / 100 : 0; st = g.qh && g.qh.on ? 'on' : ''; }
       f = Math.max(0, Math.min(1, f));
       const key = st + '|' + n + '|' + Math.round(f * 50);

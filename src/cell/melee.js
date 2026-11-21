@@ -10,7 +10,7 @@ const SLOT_NAME = { p: 'PRIMARY', s: 'SECONDARY', k: 'KNIFE' };
 
 export const Melee = {
   _wpnInit() {
-    this.knifeEq = false;
+    this.knifeEq = false; // (a binocular spotter starts on the P-9: the binoculars come out on X / the wheel)
     this.wpnWheel = null;
     this._swHold = null;
     addEventListener('touchmove', (e) => {

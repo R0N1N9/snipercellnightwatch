@@ -704,7 +704,7 @@ async function renderStaging() {
       <div class="stg-k">SECONDARY</div><div class="stg-opts">${opt('shooter.secondary', 'smg', 'K9 HUSH SMG', L.shooter.secondary === 'smg', '40 rounds, full / burst / semi (B). Quiet, light kick.')}${opt('shooter.secondary', 'mag50', 'M50 MAGNUM', L.shooter.secondary === 'mag50', '7 rounds, slow and heavy. Big kick, wide from the hip: aim down sights.')}</div>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('shooter')}</div></div>
     <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3>
-      <div class="stg-k">PRIMARY</div><div class="stg-opts">${opt('spotter.primary', 'bino', 'THERMAL BINOCULARS', L.spotter.primary !== 'smg', 'Raise them to mark every enemy in the viewfinder at any range.')}${opt('spotter.primary', 'smg', 'K9 HUSH SMG', L.spotter.primary === 'smg', '40 rounds, full / burst / semi. Binoculars stay on X.')}</div>
+      <div class="stg-k">PRIMARY</div><div class="stg-opts">${opt('spotter.primary', 'bino', 'THERMAL BINOCULARS', L.spotter.primary !== 'smg', 'Thermal: every enemy in view marked. Nano drones: tap up to 3 targets, send the swarm; drones reload one at a time. You start on the P-9.')}${opt('spotter.primary', 'smg', 'K9 HUSH SMG', L.spotter.primary === 'smg', '40 rounds, full / burst / semi, three magazines. No binoculars: one or the other.')}</div>
       <div class="stg-k">SECONDARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, three magazines.')}
       <p class="stg-note">Every weapon starts suppressed; take the suppressor off in game (B).</p>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('spotter')}</div></div>`;

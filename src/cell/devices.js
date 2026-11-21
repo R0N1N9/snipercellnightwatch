@@ -180,8 +180,8 @@ export const Devices = {
     this.devBino = add(binoMesh());
     this.devDrone = add(droneMesh());
     this.devAnim = null;
-    // A spotter whose primary is the binoculars (the default) starts with them in hand.
-    this.bino = { on: this.role === 'spotter' && !this.operative && !(this.loadout && this.loadout.spotter.primary === 'smg'), k: 0 };
+    this.bino = { on: false, k: 0 };
+    this._nanoInit();
   },
 
   // Bring a device up, then run `then` (open the tablet, enter ISR, launch the drone).
@@ -192,29 +192,60 @@ export const Devices = {
     this.audio.nvgReach && this.audio.nvgReach();
   },
 
-  // ---- nano swarm (spotter, through the binoculars) ------------------------------------
-  // Fire while looking through the raised binoculars: a swarm of nano drones flies out and
-  // silently takes out up to three soft targets in the viewfinder (guards, officers, bulwarks;
-  // brutes and titans are too heavily armoured). 35 BW, 45 s cooldown.
-  _swarmCall() {
-    const B = this.bino, S = this.sentinel;
-    if (!B || !B.up) { this.hud.flash('RAISE THE BINOCULARS TO AIM THE SWARM', 'red', 0.9); return; }
-    if ((this.swarmCd || 0) > 0) { this.hud.flash(`SWARM RECHARGING ${Math.ceil(this.swarmCd)} s`, 'red', 0.8); return; }
-    if (this.ops && this.ops.bw < 35) { this.hud.flash('NOT ENOUGH BANDWIDTH (35)', 'red', 0.8); return; }
-    const cam = this.camera, o = cam.getWorldPosition(new THREE.Vector3()), dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const soft = new Set(['guard', 'scav', 'bulwark']);
-    const picks = S.guards
-      .filter((g) => g.state !== 'dead' && soft.has(g.type) && B.seen && B.seen.has(g.id))
-      .map((g) => ({ g, a: new THREE.Vector3(g.x, (g.y || 0) + 1.4, g.z).sub(o).normalize().angleTo(dir) }))
-      .sort((a, b) => a.a - b.a).slice(0, 3).map((p) => p.g);
-    if (!picks.length) { this.hud.flash('NO SOFT TARGETS IN VIEW', 'red', 0.8); return; }
-    if (this.ops) this.ops.bw -= 35;
-    this.swarmCd = 45;
+  // ---- nano drones (spotter, through the thermal binoculars) -----------------------------
+  // Three nano drones that reload one at a time (15 s each). With the binoculars raised, tap
+  // enemies (or fire on the one under the crosshair) to mark up to as many as you have drones;
+  // SWARM (E on desktop) sends them, and each marked target drops silently ~1.5 s later.
+  _nanoInit() {
+    this.nano = { ch: 3, rl: 0, marks: [] };
+    addEventListener('touchstart', (e) => {
+      const B = this.bino;
+      if (!B || !B.up || this.role !== 'spotter' || this.paused) return;
+      const t = e.changedTouches[0];
+      if (!t || (t.target.closest && t.target.closest('[data-act], .pill, .cell-abil'))) return;
+      const g = this._nanoAt(t.clientX, t.clientY);
+      if (!g) return;
+      e.preventDefault(); e.stopPropagation();
+      this._nanoMark(g.id);
+    }, { capture: true, passive: false });
+  },
+  _nanoTargets() {
+    const B = this.bino;
+    return this.sentinel.guards.filter((g) => g.state !== 'dead' && B && B.seen && B.seen.has(g.id));
+  },
+  // The enemy drawn nearest a screen point (within ~60 px), or under the crosshair.
+  _nanoAt(x, y) {
+    const cam = this.camera, W = innerWidth, H = innerHeight, v = new THREE.Vector3();
+    let best = null, bd = 60;
+    for (const g of this._nanoTargets()) {
+      v.set(g.x, (g.y || 0) + 1.2 * ((g.obj && g.obj.userData.scale) || 1), g.z).project(cam);
+      if (v.z > 1) continue;
+      const d = Math.hypot((v.x * 0.5 + 0.5) * W - x, (-v.y * 0.5 + 0.5) * H - y);
+      if (d < bd) { bd = d; best = g; }
+    }
+    return best;
+  },
+  _nanoMark(id) {
+    const N = this.nano, i = N.marks.indexOf(id);
+    if (i >= 0) { N.marks.splice(i, 1); this.audio.click(); return; }
+    if (N.marks.length >= N.ch) { this.hud.flash(N.ch ? `ONLY ${N.ch} NANO DRONE${N.ch > 1 ? 'S' : ''} READY` : 'NANO DRONES RELOADING', 'red', 0.8); return; }
+    N.marks.push(id);
     this.audio.click();
-    this.hud.flash(`NANO SWARM \u2192 ${picks.length} TARGET${picks.length > 1 ? 'S' : ''}`, 'cyan', 1.2);
+    this.hud.flash(`MARKED ${N.marks.length}/${N.ch} · SWARM TO SEND`, 'cyan', 0.7);
+  },
+  _nanoSend() {
+    const N = this.nano, S = this.sentinel;
+    if (!N) return;
+    N.marks = N.marks.filter((id) => { const g = S.byId(id); return g && g.state !== 'dead'; });
+    if (!N.marks.length) { this.hud.flash(this.bino && this.bino.up ? 'MARK TARGETS FIRST (TAP THEM)' : 'RAISE THE BINOCULARS AND MARK TARGETS', 'red', 0.9); return; }
+    const ids = N.marks.slice(0, N.ch);
+    N.ch -= ids.length;
+    N.marks = [];
+    this.hud.flash(`NANO SWARM → ${ids.length} TARGET${ids.length > 1 ? 'S' : ''}`, 'cyan', 1.2);
     this._radio && this._radio(this.role, 'Swarm away.');
-    this._swarmFx(picks.map((g) => g.id), { x: this.player.pos.x, y: this.player.pos.y + 1.6, z: this.player.pos.z });
-    this.payload('swarm', { ids: picks.map((g) => g.id), from: { x: this.player.pos.x, y: this.player.pos.y + 1.6, z: this.player.pos.z } });
+    const from = { x: this.player.pos.x, y: this.player.pos.y + 1.6, z: this.player.pos.z };
+    this._swarmFx(ids, from);
+    this.payload('swarm', { ids, from });
   },
   // The swarm itself: a cloud of tiny glints per target that streams out and wraps the head.
   _swarmFx(ids, from) {
@@ -231,7 +262,8 @@ export const Devices = {
     }
   },
   _swarmTick(dt) {
-    this.swarmCd = Math.max(0, (this.swarmCd || 0) - dt);
+    const N = this.nano;
+    if (N && N.ch < 3) { N.rl += dt; if (N.rl >= 15) { N.rl = 0; N.ch++; } }
     if (!this.swarms || !this.swarms.length) return;
     const S = this.sentinel, v = new THREE.Vector3();
     for (const w of this.swarms) {
@@ -328,8 +360,13 @@ export const Devices = {
   },
 
   // ---- binoculars ------------------------------------------------------------------------
+  // An SMG spotter carries no binoculars at all (one or the other).
+  _hasBino() {
+    return !(this.role === 'spotter' && this.loadout && this.loadout.spotter.primary === 'smg');
+  },
   _binoToggle(on) {
     const B = this.bino;
+    if ((on === undefined || on) && !B.on && !this._hasBino()) { this.hud.flash('NO BINOCULARS (SMG LOADOUT)', 'dim', 0.8); return; }
     B.on = on === undefined ? !B.on : on;
     this.audio.click();
     if (B.on) this._hint('bino');
@@ -377,7 +414,8 @@ export const Devices = {
       c.beginPath(); c.ellipse(top.x, (top.y + bot.y) / 2, w, h * 0.55, 0, 0, Math.PI * 2); c.fill();
     }
     // Viewfinder: two overlapping circles, black outside.
-    const r = Math.min(W * 0.27, H * 0.46), dx = r * 0.55;
+    // Two big overlapping circles (a Venn diagram), filling most of the screen.
+    const r = Math.min(H * 0.55, W * 0.3), dx = r * 0.62;
     const m = (this._binoMask = this._binoMask || document.createElement('canvas'));
     if (m.width !== W || m.height !== H) { m.width = W; m.height = H; }
     const mc = m.getContext('2d');
@@ -386,14 +424,33 @@ export const Devices = {
     mc.globalCompositeOperation = 'destination-out';
     mc.beginPath(); mc.arc(W / 2 - dx, H / 2, r, 0, Math.PI * 2); mc.arc(W / 2 + dx, H / 2, r, 0, Math.PI * 2); mc.fill();
     c.drawImage(m, 0, 0, W, H);
+    // A rim round each lens so the two-circle shape reads even against the night.
+    c.strokeStyle = 'rgba(190,205,220,0.45)'; c.lineWidth = 2;
+    for (const sx of [-1, 1]) { c.beginPath(); c.arc(W / 2 + sx * dx, H / 2, r, 0, Math.PI * 2); c.stroke(); }
     c.strokeStyle = 'rgba(220,230,240,0.7)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(W / 2 - 40, H / 2); c.lineTo(W / 2 + 40, H / 2); c.moveTo(W / 2, H / 2 - 30); c.lineTo(W / 2, H / 2 + 30); c.stroke();
     for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(W / 2 + i * 14, H / 2 - 4); c.lineTo(W / 2 + i * 14, H / 2 + 4); c.stroke(); }
     c.fillStyle = 'rgba(255,120,90,0.95)'; c.font = '600 12px JetBrains Mono, monospace'; c.textAlign = 'center';
-    c.fillText(`THERMAL · ${B.seen ? B.seen.size : 0} MARKED`, W / 2, H / 2 + r * 0.8);
-    if (this.role === 'spotter') {
-      c.fillStyle = (this.swarmCd || 0) > 0 ? 'rgba(160,170,180,0.85)' : 'rgba(150,235,255,0.95)';
-      c.fillText((this.swarmCd || 0) > 0 ? `NANO SWARM ${Math.ceil(this.swarmCd)} s` : 'FIRE \u00B7 NANO SWARM (up to 3 soft targets)', W / 2, H / 2 + r * 0.8 + 18);
+    const mag = Math.round(((this.player.fov ? this.player.fov() : 70) / this.camera.fov) * 10) / 10;
+    c.fillText(`THERMAL · ${mag}\u00D7 (WHEEL / ZOOM) · ${B.seen ? B.seen.size : 0} MARKED`, W / 2, H / 2 + r * 0.8);
+    if (this.role === 'spotter' && this.nano) {
+      const N = this.nano;
+      // Marked targets: a cyan diamond and its number.
+      c.strokeStyle = '#7fe8ff'; c.fillStyle = '#7fe8ff'; c.lineWidth = 2;
+      N.marks.forEach((id, i) => {
+        const g = this.sentinel.byId(id);
+        if (!g || g.state === 'dead') return;
+        const hp = proj(g.x, (g.y || 0) + 1.6 * ((g.obj && g.obj.userData.scale) || 1), g.z);
+        if (hp.behind) return;
+        // A ring on the head and a numbered diamond just above it (screen-space, so zoom doesn't push it off).
+        c.beginPath(); c.arc(hp.x, hp.y, 14, 0, Math.PI * 2); c.stroke();
+        const p = { x: hp.x, y: hp.y - 30 };
+        c.beginPath(); c.moveTo(p.x, p.y - 10); c.lineTo(p.x + 9, p.y); c.lineTo(p.x, p.y + 10); c.lineTo(p.x - 9, p.y); c.closePath(); c.stroke();
+        c.fillText(String(i + 1), p.x, p.y + 4);
+      });
+      c.fillStyle = N.ch ? 'rgba(150,235,255,0.95)' : 'rgba(160,170,180,0.85)';
+      const pips = '\u25C6'.repeat(N.ch) + '\u25C7'.repeat(3 - N.ch);
+      c.fillText(`NANO ${pips}${N.ch < 3 ? ` +1 in ${Math.ceil(15 - N.rl)} s` : ''} \u00B7 TAP / FIRE: MARK ${N.marks.length} \u00B7 SWARM / E: SEND`, W / 2, H / 2 + r * 0.8 + 18);
     }
     c.restore();
   },
