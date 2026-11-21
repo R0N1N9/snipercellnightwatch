@@ -467,3 +467,4 @@ body:not(:has(#cell-hud.isr)) .cell-tbar .pill.z { display: none; }
 .cell-wheel.laid .cw-centre { top: -14px; }
 /* Phones: the middle strip folds into the wheel; only USE, pause and the context buttons stay. */
 body.cell-compact #touch .cell-tbar .pill:not(.keep) { display: none !important; }
+.stg-note { font-size: 11px; opacity: 0.7; margin: 6px 0 0; }

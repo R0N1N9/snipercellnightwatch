@@ -29,18 +29,17 @@ export const PERKS = {
 };
 export const DEFAULT_LOADOUT = {
   shooter: { secondary: 'smg', secSup: true, perk: 'camo', bolt: 'standard' },
-  spotter: { pistolSup: true, perk: 'bandwidth' },
+  spotter: { primary: 'bino', pistolSup: true, perk: 'bandwidth' },
 };
 export function normLoadout(lo) {
   const L = JSON.parse(JSON.stringify(DEFAULT_LOADOUT));
   if (lo && lo.shooter) {
     if (['smg', 'mag50'].includes(lo.shooter.secondary)) L.shooter.secondary = lo.shooter.secondary;
-    if (typeof lo.shooter.secSup === 'boolean') L.shooter.secSup = lo.shooter.secSup;
     if (PERKS.shooter[lo.shooter.perk]) L.shooter.perk = lo.shooter.perk;
     if (['standard', 'straight'].includes(lo.shooter.bolt)) L.shooter.bolt = lo.shooter.bolt;
   }
   if (lo && lo.spotter) {
-    if (typeof lo.spotter.pistolSup === 'boolean') L.spotter.pistolSup = lo.spotter.pistolSup;
+    if (['bino', 'smg'].includes(lo.spotter.primary)) L.spotter.primary = lo.spotter.primary;
     if (PERKS.spotter[lo.spotter.perk]) L.spotter.perk = lo.spotter.perk;
   }
   return L;
