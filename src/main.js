@@ -702,12 +702,11 @@ async function renderStaging() {
       <div class="stg-k">PRIMARY</div>${prim('KR-50 NIGHTJAR', '.50 subsonic bolt gun, integral suppressor, 2\u00D7/8\u00D7 night scope. Through bodies and thin walls; special magazines (Z): explosive, penetrator, EMP. Kicks hard; wide from the hip.')}
       <div class="stg-k">KR-50 BOLT</div><div class="stg-opts">${opt('shooter.bolt', 'standard', 'STANDARD', L.shooter.bolt !== 'straight', 'Tap fire: off the glass to work the bolt. Hold fire to stay scoped.')}${opt('shooter.bolt', 'straight', 'STRAIGHT-PULL', L.shooter.bolt === 'straight', 'Cycles while you stay on target. A little more climb.')}</div>
       <div class="stg-k">SECONDARY</div><div class="stg-opts">${opt('shooter.secondary', 'smg', 'K9 HUSH SMG', L.shooter.secondary === 'smg', '40 rounds, full / burst / semi (B). Quiet, light kick.')}${opt('shooter.secondary', 'mag50', 'M50 MAGNUM', L.shooter.secondary === 'mag50', '7 rounds, slow and heavy. Big kick, wide from the hip: aim down sights.')}</div>
-      <div class="stg-k">SECONDARY SUPPRESSOR</div><div class="stg-opts">${opt('shooter.secSup', '1', 'FITTED', L.shooter.secSup, 'Quiet. Hold B in game to twist it off.')}${opt('shooter.secSup', '0', 'OFF', !L.shooter.secSup, 'Loud: every shot carries 70 m.')}</div>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('shooter')}</div></div>
     <div class="stg-col" data-r="spotter"><h3>SPOTTER \u00B7 ${CELL_CALL.spotter}</h3>
-      <div class="stg-k">PRIMARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, two magazines. Suppressor fitted by default.')}
-      <div class="stg-k">SECOND</div>${prim('THERMAL BINOCULARS', 'X to swap from the P-9; raise them to mark every enemy in the viewfinder at any range.')}
-      <div class="stg-k">P-9 SUPPRESSOR</div><div class="stg-opts">${opt('spotter.pistolSup', '1', 'FITTED', L.spotter.pistolSup, 'Quiet up close.')}${opt('spotter.pistolSup', '0', 'OFF', !L.spotter.pistolSup, 'Loud: every shot carries 70 m.')}</div>
+      <div class="stg-k">PRIMARY</div><div class="stg-opts">${opt('spotter.primary', 'bino', 'THERMAL BINOCULARS', L.spotter.primary !== 'smg', 'Raise them to mark every enemy in the viewfinder at any range.')}${opt('spotter.primary', 'smg', 'K9 HUSH SMG', L.spotter.primary === 'smg', '40 rounds, full / burst / semi. Binoculars stay on X.')}</div>
+      <div class="stg-k">SECONDARY</div>${prim('P-9 PISTOL', '9 mm service pistol, 12 rounds, three magazines.')}
+      <p class="stg-note">Every weapon starts suppressed; take the suppressor off in game (B).</p>
       <div class="stg-k">PERK</div><div class="stg-opts">${perks('spotter')}</div></div>`;
 }
 $('panel-staging').addEventListener('click', (e) => {

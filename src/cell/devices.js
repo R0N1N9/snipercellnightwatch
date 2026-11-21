@@ -180,7 +180,8 @@ export const Devices = {
     this.devBino = add(binoMesh());
     this.devDrone = add(droneMesh());
     this.devAnim = null;
-    this.bino = { on: false, k: 0 };
+    // A spotter whose primary is the binoculars (the default) starts with them in hand.
+    this.bino = { on: this.role === 'spotter' && !this.operative && !(this.loadout && this.loadout.spotter.primary === 'smg'), k: 0 };
   },
 
   // Bring a device up, then run `then` (open the tablet, enter ISR, launch the drone).

@@ -609,8 +609,12 @@ export class CellGame {
     const extra = this.role === 'shooter' && L.shooter.perk === 'mags' ? 2 : 0;
     P._spare = (d) => P._baseSpare(d) + extra;
     const mk = (d, sup) => ({ def: d, mag: d.mag, chamber: 1, reserve: d.mag * P._spare(d), zoomIdx: 0, zero: d.fixedZero || 100, sup, mode: d.modes ? d.modes[0] : null });
-    P.arms = this.role === 'shooter' ? [mk(KR50, true), mk(L.shooter.secondary === 'mag50' ? MAGNUM : SMG, L.shooter.secSup)] : [mk(P9, L.spotter.pistolSup)];
+    // Everything starts suppressed (B takes it off in game). The spotter's primary is the
+    // binoculars (default) or the K9 SMG; the P-9 is their secondary.
+    const spotSmg = this.role === 'spotter' && L.spotter.primary === 'smg';
+    P.arms = this.role === 'shooter' ? [mk(KR50, true), mk(L.shooter.secondary === 'mag50' ? MAGNUM : SMG, true)] : spotSmg ? [mk(SMG, true), mk(P9, true)] : [mk(P9, true)];
     P.slot = 0;
+    if (this.role === 'spotter' && !spotSmg && this.bino) this.bino.on = true; // binoculars in hand to start
   }
 
   _look(role) {
