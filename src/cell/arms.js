@@ -1,7 +1,7 @@
 // Sniper Cell — sidearms, their first-person models, and the staging-area loadouts.
 //   K9 HUSH      compact SMG with a long suppressor shroud, red-dot, folding stock, a long
 //                magazine ahead of the trigger and a vertical foregrip. FULL / BURST / SEMI.
-//   M50 MAGNUM   heavy semi-auto hand cannon. Slow, hits hard.
+//   M50 MAGNUM   heavy semi-auto hand cannon: steel slide, ported comp. Slow, hits hard.
 //   P-9          the spotter's basic pistol.
 // Every sidearm wears a detachable suppressor, on by default. Same anchor contract as the
 // valley's viewmodels (gripR / gripL / muzzle / mag / magHome / slide / slideHome / sight).
@@ -60,68 +60,125 @@ function kit(g) {
 export function buildSMG() {
   const g = new THREE.Group();
   const M = mats(), { box, cyl, anchor } = kit(g);
-  // Angular upper receiver with a chamfered top, lower with the grip.
-  box(0.05, 0.06, 0.32, M.body, 0, 0.01, -0.12);
-  box(0.046, 0.02, 0.3, M.hi, 0, 0.048, -0.12);
-  box(0.054, 0.03, 0.14, M.olive, 0, -0.012, -0.21);
-  // Long ventilated suppressor shroud (integral-looking).
-  cyl(0.026, 0.34, M.dark, 0, 0.012, -0.44, 12);
-  for (let i = 0; i < 5; i++) box(0.054, 0.006, 0.02, M.hi, 0, 0.012, -0.32 - i * 0.055);
-  // Detachable can extension at the very end (removable suppressor).
-  const can = cyl(0.024, 0.14, M.dark, 0, 0.012, -0.68, 12);
-  // Red-dot sight.
-  box(0.034, 0.03, 0.06, M.dark, 0, 0.075, -0.1);
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.006, 8), M.red);
+  const metal = new THREE.MeshStandardMaterial({ color: '#2a2d32', metalness: 0.6, roughness: 0.45, emissive: '#16181b', emissiveIntensity: 0.45 });
+  const poly = new THREE.MeshLambertMaterial({ color: '#25272b', emissive: '#25272b', emissiveIntensity: 0.14 });
+  const tan = new THREE.MeshLambertMaterial({ color: '#6b5d45', emissive: '#6b5d45', emissiveIntensity: 0.12 });
+  // Upper receiver with a chamfered top and a full-length rail (teeth along the top).
+  box(0.05, 0.058, 0.34, metal, 0, 0.012, -0.12);
+  box(0.042, 0.012, 0.34, metal, 0, 0.046, -0.12);
+  for (let i = 0; i < 14; i++) box(0.046, 0.006, 0.01, M.dark, 0, 0.055, 0.03 - i * 0.022);
+  // Ejection port and a side charging handle (the "slide" the reload animates).
+  box(0.002, 0.016, 0.05, M.dark, 0.026, 0.02, -0.06);
+  // Handguard: slotted (M-LOK style), wider than the receiver, tan accent panel.
+  box(0.056, 0.05, 0.16, poly, 0, 0.006, -0.36);
+  for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) box(0.002, 0.012, 0.024, M.dark, sx * 0.029, 0.006, -0.3 - i * 0.036);
+  box(0.058, 0.012, 0.1, tan, 0, -0.022, -0.36);
+  // Lower: textured pistol grip, flared magwell, big trigger guard.
+  const grip = box(0.036, 0.11, 0.05, poly, 0, -0.065, 0.025, 0.3);
+  void grip;
+  for (let i = 0; i < 4; i++) box(0.037, 0.004, 0.044, M.dark, 0, -0.04 - i * 0.022, 0.03 + i * 0.006, 0.3);
+  box(0.04, 0.03, 0.18, poly, 0, -0.025, -0.08);
+  box(0.034, 0.008, 0.07, poly, 0, -0.048, -0.025);
+  box(0.006, 0.022, 0.006, M.dark, 0, -0.035, -0.02);
+  box(0.044, 0.02, 0.06, poly, 0, -0.045, -0.12);
+  // Long ventilated suppressor shroud with cooling flutes.
+  cyl(0.027, 0.26, M.dark, 0, 0.012, -0.57, 16);
+  for (let i = 0; i < 6; i++) box(0.058, 0.005, 0.018, M.hi, 0, 0.012, -0.47 - i * 0.04);
+  // Detachable can at the very end (removable suppressor).
+  const can = cyl(0.025, 0.12, M.dark, 0, 0.012, -0.76, 16);
+  // Hooded red-dot with a lens and a dot.
+  box(0.036, 0.008, 0.07, M.dark, 0, 0.06, -0.1);
+  box(0.006, 0.034, 0.06, metal, -0.017, 0.078, -0.1);
+  box(0.006, 0.034, 0.06, metal, 0.017, 0.078, -0.1);
+  box(0.04, 0.006, 0.064, metal, 0, 0.097, -0.1);
+  const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.028, 0.028), new THREE.MeshBasicMaterial({ color: '#2a4a52', transparent: true, opacity: 0.35 }));
+  lens.position.set(0, 0.078, -0.13); g.add(lens);
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0045, 10), M.red);
   dot.position.set(0, 0.078, -0.068);
   g.add(dot);
-  // Grip, trigger guard, long magazine ahead of the trigger, vertical foregrip.
-  box(0.034, 0.1, 0.046, M.dark, 0, -0.06, 0.02, 0.3);
-  box(0.008, 0.008, 0.06, M.dark, 0, -0.03, -0.035);
+  // Long magazine ahead of the trigger (textured), angled foregrip.
   const magG = new THREE.Group();
-  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.17, 0.05), M.dark);
-  mag.position.y = -0.085;
-  mag.rotation.x = 0.12;
-  magG.add(mag);
+  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.17, 0.05), poly);
+  mag.position.y = -0.085; mag.rotation.x = 0.12; magG.add(mag);
+  for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.052), M.dark); r.position.set(0, -0.05 - i * 0.04, -0.005 + i * 0.005); r.rotation.x = 0.12; magG.add(r); }
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.012, 0.058), tan); base.position.set(0, -0.172, -0.012); base.rotation.x = 0.12; magG.add(base);
   magG.position.set(0, -0.02, -0.1);
   g.add(magG);
-  box(0.03, 0.09, 0.03, M.body, 0, -0.055, -0.25);
-  // Folding skeleton stock (folded along the right side).
-  box(0.012, 0.03, 0.2, M.hi, 0.034, 0.0, 0.08);
-  box(0.012, 0.07, 0.014, M.hi, 0.034, -0.02, 0.18);
+  box(0.03, 0.08, 0.03, poly, 0, -0.06, -0.33, -0.25);
+  // Folding stock (folded along the right side) with a buttpad.
+  box(0.012, 0.03, 0.2, metal, 0.034, 0.0, 0.08);
+  box(0.016, 0.075, 0.02, poly, 0.034, -0.02, 0.185);
   const slide = new THREE.Group();
-  slide.add(new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.014, 0.03), M.hi));
-  slide.position.set(-0.03, 0.03, -0.05);
+  slide.add(new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.014, 0.03), metal));
+  slide.position.set(-0.032, 0.03, -0.05);
   g.add(slide);
   g.userData = {
-    gripR: anchor(0, -0.075, 0.03), gripL: anchor(0, -0.09, -0.25), muzzle: anchor(0, 0.012, -0.76), can,
+    gripR: anchor(0, -0.075, 0.03), gripL: anchor(0, -0.09, -0.33), muzzle: anchor(0, 0.012, -0.82), can,
     mag: magG, magHome: magG.position.clone(), slide, slideHome: slide.position.clone(), sight: 0.078,
   };
   return g;
 }
 
+// M50 Magnum: a big, modern hand cannon, nothing like the P-9. A black frame with a
+// full-length dust cover, a tall brushed-steel slide with a lightening window over the barrel, a ported
+// compensator, an oversized squared trigger guard, a chunky textured grip with a flared
+// magwell, hammer and beavertail, and night sights: two green rear dots, a red front dot.
 export function buildMagnum() {
   const g = new THREE.Group();
-  const M = mats(), { box, cyl, anchor } = kit(g);
-  box(0.036, 0.03, 0.17, M.hi, 0, -0.004, -0.06);
-  const grip = box(0.036, 0.115, 0.055, M.dark, 0, -0.07, 0.008, 0.22);
-  void grip;
+  const { box, cyl, anchor } = kit(g);
+  const frameM = new THREE.MeshStandardMaterial({ color: '#1c1e22', metalness: 0.5, roughness: 0.5, emissive: '#111214', emissiveIntensity: 0.5 });
+  const slideM = new THREE.MeshStandardMaterial({ color: '#7d838b', metalness: 0.85, roughness: 0.3, emissive: '#3c4046', emissiveIntensity: 0.5 }); // brushed steel
+  const gripM = new THREE.MeshLambertMaterial({ color: '#202226', emissive: '#202226', emissiveIntensity: 0.12 });
+  const dark = new THREE.MeshLambertMaterial({ color: '#0d0e10' });
+  const barrelM = new THREE.MeshStandardMaterial({ color: '#8a8f96', metalness: 0.9, roughness: 0.25, emissive: '#3a3d42', emissiveIntensity: 0.4 });
+  // Frame: full-length dust cover under the slide, with a rail underneath.
+  box(0.044, 0.032, 0.27, frameM, 0, -0.006, -0.1);
+  box(0.03, 0.01, 0.11, frameM, 0, -0.027, -0.16);
+  for (let i = 0; i < 4; i++) box(0.034, 0.004, 0.012, dark, 0, -0.033, -0.12 - i * 0.026);
+  // Oversized squared trigger guard and trigger.
+  box(0.036, 0.01, 0.06, frameM, 0, -0.06, -0.04);
+  box(0.036, 0.04, 0.01, frameM, 0, -0.042, -0.068);
+  box(0.008, 0.026, 0.008, dark, 0, -0.035, -0.03);
+  // Grip: chunky, raked, wraparound texture, flared magwell, beavertail.
+  box(0.044, 0.13, 0.064, gripM, 0, -0.078, 0.012, 0.22);
+  const texM = new THREE.MeshLambertMaterial({ color: '#3d4148', emissive: '#3d4148', emissiveIntensity: 0.12 });
+  for (let i = 0; i < 6; i++) box(0.046, 0.004, 0.058, texM, 0, -0.04 - i * 0.019, 0.012 + i * 0.0042, 0.22);
+  box(0.05, 0.016, 0.07, frameM, 0, -0.142, 0.03, 0.22);
+  box(0.036, 0.016, 0.03, frameM, 0, 0.004, 0.052, -0.3);
   const slide = new THREE.Group();
-  slide.add(new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.04, 0.21), M.body));
-  for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.03, 0.004), M.dark); s.position.set(0, 0, 0.07 + i * 0.008); slide.add(s); }
-  const sightF = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.01, 0.008), M.red); sightF.position.set(0, 0.025, -0.1); slide.add(sightF);
-  const sightR = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.01, 0.008), M.hi); sightR.position.set(0, 0.025, 0.095); slide.add(sightR);
-  slide.position.set(0, 0.028, -0.07);
+  // Long slide with a chamfered front, serrations front and back, a top rib and a window.
+  const sl = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.054, 0.27), slideM); slide.add(sl);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.036, 0.03), slideM); nose.position.set(0, -0.006, -0.148); slide.add(nose);
+  for (let i = 0; i < 7; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.04, 0.003), dark); c.position.set(0, -0.002, 0.09 + i * 0.006); slide.add(c); }
+  for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.034, 0.003), dark); c.position.set(0, -0.004, -0.09 - i * 0.006); slide.add(c); }
+  const rib = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.005, 0.18), dark); rib.position.set(0, 0.029, -0.01); slide.add(rib);
+  for (const sx of [-1, 1]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.026, 0.11), dark); win.position.set(sx * 0.0215, 0.004, -0.045); slide.add(win);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.014, 0.1), barrelM); bar.position.set(sx * 0.0225, 0.004, -0.045); slide.add(bar);
+  }
+  const port = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.004, 0.04), dark); port.position.set(0.008, 0.0275, 0.03); slide.add(port);
+  // Night sights: red dot up front, two green dots either side of the rear notch.
+  const fs = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.012, 0.01), dark); fs.position.set(0, 0.033, -0.118); slide.add(fs);
+  const fd = new THREE.Mesh(new THREE.SphereGeometry(0.0042, 10, 8), new THREE.MeshBasicMaterial({ color: '#ff2a2a' })); fd.position.set(0, 0.035, -0.112); slide.add(fd);
+  for (const sx of [-0.0095, 0.0095]) {
+    const rs = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.014, 0.01), dark); rs.position.set(sx, 0.033, 0.118); slide.add(rs);
+    const rd = new THREE.Mesh(new THREE.SphereGeometry(0.0038, 10, 8), new THREE.MeshBasicMaterial({ color: '#30ff60' })); rd.position.set(sx, 0.035, 0.124); slide.add(rd);
+  }
+  const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.02, 0.012), dark); hammer.position.set(0, 0.01, 0.14); hammer.rotation.x = -0.4; slide.add(hammer);
+  slide.position.set(0, 0.032, -0.09);
   g.add(slide);
-  // Ported compensator and a suppressor can.
-  box(0.03, 0.036, 0.04, M.dark, 0, 0.026, -0.195);
-  const can = cyl(0.02, 0.15, M.dark, 0, 0.026, -0.29, 12);
+  // Ported compensator: blocky, with three top ports, then a can for the suppressor.
+  box(0.046, 0.054, 0.06, frameM, 0, 0.022, -0.265);
+  for (let i = 0; i < 3; i++) box(0.024, 0.004, 0.008, dark, 0, 0.05, -0.248 - i * 0.016);
+  const bore = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.01, 10).rotateX(Math.PI / 2), dark); bore.position.set(0, 0.026, -0.296); g.add(bore);
+  const can = cyl(0.026, 0.16, dark, 0, 0.026, -0.375, 16);
   const magG = new THREE.Group();
-  magG.add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.014, 0.05), M.dark));
-  magG.position.set(0, -0.13, 0.022);
+  magG.add(new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.016, 0.066), frameM));
+  magG.position.set(0, -0.155, 0.04);
   g.add(magG);
   g.userData = {
-    gripR: anchor(0, -0.075, 0.02), gripL: anchor(-0.024, -0.08, 0.005), muzzle: anchor(0, 0.026, -0.37), can,
-    slide, slideHome: slide.position.clone(), mag: magG, magHome: magG.position.clone(), sight: 0.052,
+    gripR: anchor(0, -0.085, 0.022), gripL: anchor(-0.028, -0.09, 0.006), muzzle: anchor(0, 0.026, -0.46), can,
+    slide, slideHome: slide.position.clone(), mag: magG, magHome: magG.position.clone(), sight: 0.067,
   };
   return g;
 }

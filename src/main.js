@@ -245,6 +245,9 @@ let loadingCell = false;
 const CELL_PANELS = new Set(['panel-cell', 'panel-staging']);
 function setModeHeader(cell) {
   $('kicker-mode').textContent = cell ? '// INFILTRATION' : '// TACTICAL DUEL';
+  // NightWatch selected: SNIPER CELL: NIGHTWATCH (night cyan, watch red).
+  if (cell && !polloOn()) { $('title').innerHTML = 'SNIPER<br />CELL:<span class="nw-title"><span class="t-c">NIGHT</span><span class="t-r">WATCH</span></span>'; document.title = 'Sniper Cell: NightWatch'; }
+  else updateTitle();
   const tl = $('tagline');
   if (cell) { if (!tl.dataset.duel) tl.dataset.duel = tl.textContent; tl.textContent = 'Night op at the Kestrel Ridge data center: break in, upload the malware, pull the archive drive, and get it out.'; tl.classList.add('cell-tag'); }
   else if (tl.dataset.duel) { tl.textContent = tl.dataset.duel; delete tl.dataset.duel; tl.classList.remove('cell-tag'); }

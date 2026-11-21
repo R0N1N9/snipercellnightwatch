@@ -2912,15 +2912,27 @@ class CellHud {
     const bar = document.createElement('div');
     bar.className = 'cell-tbar';
     // SWEEP ('z') shows only in the ISR view; elsewhere the press-and-hold wheel has it.
-    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-isr', 'ISR'], ['cell-sweep', 'SWEEP', 'z'], ['cell-hack', 'HACK']] : [];
+    const extra = (g.role === 'spotter' || g.operative) ? [['cell-zout', 'ZOOM \u2212', 'z'], ['cell-zin', 'ZOOM +', 'z'], ['cell-sweep', 'SWEEP', 'z']] : [];
     const common = [...extra, ['cell-light', 'LIGHT'], ['cell-drop', 'DROP'], ['cell-ping', 'PING \u25CE'], ['cell-help', 'HELP \u271A'], ['cell-sync', 'SYNC'], ['cell-knife', 'KNIFE'], ['cell-use', 'USE'], ['cell-sup', 'SUPP'], ['cell-laser', 'LASER'], ['cell-nv', 'NV'], ['cell-chat', 'CHAT'], ...(g.net ? [['cell-mic', 'MIC'], ['cell-talk', 'TALK']] : [])];
     const pills = g.operative
-      ? [['cell-tab', 'TABLET'], ['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-quad', 'DRONE'], ['cell-recall', 'RECALL'], ...common]
+      ? [['cell-tab', 'TABLET'], ['cell-xr', 'ROUNDS'], ['cell-recall', 'RECALL'], ...common]
       : g.role === 'shooter'
-        ? [['cell-ability', 'CAMO'], ['cell-deadeye', 'DEADEYE'], ['cell-lure', 'LURE'], ['cell-exec', 'EXEC'], ['cell-xr', 'ROUNDS'], ['cell-dart', 'DART'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
-        : [['cell-tab', 'TABLET'], ['cell-ability', 'DRONE'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
+        ? [['cell-xr', 'ROUNDS'], ['cell-breath', 'BREATH'], ['cell-tab', 'MAP'], ...common]
+        : [['cell-tab', 'TABLET'], ['cell-recall', 'RECALL'], ['cell-yes', 'SEND \u2713'], ['cell-no', 'DENY \u2715'], ...common];
     bar.innerHTML = pills.map(([a, l, c]) => `<div class="pill${c ? ' ' + c : ''}" data-act="${a}">${l}</div>`).join('') + '<div class="pill" id="cell-tpause">❚❚</div>';
     t.appendChild(bar);
+    // Abilities: their own round buttons on the left, each with a recharge bar along the bottom.
+    const AB = g.operative
+      ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-quad', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']]
+      : g.role === 'shooter'
+        ? [['cell-ability', 'CAMO', 'camo'], ['cell-deadeye', 'DEADEYE', 'deadeye'], ['cell-lure', 'LURE', 'lure'], ['cell-exec', 'EXEC', 'exec'], ['cell-dart', 'DART', 'dart']]
+        : [['cell-ability', 'DRONE', 'drone'], ['cell-isr', 'ISR', 'isr'], ['cell-hack', 'HACK', 'hack']];
+    const ab = document.createElement('div');
+    ab.className = 'cell-abil';
+    ab.innerHTML = AB.map(([a, l, k]) => `<div class="ab" data-act="${a}" data-k="${k}"><span>${l}</span><em></em><i><b></b></i></div>`).join('');
+    t.appendChild(ab);
+    this.abEl = ab;
+    this.abBtns = [...ab.children].map((el) => ({ el, k: el.dataset.k, bar: el.querySelector('b'), cnt: el.querySelector('em'), last: '' }));
     bar.querySelector('#cell-tpause').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.setPause(true); }, { passive: false });
     // PING: hold and drag your thumb to pick from the wheel.
     const ping = bar.querySelector('[data-act="cell-ping"]');
@@ -2932,6 +2944,69 @@ class CellHud {
     }, { passive: true });
     addEventListener('touchend', (e) => { for (const t of e.changedTouches) if (t.identifier === pid) pid = null; });
     this.tbar = bar;
+  }
+
+  // Ability buttons (touch): fill = how charged / ready it is; 'cd' greys it out, 'on' = active.
+  _abilTick(dt) {
+    const g = this.g, K = g.kit, A = g.ab, C = g.cloak;
+    for (const b of this.abBtns) {
+      let f = 1, st = '', n = '';
+      if (b.k === 'camo') { f = C.bat / 100; st = C.on ? 'on' : C.bat < 10 || C.lockT > 0 ? 'cd' : ''; }
+      else if (b.k === 'deadeye' && K) { if (K.deadeye > 0) { f = K.deadeye / KIT.deadeye.dur; st = 'on'; } else if (K.deadeyeCd > 0) { f = 1 - K.deadeyeCd / KIT.deadeye.cd; st = 'cd'; n = Math.ceil(K.deadeyeCd) + 's'; } }
+      else if (b.k === 'lure' && K) { const mx = Math.max(K.lures, g.loadout.shooter.perk === 'lures' ? 5 : KIT.lure.charges); f = K.lures / mx; st = K.lures ? '' : 'cd'; n = '\u00D7' + K.lures; }
+      else if (b.k === 'exec' && K) { f = K.execs / KIT.exec.max; st = K.execs ? 'on' : 'cd'; n = '\u00D7' + K.execs; }
+      else if (b.k === 'dart' && A) { f = A.darts / 3; st = A.darts ? '' : 'cd'; n = '\u00D7' + A.darts; }
+      else if (b.k === 'drone') {
+        const out = g._quadOut && g._quadOut();
+        if (g.quadCd > 0) { this._qcdMax = Math.max(this._qcdMax || 0, g.quadCd); f = 1 - g.quadCd / this._qcdMax; st = 'cd'; n = Math.ceil(g.quadCd) + 's'; }
+        else { this._qcdMax = 0; f = (out && g.quad ? g.quad.bat : g.quadBat ?? 300) / 300; st = out ? 'on' : ''; }
+      } else if (b.k === 'isr') { const cd = g.isr.sweepCd || 0; f = 1 - cd / 25; st = g.isr.active ? 'on' : ''; n = cd > 0 ? Math.ceil(cd) + 's' : ''; }
+      else if (b.k === 'hack') { f = g.ops ? g.ops.bw / 100 : 0; st = g.qh && g.qh.on ? 'on' : ''; }
+      f = Math.max(0, Math.min(1, f));
+      const key = st + '|' + n + '|' + Math.round(f * 50);
+      if (key === b.last) continue;
+      b.last = key;
+      b.el.classList.toggle('on', st === 'on');
+      b.el.classList.toggle('cd', st === 'cd');
+      b.el.classList.toggle('full', f >= 0.999);
+      b.bar.style.width = `${Math.round(f * 100)}%`;
+      b.cnt.textContent = n;
+    }
+    this._abPlaceT = (this._abPlaceT || 0) - dt;
+    if (this._abPlaceT <= 0) { this._abPlaceT = 1; this._abilPlace(); }
+  }
+
+  // Put the ability buttons on the left, below the objective board, without covering anything:
+  // try a few column counts and offsets, take the first that clears every other control.
+  _abilPlace() {
+    const el = this.abEl;
+    if (!el || !el.getClientRects().length) return;
+    const W = innerWidth, H = innerHeight, n = this.abBtns.length;
+    const avoid = [...document.querySelectorAll('#touch .tb, #touch .cell-tbar .pill, #touch .stick, #cell-hud .c-obj, #cell-hud .c-vis, #cell-hud .c-vitals, #cell-bodycams')]
+      .filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden')
+      .map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    const hits = (x, y, w, h) => avoid.some((r) => x < r.right + 4 && x + w > r.left - 4 && y < r.bottom + 4 && y + h > r.top - 4);
+    const obj = document.querySelector('#cell-hud .c-obj');
+    const or = obj && obj.getClientRects().length ? obj.getBoundingClientRect() : null;
+    const top0 = or ? or.bottom + 8 : 70;
+    for (const size of [50, 44, 40]) {
+      const gap = 6;
+      for (const cols of [1, 2, 3, 4, n]) {
+        const rows = Math.ceil(n / cols), w = cols * size + (cols - 1) * gap, h = rows * size + (rows - 1) * gap;
+        for (let y = top0; y + h < H - 8; y += 12) {
+          for (let x = 12; x + w < W * 0.45; x += 12) {
+            if (!hits(x, y, w, h)) { this._abSet(x, y, cols, size); return; }
+          }
+        }
+      }
+    }
+    this._abSet(12, top0, 2, 40);
+  }
+  _abSet(x, y, cols, size) {
+    const s = this.abEl.style;
+    s.left = `${Math.round(x)}px`; s.top = `${Math.round(y)}px`;
+    s.gridTemplateColumns = `repeat(${cols}, ${size}px)`;
+    s.setProperty('--ab', `${size}px`);
   }
 
   intro(M, who) {
@@ -3028,6 +3103,7 @@ class CellHud {
 
   update(dt) {
     const g = this.g, P = g.player, ob = g.obj, S = g.sentinel;
+    if (this.abBtns) this._abilTick(dt);
     // Touch swap button names what you'd swap to. The spotter's P-9 is primary, binoculars secondary.
     if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
     if (this.elSwap) {
