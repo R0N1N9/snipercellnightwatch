@@ -553,7 +553,7 @@ export const Devices = {
       });
       c.fillStyle = N.ch ? 'rgba(150,235,255,0.95)' : 'rgba(160,170,180,0.85)';
       const pips = '\u25C6'.repeat(N.ch) + '\u25C7'.repeat(3 - N.ch);
-      c.fillText(`NANO ${pips}${N.ch < 3 ? ` +1 in ${Math.ceil(15 - N.rl)} s` : ''} \u00B7 TAP / FIRE: MARK ${N.marks.length} \u00B7 SWARM / E: SEND`, W / 2, H / 2 + r * 0.8 + 18);
+      c.fillText(`NANO ${pips}${N.ch < 3 ? ` +1 in ${Math.ceil(15 - N.rl)} s` : ''} \u00B7 LOOK / TAP: MARK ${N.marks.length} \u00B7 FIRE / E: SWARM`, W / 2, H / 2 + r * 0.8 + 18);
     }
     c.restore();
   },
