@@ -695,7 +695,7 @@ export class Sentinel {
       break;
     }
     if (best) {
-      d.aw = Math.min(1.3, d.aw + 0.1 * (best.cloak && !best.cloakFlicker ? 0.5 : best.ghillie ? 0.4 : 1.6));
+      d.aw = Math.min(1.3, d.aw + 0.1 * (best.cloak && !best.cloakFlicker ? 0 : best.ghillie ? 0.4 : 1.6));
       if (d.aw >= 1) {
         if (!d.lock) {
           d.lock = best.role;
@@ -1080,7 +1080,7 @@ export class Sentinel {
     const range = base * (vis < 0.5 ? 0.55 : 1);
     if (d > range) return 0;
     if (d > 2.5 && ang > cone) return 0;
-    if (a.cloak && !a.cloakFlicker && d > 4 && this.rng() < 0.6) return 0;
+    if (a.cloak && !a.cloakFlicker && d > 2.5) return 0; // a steady cloak breaks line of sight outright
     if (a.ghillie && d > 15) return 0; // ghillie freeze: prone and still, invisible past ~15 m
     if (!this.fac.los(ep, tp)) return 0;
     return vis * (1 - (d / range) * 0.5) * T.rate;
@@ -1285,7 +1285,7 @@ export class Sentinel {
     if (kind === 'beam') p = 0.55 + this.D.guardAcc * 0.4;
     if (tgt.stance === 2) p *= 0.6; else if (tgt.stance === 1) p *= 0.8;
     if (tgt.moving) p *= kind === 'beam' ? 0.7 : 0.8;
-    if (tgt.cloak) p *= 0.35;
+    if (tgt.cloak) p *= tgt.cloakFlicker ? 0.35 : 0.12; // firing at a shimmer
     const base = { bullet: [9, 6], plasma: [7, 4], heavy: [11, 5], beam: [42, 10] }[kind];
     const dmg = Math.round((base[0] + this.rng() * base[1]) * this.D.guardDmg);
     const sc = TYPES[g.type].scale;
@@ -1578,7 +1578,7 @@ export class Sentinel {
       const range = d.state === 'hunt' ? 30 : 22;
       for (const a of agents) {
         const tp = { x: a.pos.x, y: a.pos.y + 1, z: a.pos.z };
-        const r = range * (a.cloak && !a.cloakFlicker ? 0.35 : 1);
+        const r = range * (a.cloak && !a.cloakFlicker ? 0.1 : 1);
         const dd = Math.hypot(tp.x - d.x, tp.y - d.y, tp.z - d.z);
         if (dd > r || !this.fac.los(d, tp)) continue;
         const v = 1 - dd / r;
@@ -1621,7 +1621,8 @@ export class Sentinel {
       if (!a.alive || a.downed) continue;
       const tp = { x: a.pos.x, y: a.pos.y + 1, z: a.pos.z };
       const dx = tp.x - c.x, dz = tp.z - c.z, d = Math.hypot(dx, dz);
-      let r = c.range * (a.cloak && !a.cloakFlicker ? 0.3 : 1);
+      if (a.cloak && !a.cloakFlicker) continue;
+      let r = c.range;
       if (this.fac.lightAt(tp.x, tp.y, tp.z) < 0.35) r *= 0.5;
       if (d > r) continue;
       if (Math.abs(angDiff(Math.atan2(-dx, -dz), c.yaw)) > 0.5) continue;

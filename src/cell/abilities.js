@@ -17,7 +17,7 @@ export const HINTS = {
   deadeye: ['DEADEYE (H)', 'Sweep your crosshair over up to three enemies to mark them, then pull the trigger: Ra drops the rifle to his left hand, draws the M50 and drops all three, one after another.'],
   execute: ['MARK & EXECUTE (T)', 'Mark enemies (Q), then press T: Ra snaps through every marked target in line of sight, one suppressed shot each. Earn charges with silent takedowns.'],
   lure: ['LURE (X)', 'Throw a noise-maker. Patrols walk over to check it, off their route and into your sights.'],
-  camo: ['ACTIVE CAMO (G)', 'Near-invisible while the battery lasts. Firing breaks it, and it needs a moment before it comes back.'],
+  camo: ['ACTIVE CAMO (G)', 'Breaks line of sight: guards, cameras and drones can\u2019t see you past arm\u2019s length. Moving drains it; hold still and it slowly recharges even while on. Firing breaks it.'],
   rounds: ['ROUNDS (Z)', 'Pick a magazine: Standard goes through bodies; Explosive sticks and blows; Penetrator punches through walls and shields; EMP kills electronics and radios.'],
   ghillie: ['GHILLIE FREEZE', 'Prone and dead still: you all but vanish past ~15 m. Move or fire and it breaks.'],
   breath: ['BREATH CONTROL (SHIFT)', 'Hold SHIFT on the scope: the view slows and stops swaying for a few seconds. Watch the wind readout and aim at the hold-off dot.'],

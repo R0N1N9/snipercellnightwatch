@@ -303,7 +303,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **First-use hints:** the first time you use an ability, a short card explains it.
 - Secondary: the **K9 HUSH SMG** (40-round magazine; full / burst / semi) or the **M50 Magnum** (7 rounds, slow and heavy: a deep boom, a big kick and a wide hip spread, so aim down sights or get close). Its suppressor is fitted by default and removable: your support hand comes up to the muzzle and twists the can off and pockets it (or threads it back on). You can't fire mid-gesture.
 - **Stealth kit:**
-  - **G** active camo. **Firing breaks it.**
+  - **G** active camo (PlanetSide-style): it **breaks line of sight**, so guards, cameras, recon drones and spotlight helis can't see you past arm's length, and guards already shooting at you lose you and go searching. Moving drains the battery (sprinting faster). Hold still while cloaked and it slowly recharges; switched off it recharges at the full rate. **Firing breaks it.** Only the sniper has camo; the spotter has to stay hidden on their own.
   - **H** Deadeye (Splinter Cell style): sweep your crosshair over up to three enemies to mark them, then pull the trigger. Ra drops the KR-50 to his left hand, draws the M50 and puts a round in each marked head, one after another.
   - **X** lures.
   - **T** Mark & Execute.
