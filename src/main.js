@@ -233,6 +233,13 @@ $('in-quality').onchange = (e) => store.set('quality', (settings.quality = e.tar
 // Graphics style (Inked / OG): one setting, also on the Sniping style panel and the NightWatch panel.
 $('in-look').value = settings.rules.look;
 $('in-look').onchange = (e) => saveRules({ ...settings.rules, look: e.target.value });
+// Player models and camera (NightWatch co-op): the same keys as the in-game pause menu.
+const lsGet = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+$('in-models').value = lsGet('draxxed.cellModels', 'hero') === 'classic' ? 'classic' : 'hero';
+$('in-models').onchange = (e) => lsSet('draxxed.cellModels', e.target.value);
+$('in-camera').value = lsGet('draxxed.cellCamera', 'first') === 'third' ? 'third' : 'first';
+$('in-camera').onchange = (e) => lsSet('draxxed.cellCamera', e.target.value);
 $('in-sens').oninput = (e) => {
   settings.sensitivity = +e.target.value;
   $('sens-val').textContent = settings.sensitivity.toFixed(2);
