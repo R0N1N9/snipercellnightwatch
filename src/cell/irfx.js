@@ -88,7 +88,7 @@ export function ghostAvatar(look, scene) {
   if (!ghostMat) ghostMat = new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
-    fragmentShader: 'uniform float uT; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 1.6); float p = 0.75 + 0.25 * sin(uT * 4.0); gl_FragColor = vec4(vec3(0.95, 0.97, 1.0) * (0.06 + f * 0.75) * p, 1.0); }',
+    fragmentShader: 'uniform float uT; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(max(0.0, 1.0 - abs(dot(normalize(vN), normalize(vV)))), 1.6); float p = 0.75 + 0.25 * sin(uT * 4.0); gl_FragColor = vec4(vec3(0.95, 0.97, 1.0) * (0.06 + f * 0.75) * p, 1.0); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
   const av = new Avatar('#ffffff', 31);

@@ -129,7 +129,7 @@ function shellMat(color) {
   return new THREE.ShaderMaterial({
     uniforms: { uC: { value: new THREE.Color(color) }, uA: { value: 0.4 }, uT: { value: 0 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }',
-    fragmentShader: 'uniform vec3 uC; uniform float uA, uT; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 2.2); float hex = 0.6 + 0.4 * sin(vP.y * 40.0 + uT * 3.0) * sin(vP.x * 40.0 - uT * 2.0); gl_FragColor = vec4(uC * f * hex * uA * 1.6, 1.0); }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA, uT; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float f = pow(max(0.0, 1.0 - abs(dot(normalize(vN), normalize(vV)))), 2.2); float hex = 0.6 + 0.4 * sin(vP.y * 40.0 + uT * 3.0) * sin(vP.x * 40.0 - uT * 2.0); gl_FragColor = vec4(uC * f * hex * uA * 1.6, 1.0); }',
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   });
 }

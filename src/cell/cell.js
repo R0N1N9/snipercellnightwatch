@@ -201,7 +201,7 @@ function cloakMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uFlick: { value: 0 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); vW = (modelMatrix * vec4(position,1.0)).xyz; gl_Position = projectionMatrix * mv; }',
-    fragmentShader: 'uniform float uTime, uFlick; varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 2.5); float band = 0.5 + 0.5 * sin(vW.y * 18.0 - uTime * 7.0 + vW.x * 3.0); vec3 c = vec3(0.55, 0.75, 1.0) * (f * (0.22 + 0.25 * band) + uFlick * 0.25); gl_FragColor = vec4(c, 0.08 + f * 0.35 + uFlick * 0.3); }',
+    fragmentShader: 'uniform float uTime, uFlick; varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ float f = pow(max(0.0, 1.0 - abs(dot(normalize(vN), normalize(vV)))), 2.5); float band = 0.5 + 0.5 * sin(vW.y * 18.0 - uTime * 7.0 + vW.x * 3.0); vec3 c = vec3(0.55, 0.75, 1.0) * (f * (0.22 + 0.25 * band) + uFlick * 0.25); gl_FragColor = vec4(c, 0.08 + f * 0.35 + uFlick * 0.3); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
 }
