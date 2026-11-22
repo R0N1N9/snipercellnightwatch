@@ -2045,7 +2045,7 @@ export class CellGame {
     if (best) {
       this.payload('tag', { id: best.id, by: this.role });
       if (this.isHost) best.tagT = HACK.tag;
-      this.audio.ping && this.audio.ping();
+      this.audio.scan && this.audio.scan();
       this.hud.flash(best.kind === 'd' ? 'DRONE TAGGED' : best.chief ? 'SITE CHIEF TAGGED' : 'TAGGED');
     } else {
       // Nothing there: call "look here" on the spot (V on open ground drops a plain PING).
@@ -3116,7 +3116,7 @@ class CellHud {
       <div class="c-kit"></div>
       <div class="c-req"><span class="c-req-t"></span><button class="c-req-y">\u2713 <small>Y</small></button><button class="c-req-n">\u2715 <small>U</small></button></div>
       <div class="c-intro"><div class="c-intro-k">KESTREL RIDGE // DC-3</div><h1></h1><p class="c-intro-l"></p><p class="c-intro-r"></p></div>
-      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="ghost c-exit">Exit to main menu</button></div></div>
+      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="c-cant">Pistol hold: CENTRE</button><button class="ghost c-exit">Exit to main menu</button></div></div>
       <div class="c-debrief"></div>`;
     document.body.appendChild(root);
     document.body.classList.add('cell-mode', 'cell-' + game.role);
@@ -3189,6 +3189,18 @@ class CellHud {
     const voiceLabel = () => { voiceBtn.textContent = `Radio voices: ${game.radio.voiceOn ? 'ON' : 'OFF (text only)'}`; };
     voiceLabel();
     voiceBtn.onclick = () => { game.radio.voiceOn = !game.radio.voiceOn; setVoiceSetting(game.radio.voiceOn); voiceLabel(); };
+    // Pistol hold (P-9 and M50): canted in the centre of the screen (the default) or the plain
+    // hold on the right. Saved with the other settings.
+    const cantBtn = $('.c-cant');
+    const cantLabel = () => { cantBtn.textContent = `Pistol hold: ${game.settings.pistolCant !== false ? 'CENTRE (canted)' : 'RIGHT SIDE'}`; };
+    cantLabel();
+    cantBtn.onclick = () => {
+      game.settings.pistolCant = game.settings.pistolCant === false;
+      try { localStorage.setItem('draxxed.pistolCant', JSON.stringify(game.settings.pistolCant)); } catch {}
+      const box = document.getElementById('in-cant');
+      if (box) box.checked = game.settings.pistolCant;
+      cantLabel();
+    };
     $('.c-pnote').textContent = game.solo ? 'Solo: the mission is paused.' : 'Co-op: the mission keeps running while you are in this menu \u2014 find cover first.';
     this._touch();
   }

@@ -199,7 +199,18 @@ OP = [
     'Green keycard.',
     'Blue keycard.',
     'Violet keycard.',
+    'Swarm away.',
+    'Requesting, take out the lights.',
+    'Copy. Taking out the lights.',
 ]
+
+# Fragments the game strings together for lines with numbers in them (the spotter's firing
+# call, range callouts): played back to back as one transmission, in the speaker's own voice.
+TARGETS = ['X-ray', 'officer', 'bulwark', 'brute', 'overseer', 'titan']
+METERS = list(range(10, 501, 10)) + list(range(550, 1001, 50))
+OP += [f'Target, {n}.' for n in TARGETS]
+OP += [f'{m} meters.' for m in METERS]
+OP += ['Dead on.', 'Walking left, lead him.', 'Walking right, lead him.', 'Send it.', 'X-ray marked.']
 
 ISR = [
     'Green light. Jump.',

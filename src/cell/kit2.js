@@ -357,13 +357,13 @@ export const Kit2 = {
 
   // ---- radio voices ------------------------------------------------------------------
   // who: 'shooter' | 'spotter' | 'isr' (or 'partner' / 'me'). Plays locally.
-  _voice(who, text, keep = false, low = false) {
+  _voice(who, text, keep = false, low = false, parts = null) {
     if (!this.radio) return;
     if (who === 'me') who = this.role;
     if (who === 'partner') who = this.partnerRole;
     // Subtitles carry the operators' callsigns.
     this.radio.names = { [this.role]: this.name, [this.partnerRole]: this.partnerName, isr: 'OVERWATCH' };
-    this.radio.say(who, text, false, keep, low);
+    this.radio.say(who, text, false, keep, low, parts);
   },
 
   // ---- SYNC shots -----------------------------------------------------------------------

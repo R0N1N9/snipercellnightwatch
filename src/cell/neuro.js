@@ -71,7 +71,7 @@ export const Neuro = {
       this._autoTag.set(x.id, this.t);
       this.payload('tag', { id: x.id, by: this.role, auto: true });
       if (this.isHost) x.tagT = Math.max(x.tagT || 0, 12);
-      this.audio.ping && this.audio.ping();
+      this.audio.scan && this.audio.scan(false);
       this.neuroFx.push({ id: x.id, t: 0, eyes: true });
     }
     if (this._eyesT > 0) return;

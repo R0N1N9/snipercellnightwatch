@@ -12,6 +12,7 @@ import { TYPES, WALL, guardCapsules, angDiff } from './sentinel.js';
 import { PAYLOAD } from './ops.js';
 import { WHEEL } from './wheel.js';
 import { buildVan, SEATS, setVanLights } from './van.js';
+import { callRange } from './devices.js';
 
 export const KIT = {
   deadeye: { dur: 8, cd: 60 },
@@ -20,6 +21,8 @@ export const KIT = {
 };
 const CALL_LINE = { look: 'Eyes on my mark.', enemy: 'Enemy, marked.', move: 'Moving to my mark.', hold: 'Hold position.', regroup: 'On me.', cover: 'Cover me.', sync: 'Sync target. Get on him.', pickup: 'I\'m down! Need a pickup!', perch: 'Set up there. Good sightline.' };
 const COMMS_LABEL = { look: 'LOOK HERE', enemy: 'ENEMY', move: 'MOVE HERE', hold: 'HOLD', regroup: 'ON ME', cover: 'COVER ME', sync: 'SYNC TARGET', pickup: 'PICK ME UP', perch: 'SNIPER POSITION' };
+// What a request sounds like on the radio (as recorded).
+const reqSay = (k) => (k === 'lights' ? 'Requesting, take out the lights.' : `Requesting ${REQ_LABEL[k].toLowerCase()}.`);
 const REQ_LABEL = { supply: 'SUPPLY DROP', scan: 'PULSE SCAN', emp: 'EMP', decoy: 'DECOY', lights: 'TAKE OUT THE LIGHTS', drone: 'DRONE OVERWATCH' };
 const BOLT = {
   plasma: { color: '#60ff80', speed: 38, size: 0.5 },
@@ -196,7 +199,7 @@ export const KitMethods = {
         .map((g) => { const h = guardCapsules(g)[0].a; const v = new THREE.Vector3(h.x, h.y, h.z).sub(o); return { g, h, d: v.length(), a: v.normalize().angleTo(fwd) }; })
         .filter((q) => q.d < 60 && q.a < 1.2 && this.fac.los(o, q.h))
         .sort((a, b) => a.d - b.d).slice(0, 3).map((q) => q.g.id);
-      if (K.deMarks.some((id) => !prev.includes(id))) this.audio.ping && this.audio.ping();
+      if (K.deMarks.some((id) => !prev.includes(id))) this.audio.scan && this.audio.scan();
     }
     if (live && (act.fire) && K.deMarks.length) {
       this.deSeq = { t: 0, ids: K.deMarks.slice(), i: 0, phase: 'draw', switchT: 0.35 };
@@ -434,10 +437,11 @@ export const KitMethods = {
     let rng = null;
     if (k === 'enemy' && enemyId && (this.t - (this._rngCallT ?? -99) > 8 || Math.random() < 0.4)) { this._rngCallT = this.t; rng = Math.round(Math.hypot(at.x - P.x, at.z - P.z)); }
     const voiced = !routine || !!rng || (this.radio && this.radio.idle() && Math.random() < 0.35);
+    if (rng) rng = callRange(rng); // as recorded: nearest 10 m (50 m past 500)
     const line = rng ? `X-ray marked, ${rng} meters.` : null;
     this.send({ t: 'cm', ...pin, id: enemyId || 0, v: voiced ? 1 : 0, line });
     this.comms(line || label.charAt(0) + label.slice(1).toLowerCase() + '.', ROLES_COLOR[this.role], this.name);
-    if (voiced) this._voice('me', line || CALL_LINE[k] || label.toLowerCase());
+    if (voiced) this._voice('me', line || CALL_LINE[k] || label.toLowerCase(), false, false, rng ? ['X-ray marked.', `${rng} meters.`] : null);
     if (k === 'pickup') return;
     if (this.aiShoot) this._aiShooterCall(k, at, enemyId);
     if (this.aiSpot) this._aiSpotterCall(k, at, enemyId);
@@ -461,7 +465,8 @@ export const KitMethods = {
     this._addPin({ x: m.x, z: m.z, label: m.label, by: m.by }, true);
     this.lastCm = { k: m.k, label: m.label, t: 10 };
     this.comms(m.line ? `${m.line} (Y: roger)` : `${m.label}${m.k === 'enemy' ? ' — marked' : ''}. (Y: roger)`, '#ffd040', this.partnerName);
-    if (m.v !== 0) this._voice('partner', m.line || CALL_LINE[m.k] || m.label.toLowerCase());
+    const rm = m.line && /^X-ray marked, (\d+) meters\.$/.exec(m.line);
+    if (m.v !== 0) this._voice('partner', m.line || CALL_LINE[m.k] || m.label.toLowerCase(), false, false, rm ? ['X-ray marked.', `${rm[1]} meters.`] : null);
     this.sfx.ui(true);
   },
 
@@ -478,11 +483,11 @@ export const KitMethods = {
     // Solo with the AI spotter: Rōnin answers after a beat.
     if (this.aiSpot) {
       this.comms(`Requesting ${REQ_LABEL[k].toLowerCase()}.`, '#f2b35b', this.name);
-      this._voice('me', `Requesting ${REQ_LABEL[k].toLowerCase()}.`);
+      this._voice('me', reqSay(k));
       setTimeout(() => {
         const why = this._runRequest(k, at);
         this.comms(why ? `Negative — ${why.toLowerCase()}.` : `${REQ_LABEL[k].toLowerCase()} — on it.`, 'cyan', this.partnerName);
-        this._voice('partner', why ? 'Negative. Can\'t do that.' : `Copy. ${REQ_LABEL[k].toLowerCase()} inbound.`);
+        this._voice('partner', why ? 'Negative. Can\'t do that.' : k === 'lights' ? 'Copy. Taking out the lights.' : `Copy. ${REQ_LABEL[k].toLowerCase()} inbound.`);
       }, 900);
       return;
     }
@@ -491,7 +496,7 @@ export const KitMethods = {
     this.send({ t: 'rq', id: r.id, k, x: at.x, z: at.z, by: this.role });
     this._addPin({ x: at.x, z: at.z, label: REQ_LABEL[k], by: this.role });
     this.comms(`Requesting ${REQ_LABEL[k].toLowerCase()}.`, '#f2b35b', this.name);
-    this._voice('me', `Requesting ${REQ_LABEL[k].toLowerCase()}.`);
+    this._voice('me', reqSay(k));
   },
 
   // Run a request with your own (or the AI's) console. Returns null or the reason it failed.
