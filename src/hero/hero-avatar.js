@@ -11,6 +11,8 @@
 // merged into one mesh per material at build time; only the arm segments move per frame (two-bone IK from the
 // shoulders to wrists on the gun, which also carries the gloves). About 60 draw calls with outlines, 30 without.
 import * as THREE from 'three';
+import { heroLark, heroB12, heroK9 } from './hero-guns-a.js';
+import { heroNightjar } from './hero-guns-b.js';
 import { hm, GLOW, K, roundedBox, bend, limb, span, joint, camo, webbing, decal, decalMesh, outline, heroX4, heroVX7, heroShieldKit, heroTablet, COLOURWAYS, heroStyle } from './hero.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -274,14 +276,39 @@ export class HeroAvatar {
     this.strobe.userData.keep = true;
   }
   _ponchoMat() { return hm('#3a3d42', 'cloth', { map: camo('mcblack'), paint: 0.14, side: THREE.DoubleSide, ink: '#05070d' }); }
-  // Ra's poncho: an open-fronted cloth shell from the shoulders to the knees, on the spine (moves with the torso).
+  // Ra's poncho, worn as a cape: long down the back, slung over the LEFT shoulder and down the left side, with a
+  // shorter flap crossing to the front-left. The right side stays open: gun arm, grip and stock are never covered.
+  // A custom draped surface (angle around the torso × drop), on the spine so it moves with the torso.
   _poncho(spine) {
-    const prof = [[0.12, 0.62], [0.2, 0.57], [0.28, 0.48], [0.31, 0.3], [0.33, 0.05], [0.36, -0.25], [0.39, -0.48], [0.385, -0.52]];
-    const g = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 36, Math.PI + 0.85, Math.PI * 2 - 1.7);
-    const m = new THREE.Mesh(g, this._ponchoMat()); m.scale.set(1, 1, 0.78); m.userData.noHull = true; spine.add(m);
-    // Hem: a slightly darker drop band, and a fold down the back.
-    const hem = new THREE.LatheGeometry([[0.39, -0.46], [0.395, -0.53], [0.388, -0.55]].map(([r, y]) => new THREE.Vector2(r, y)), 36, Math.PI + 0.85, Math.PI * 2 - 1.7);
-    const hm2 = new THREE.Mesh(hem, hm('#26282c', 'cloth', { side: THREE.DoubleSide })); hm2.scale.set(1, 1, 0.78); hm2.userData.noHull = true; spine.add(hm2);
+    // Angle θ around the body: 0 = back (+Z), -π/2 = left (-X), ±π = front (-Z), +π/2 = right (+X).
+    const A0 = 1.15, A1 = -2.55, NA = 34, NT = 12, top = 0.5;
+    const len = (th) => {                       // drop length by angle: knee-length at the back, chest-length in front
+      const back = Math.cos(th);                // 1 at the back, -1 in front
+      return th > 0 ? 0.88 + 0.12 * back : 0.62 + 0.4 * Math.max(0, back) + 0.12 * Math.max(0, -Math.sin(th));
+    };
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= NA; i++) {
+      const u = i / NA, th = A0 + (A1 - A0) * u, L = len(th);
+      for (let j = 0; j <= NT; j++) {
+        const t = j / NT, y = top - t * L;
+        const fold = 1 + 0.045 * Math.sin(th * 7 + t * 2) * t;              // soft folds that open toward the hem
+        let r = (0.17 + 0.12 * Math.min(1, t * 3.2) + 0.09 * t) * fold;      // shoulders → flare at the hem
+        if (th < -1.9) r += 0.05 * t;                                          // the front flap hangs off the chest
+        pos.push(Math.sin(th) * r, y, Math.cos(th) * r * 0.82);
+        uv.push(u * 2, t * 1.5);
+      }
+    }
+    for (let i = 0; i < NA; i++) for (let j = 0; j < NT; j++) { const a = i * (NT + 1) + j, b = a + NT + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, this._ponchoMat()); m.userData.noHull = true; spine.add(m);
+    // Collar where it gathers at the neck and over the left shoulder, and a darker hem band.
+    const k = K(spine), cl = this._ponchoMat();
+    k.torus(0.15, 0.03, cl, 0, top + 0.01, 0.0, Math.PI / 2, 0, 0).scale.set(1, 0.82, 1);
+    k.ball(0.1, cl, -0.17, top - 0.02, 0.0, 1.0, 0.55, 1.05);
+    const hemPts = []; for (let i = 0; i <= NA; i++) { const th = A0 + (A1 - A0) * i / NA, L = len(th), r = (0.17 + 0.12 + 0.09) * (1 + 0.045 * Math.sin(th * 7 + 2)) + (th < -1.9 ? 0.05 : 0); hemPts.push(new THREE.Vector3(Math.sin(th) * r, top - L, Math.cos(th) * r * 0.82)); }
+    const hem = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hemPts), 48, 0.012, 6), hm('#26282c', 'cloth')); hem.userData.noHull = true; spine.add(hem);
   }
   _nvg(q, M) {
     const k = K(q);
@@ -315,7 +342,7 @@ export class HeroAvatar {
     this.root.traverse((o) => { if (o.userData.isHull) o.visible = on; });
     this.outlinesOn = on;
   }
-  fire() { this.recoil = 1; }
+  fire() { this.recoil = 1; this.lastFire = this.t; }
   muzzle(out = new THREE.Vector3()) { return this.gun.userData.muzzleObj.getWorldPosition(out); }
   muzzleDir(out = new THREE.Vector3()) { this.gun.getWorldQuaternion(_q); return out.set(0, 0, -1).applyQuaternion(_q); }
   eye(out = new THREE.Vector3()) { return this.head.localToWorld(out.set(0, 0.07, -0.08)); }
@@ -345,13 +372,16 @@ export class HeroAvatar {
       L.knee.rotation.x = cur.knL - Math.max(0, sw) * 0.5 * mk; R.knee.rotation.x = cur.knR - Math.max(0, -sw) * 0.5 * mk;
     } else {
       L.thigh.rotation.set(cur.thL + sw * amp, 0, -0.02 - cur.splay); R.thigh.rotation.set(cur.thR - sw * amp, 0, 0.02 + cur.splay);
-      L.knee.rotation.x = cur.knL - Math.max(0, -Math.cos(ph)) * 1.1 * amp - 0.1 * mk; R.knee.rotation.x = cur.knR - Math.max(0, Math.cos(ph)) * 1.1 * amp - 0.1 * mk;
+      // Knees flex while each leg swings forward (thigh angle rising), straight while it pushes back under the body.
+      L.knee.rotation.x = cur.knL - Math.max(0, Math.cos(ph)) * 1.1 * amp - 0.1 * mk; R.knee.rotation.x = cur.knR - Math.max(0, -Math.cos(ph)) * 1.1 * amp - 0.1 * mk;
     }
     L.foot.rotation.x = cur.ftL - (L.thigh.rotation.x + L.knee.rotation.x) * (st === 0 ? 1 : 0) * 0.9;
     R.foot.rotation.x = cur.ftR - (R.thigh.rotation.x + R.knee.rotation.x) * (st === 0 ? 1 : 0) * 0.9;
     // Torso: bladed stance (twist), lean, breathing, a little counter-swing when walking.
     this.adsK += ((s.ads ? 1 : 0) - this.adsK) * Math.min(1, dt * 12);
-    this.lowK += (((s.sprint && st === 0 && s.moving) || s.lowReady ? 1 : 0) - this.lowK) * Math.min(1, dt * 8);
+    // Natural rest: low ready unless aiming or just fired (1.5 s), always low on the sprint. Callers can force it.
+    const rest = s.lowReady ?? (!s.ads && this.t - (this.lastFire ?? -9) > 1.5 && st !== 2);
+    this.lowK += (((s.sprint && st === 0 && s.moving) || rest ? 1 : 0) - this.lowK) * Math.min(1, dt * 8);
     const twist = cur.twist * (1 - this.lowK * 0.6) - hipYaw;
     this.spine.rotation.set(cur.spRx + breathe + (s.sprint ? 0.12 : 0) * mk * (st === 0 ? 1 : 0), twist + sw * 0.05 * mk, -Math.sin(ph) * 0.03 * mk);
     this.chest.scale.set(1, 1 + breathe * 0.6, 1);

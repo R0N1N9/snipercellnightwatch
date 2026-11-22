@@ -1628,6 +1628,7 @@ export class CellGame {
   }
 
   _fire() {
+    if (this.selfAvatar && this.selfAvatar.hero) this.selfAvatar.hero.fire();   // third person: the gun comes up and kicks
     this.input.rumble(this.player.def.slot === 'rifle' ? 0.8 : 0.35, 0.5, this.player.def.slot === 'rifle' ? 140 : 60);
     const P = this.player, def = P.def;
     const rifle = def.slot === 'rifle';
@@ -2932,7 +2933,7 @@ export class CellGame {
     this.selfAvatar.setVisible(showSelf);
     if (this._tpsOn && !this.downed) {
       const P = this.player;
-      this.selfAvatar.update(dt, { p: P.pos, yaw: P.yaw, pitch: P.pitch, st: P.stance, moving: P.moving, sprint: P.sprinting && P.moving, ads: P.scopeT > 0.15, lowReady: false });
+      this.selfAvatar.update(dt, { p: P.pos, yaw: P.yaw, pitch: P.pitch, st: P.stance, moving: P.moving, sprint: P.sprinting && P.moving, ads: P.scopeT > 0.15 });
     } else if (showSelf) this.selfAvatar.update(dt, { p: this.player.pos, yaw: this.player.yaw, pitch: 0, st: this.downed ? 2 : 1, moving: false, w: true });
   }
 
