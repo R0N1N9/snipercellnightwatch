@@ -3581,10 +3581,12 @@ class CellHud {
         if (el && (el.style.display === 'none') === on) el.style.display = on ? '' : 'none';
       }
     }
-    // Touch swap button names what you'd swap to. The spotter's P-9 is primary, binoculars secondary.
+    // Touch swap button names the weapon in your hands (KR-50, K9, M50, P-9, KNIFE, BINOS);
+    // tap for the next one, hold for the wheel.
     if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
     if (this.elSwap) {
-      const lbl = ({ p: 'PRIMARY', s: 'SECONDARY', k: 'KNIFE' })[g._wpnNextK ? g._wpnNextK() : 's'];
+      const cur = g._wpnCur ? g._wpnCur() : 'p', it = g._wpnList ? g._wpnList().find((o) => o.k === cur) : null;
+      const lbl = it ? (it.label === 'BINOCULARS' ? 'BINOS' : it.label) : 'SWAP';
       if (this.elSwap.textContent !== lbl) this.elSwap.textContent = lbl;
     }
     // Objective & alarm.
