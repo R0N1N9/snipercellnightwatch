@@ -302,6 +302,15 @@ export const Kit2 = {
     if (Q.seen && !Q.kia && !Q.downed && !Q.seated && !(Q.ai && Q.avatarHidden)) {
       // Your partner's: from the muzzle of the rifle / pistol on their model, along its barrel.
       const av = Q.avatar;
+      if (av.hero) {
+        // Hero models: the gun's own muzzle anchor and barrel direction.
+        av.hero.root.updateMatrixWorld(true);
+        const a = av.hero.muzzle(new THREE.Vector3()), d = av.hero.muzzleDir(new THREE.Vector3());
+        const end = a.clone().addScaledVector(d, 220);
+        const h = this.fac.ray(a.clone().addScaledVector(d, 0.05), end, 'shot');
+        this.irLasers.partner.set(a, h ? h.point : end, true);
+        this.visLasers.partner.set(a, h ? h.point : end, !!(Q.ex ? Q.ex.lz : Q.ai) && !this.cine.active);
+      } else {
       if (!av._irMz) {
         const r = new THREE.Object3D(); r.position.set(0, 0, -1.27); av.rifle.add(r);
         const pz = new THREE.Object3D(); pz.position.set(0, 0, -0.1); av.pistol.add(pz);
@@ -315,6 +324,7 @@ export const Kit2 = {
       const h = this.fac.ray(a.clone().addScaledVector(d, 0.05), end, 'shot');
       this.irLasers.partner.set(a, h ? h.point : end, true);
       this.visLasers.partner.set(a, h ? h.point : end, !!(Q.ex ? Q.ex.lz : Q.ai) && !this.cine.active);
+      }
     } else { this.irLasers.partner.set(o, o, false); this.visLasers.partner.set(o, o, false); }
     // Hunt ghosts: where SENTINEL last saw each operator, while they hunt.
     for (const role of ['shooter', 'spotter']) {
