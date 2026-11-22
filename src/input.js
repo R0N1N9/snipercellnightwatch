@@ -33,6 +33,7 @@ export class Input {
       // Cmd (macOS) shortcuts belong to the system (Cmd+Shift+4 is a screenshot, not "Shift +
       // 4"), and macOS sends no keyup for keys released while Cmd is down: let go of everything.
       if (e.metaKey) { this.keys.clear(); return; }
+      this.kbmT = performance.now();
       if (e.code === 'Tab') e.preventDefault();
       if (!this.keys.has(e.code)) this.pressedSet.add(e.code);
       this.keys.add(e.code);
@@ -80,6 +81,7 @@ export class Input {
       if (!this.enabled || !(this.locked || (this.mouseMode && this.touch && e.pointerType !== 'touch'))) return;
       this.look.x += e.movementX;
       this.look.y += e.movementY;
+      if (e.movementX || e.movementY) this.kbmT = performance.now();
     });
     addEventListener('wheel', (e) => {
       if (!this.enabled) return;
@@ -314,6 +316,85 @@ export class Input {
     return this.pressedSet.has(code);
   }
 
+  // ---- Gamepad (PS5 DualSense, Xbox and others with the standard mapping) ------------------
+  // Call once per frame before reading actions. Buttons become the same key codes the keyboard
+  // sends (so every mode reads them unchanged); the sticks move and aim; the triggers fire and
+  // scope. Layout (PlayStation names):
+  //   L stick move · R stick aim · R2 fire · L2 aim / scope · R1 ping / mark (hold: wheel)
+  //   L1 ability (camo / drone) · X jump · O crouch (hold: prone) · [] use, or reload (hold:
+  //   round type) · /\ next weapon · L3 sprint (scoped: hold breath) · R3 knife
+  //   d-pad: up NV, down IFAK, left sticky / binoculars, right sync · touchpad deadeye / hack
+  //   Create: tablet / map · Options: pause
+  pollPad(dt) {
+    if (!navigator.getGamepads || !this.enabled) return;
+    if (!this._padLive) { this._padScan = (this._padScan || 0) - dt; if (this._padScan > 0) return; this._padScan = 0.5; }
+    let gp = null;
+    try { for (const g of navigator.getGamepads() || []) if (g && g.connected !== false && g.buttons && g.axes && (!gp || (g.mapping === 'standard' && gp.mapping !== 'standard'))) gp = g; } catch {}
+    const was = this._padLive;
+    this._padLive = !!gp;
+    this.pad = gp;
+    if (!gp) { if (was) this._padRelease(); return; }
+    if (!was) this.onPad && this.onPad(gp.id);
+    const bt = gp.buttons, ax = gp.axes, down = (i) => !!bt[i] && (bt[i].pressed || bt[i].value > 0.5);
+    const DZ = 0.16, want = new Set();
+    let used = false;
+    // Left stick: move (radial dead zone, rescaled from its edge).
+    let x = ax[0] || 0, y = ax[1] || 0, m = Math.hypot(x, y);
+    if (m > DZ) { const f = Math.min(1, (m - DZ) / (1 - DZ)) / m; this.move.x = x * f; this.move.y = y * f; this._padMove = true; used = true; }
+    else if (this._padMove) { this.move.x = this.move.y = 0; this._padMove = false; }
+    // Right stick: aim. Squared response: fine near the centre, quick at the rim.
+    x = ax[2] || 0; y = ax[3] || 0; m = Math.hypot(x, y);
+    if (m > DZ) {
+      const n = Math.min(1, (m - DZ) / (1 - DZ)), v = n * n * (this.padLook || 1100) * dt;
+      this.look.x += (x / m) * v; this.look.y += (y / m) * v; used = true;
+    }
+    // Triggers.
+    const fire = down(7), scope = down(6);
+    if (fire && !this.padFire) this.pressedSet.add('Fire');
+    this.padFire = fire; this.padScope = scope;
+    // Face buttons, shoulders, d-pad: as keys.
+    const MAP = { 0: 'Space', 3: 'swap', 4: 'KeyF', 5: 'KeyQ', 8: 'Tab', 11: 'KeyV', 12: 'KeyN', 13: 'KeyG', 14: 'KeyX', 15: 'KeyT', 17: 'KeyH' };
+    for (const [i, code] of Object.entries(MAP)) if (down(+i)) want.add(code);
+    // O: tap crouch, hold prone.
+    const o = down(1);
+    if (o) { this._oT = (this._oT || 0) + dt; if (this._oT > 0.4 && !this._oDone) { this._oDone = true; this.pressedSet.add('KeyZ'); } }
+    else { if (this._oT > 0 && !this._oDone) this.pressedSet.add('KeyC'); this._oT = 0; this._oDone = false; }
+    // []: use when there's something to use, otherwise reload (held, so hold = round type).
+    const sq = down(2);
+    if (sq && !this._sqCode) this._sqCode = this.useAvail ? 'KeyE' : 'KeyR';
+    if (sq) want.add(this._sqCode); else this._sqCode = null;
+    // L3: sprint (click to run until you stop), or hold breath while scoped.
+    const l3 = down(10);
+    if (scope) { if (l3) want.add('ShiftLeft'); this._padSprint = false; }
+    else {
+      if (l3 && !this._l3) this._padSprint = !this._padSprint;
+      if (this._padSprint && (Math.hypot(this.move.x, this.move.y) < 0.3 || fire)) this._padSprint = false;
+      if (this._padSprint) want.add('ShiftLeft');
+    }
+    this._l3 = l3;
+    if (down(9) && !this._opt) this.pressedSet.add('PadStart');
+    this._opt = down(9);
+    // Apply: press what's new, release what we were holding and no longer are.
+    this._padKeys = this._padKeys || new Set();
+    for (const c of want) { if (!this._padKeys.has(c)) { if (!this.keys.has(c)) this.pressedSet.add(c); this.keys.add(c); this._padKeys.add(c); } }
+    for (const c of [...this._padKeys]) if (!want.has(c)) { this.keys.delete(c); this._padKeys.delete(c); }
+    if (used || fire || scope || want.size || o || sq) this.padT = performance.now();
+  }
+  _padRelease() {
+    for (const c of this._padKeys || []) this.keys.delete(c);
+    this._padKeys = new Set();
+    this.padFire = this.padScope = false;
+    if (this._padMove) { this.move.x = this.move.y = 0; this._padMove = false; }
+  }
+  // Which you're using right now: the controller, or keyboard and mouse.
+  get usingPad() { return !!this._padLive && (this.padT || 0) > (this.kbmT || 0); }
+  // A rumble, where the browser supports it (Chrome / Edge with a DualSense or Xbox pad).
+  rumble(strong = 0.5, weak = 0.5, ms = 80) {
+    const a = this.pad && this.pad.vibrationActuator;
+    if (!a || !this.usingPad) return;
+    try { a.playEffect && a.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }); } catch {}
+  }
+
   // Called once per frame after the game consumed the input.
   endFrame() {
     this.pressedSet.clear();
@@ -346,13 +427,14 @@ export class Input {
       if (p('Scope')) this.scopeLatched = !this.scopeLatched;
       scopeHeld = this.scopeLatched;
     } else scopeHeld = this.mouseScope;
+    if (this.padScope) scopeHeld = true;
     if (p('breath')) this.breathLatched = !this.breathLatched;
     return {
       mx, my,
       sprint: k('ShiftLeft') || k('ShiftRight') || k('T:sprint') || this.move.y < -0.9,
       breath: k('ShiftLeft') || k('ShiftRight') || this.breathLatched,
       fire: p('Fire') || p('fire'),
-      fireHeld: this.mouseFire || k('T:fire'),
+      fireHeld: this.mouseFire || k('T:fire') || !!this.padFire,
       scope: scopeHeld,
       zoomIn: p('ZoomIn') || p('zoomin') || p('Equal'),
       zoomOut: p('ZoomOut') || p('zoomout') || p('Minus'),
