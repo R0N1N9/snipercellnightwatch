@@ -1454,28 +1454,86 @@ export class Sentinel {
 
   _reinforce(dt) {
     const alive = this.guards.filter((g) => g.state !== 'dead' && !g.picket).length;
-    const cap = this.garrison + (this.lockdown ? 6 : this.alarm >= 1 ? 3 : 0);
-    const every = this.lockdown ? 9 : this.alarm >= 1 ? 14 : this.alarm > 0.3 ? 28 : 45;
+    const cap = this.garrison + 1;
+    const every = 60;
+
     this.respawnT -= dt;
     if (this.respawnT <= 0) {
       this.respawnT = every;
+
       if (alive < cap) {
-        // Out of the barracks door (unless it's hacked shut or blown, or an agent stands at it).
-        const spots = this.barracksDown ? [] : [SPOTS.barracks].filter((s) => !(this.agents || []).some((a) => a.alive && Math.hypot(a.pos.x - s.x, a.pos.z - s.z) < 14));
+        const spots = this.barracksDown ? [] : [SPOTS.barracks].filter((s) =>
+          !(this.agents || []).some((a) =>
+            a.alive && Math.hypot(a.pos.x - s.x, a.pos.z - s.z) < 14
+          )
+        );
+
         const s = spots[Math.floor(this.rng() * spots.length)];
         if (s) {
-          const yard = [[-60, 46], [-20, 52], [22, 50], [60, 44], [72, 6], [44, -36], [-44, -36], [-44, 10], [0, 28], [30, 20], [-30, 18]];
-          const pick = () => { const p = yard[Math.floor(this.rng() * yard.length)]; return { x: p[0], z: p[1] }; };
+          const yard = [
+            [-60, 46], [-20, 52], [22, 50], [60, 44],
+            [72, 6], [44, -36], [-44, -36], [-44, 10],
+            [0, 28], [30, 20], [-30, 18]
+          ];
+          const pick = () => {
+            const p = yard[Math.floor(this.rng() * yard.length)];
+            return { x: p[0], z: p[1] };
+          };
           const hunt = this.alarm >= 0.6 && this.lkp ? this.lkp : null;
           const route = [pick(), pick(), pick()];
+
           if (this.mission === 'nightwatch') {
-            // A fresh pack: a juggernaut with scavs at heel (or a bulwark and a scav).
-            const lead = this.spawnGuard({ type: this.rng() < 0.6 ? 'jugg' : 'bulwark', route, x: s.x, z: s.z, hunt });
-            const offs = [[-3, 3.5], [3, 3.5]];
-            const n = this.lockdown || this.alarm >= 1 ? 2 : 1;
-            for (let i = 0; i < n && alive + 1 + i < cap; i++) this.spawnGuard({ type: 'scav', x: s.x + offs[i][0], z: s.z + offs[i][1], leader: lead.id, off: offs[i], hunt });
-          } else this.spawnGuard({ route, x: s.x + (this.rng() - 0.5) * 2, z: s.z, hunt });
-          this.emit({ t: 'toast', m: this.lockdown || this.alarm >= 1 ? 'SENTINEL: reinforcements deployed.' : 'Fresh patrol out of the barracks.', c: 'dim' });
+            this.spawnGuard({
+              type: this.rng() < 0.6 ? 'jugg' : 'bulwark',
+              route,
+              x: s.x,
+              z: s.z,
+              hunt
+            });
+          } else {
+            this.spawnGuard({
+              route,
+              x: s.x + (this.rng() - 0.5) * 2,
+              z: s.z,
+              hunt
+            });
+          }
+
+          this.emit({
+            t: 'toast',
+            m: 'Fresh patrol out of the barracks.',
+            c: 'dim'
+          });
+        }
+      }
+    }
+
+    for (const d of this.drones) {
+      if (d.state !== 'dead' || d.respawnT === undefined || this.bayDown) continue;
+
+      d.respawnT -= dt;
+      if (d.respawnT <= 0) {
+        const pad = SPOTS.dronePad;
+        Object.assign(d, {
+          x: pad.x,
+          y: pad.y,
+          z: pad.z,
+          hp: DRONE_HP,
+          state: this.alarm >= 1 ? 'hunt' : 'patrol',
+          aw: 0,
+          huntT: 10,
+          respawnT: undefined
+        });
+        d.obj.visible = true;
+        d.obj.rotation.set(0, 0, 0);
+        this.emit({
+          t: 'toast',
+          m: 'Patrol drone launched from the drone bay.',
+          c: 'dim'
+        });
+      }
+    }
+  }
         }
       }
     }
