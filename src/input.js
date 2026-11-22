@@ -30,6 +30,9 @@ export class Input {
   _bindKeyboard() {
     addEventListener('keydown', (e) => {
       if (!this.enabled) return;
+      // Cmd (macOS) shortcuts belong to the system (Cmd+Shift+4 is a screenshot, not "Shift +
+      // 4"), and macOS sends no keyup for keys released while Cmd is down: let go of everything.
+      if (e.metaKey) { this.keys.clear(); return; }
       if (e.code === 'Tab') e.preventDefault();
       if (!this.keys.has(e.code)) this.pressedSet.add(e.code);
       this.keys.add(e.code);
@@ -51,8 +54,11 @@ export class Input {
         this.requestLock();
         if (!this.touch) return; // desktop: first click only grabs the mouse
       }
-      if (e.button === 0) { this.mouseFire = true; this.pressedSet.add('Fire'); }
-      if (e.button === 2) {
+      // Mac trackpads: Ctrl-click is the right click (scope), not fire + crouch.
+      const btn = this._btn(e);
+      if (btn === 2 && e.button === 0) this._ctrlScope = true;
+      if (btn === 0) { this.mouseFire = true; this.pressedSet.add('Fire'); }
+      if (btn === 2) {
         this.mouseScope = true;
         this.pressedSet.add('Scope');
       }
@@ -62,6 +68,7 @@ export class Input {
       if (e.button === 4) { this.pressedSet.add('swap'); e.preventDefault(); }
     });
     addEventListener('mouseup', (e) => {
+      if (e.button === 0 && this._ctrlScope) { this._ctrlScope = false; this.mouseScope = false; return; }
       if (e.button === 0) this.mouseFire = false;
       if (e.button === 2) this.mouseScope = false;
       if (e.button === 3 || e.button === 4) e.preventDefault(); // don't navigate back/forward
@@ -85,11 +92,29 @@ export class Input {
         }
         return;
       }
-      if (e.deltaY !== 0) this.pressedSet.add(e.deltaY < 0 ? 'ZoomIn' : 'ZoomOut');
+      // Vertical: one step per notch of a wheel, but a trackpad's two-finger scroll sends a
+      // stream of tiny deltas (with momentum): add them up and step at most every 120 ms.
+      if (e.deltaY !== 0) {
+        this.wheelAcc = (this.wheelAcc || 0) + e.deltaY * (e.deltaMode ? 40 : 1);
+        const now = performance.now();
+        if (Math.abs(this.wheelAcc) >= 50 && now - (this.wheelT || 0) > 120) {
+          this.pressedSet.add(this.wheelAcc < 0 ? 'ZoomIn' : 'ZoomOut');
+          this.wheelAcc = 0;
+          this.wheelT = now;
+        }
+        clearTimeout(this._wheelReset);
+        this._wheelReset = setTimeout(() => { this.wheelAcc = 0; }, 200);
+      }
     }, { passive: true });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
     });
+  }
+
+  get _isMac() { return /Mac/i.test(navigator.platform || navigator.userAgent) && !this.touch; }
+  // Which button this is: on a Mac, Ctrl + click is the trackpad's right click.
+  _btn(e) {
+    return e.button === 0 && e.ctrlKey && this._isMac ? 2 : e.button;
   }
 
   setMouseMode(on) {
@@ -333,7 +358,7 @@ export class Input {
       zoomOut: p('ZoomOut') || p('zoomout') || p('Minus'),
       zeroUp: p('KeyE') || p('PageUp') || p('zeroup'),
       zeroDown: p('KeyQ') || p('PageDown') || p('zerodown'),
-      crouch: p('KeyC') || p('ControlLeft') || p('crouch'),
+      crouch: p('KeyC') || (p('ControlLeft') && !this._isMac) || p('crouch'), // Mac: Ctrl-click is the right click
       prone: p('KeyZ') || p('prone'),
       jump: p('Space') || p('jump'),
       reload: p('KeyR') || p('reload'),

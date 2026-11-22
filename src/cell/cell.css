@@ -79,7 +79,8 @@ body.cell-mode #touch .zdn, body.cell-mode #touch .zup, body.cell-mode #touch .r
 #cell-hud .c-prompt em { display: block; height: 100%; width: 0; background: var(--cell); }
 #cell-hud .c-flash { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font-size: 24px; font-weight: 700; letter-spacing: 0.2em; opacity: 0; transition: opacity 0.2s; text-shadow: 0 1px 4px #000; }
 #cell-hud .c-flash.on { opacity: 1; }
-#cell-hud .c-keys { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); font-family: var(--mono); font-size: 10px; color: rgba(232, 230, 240, 0.45); white-space: nowrap; }
+#cell-hud .c-keys { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); font-family: var(--mono); font-size: 11px; line-height: 1.9; color: rgba(232, 230, 240, 0.7); white-space: normal; text-align: center; width: max-content; max-width: min(980px, calc(100vw - 600px)); }
+#cell-hud .c-keys b { white-space: nowrap; }
 #cell-hud .c-keys b { color: rgba(232, 230, 240, 0.8); border: 1px solid rgba(232, 230, 240, 0.3); padding: 0 4px; margin-left: 8px; }
 body.touch #cell-hud .c-keys { display: none; }
 #cell-hud .c-dmg i { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-origin: 0 0; }
@@ -514,3 +515,15 @@ body.cell-compact #cell-hud .c-obj-h { display: none !important; } /* phones: ti
 #touch .cell-ifakbtn { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 14px); bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); z-index: 7; padding: 7px 12px !important; font-size: 12px !important; letter-spacing: 0.1em; color: #6dffb5 !important; border: 1px solid rgba(80, 255, 170, 0.7) !important; background: rgba(4, 24, 14, 0.7) !important; }
 #touch .cell-ifakbtn.full { opacity: 0.55; }
 body.touch #cell-hud .c-chips { min-height: 24px; } /* keeps the row the IFAK button sits on */
+
+/* Pause menu: the full controls list. */
+#cell-hud .c-pkeys { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; text-align: left; font-family: var(--mono); font-size: 11px; color: rgba(232, 230, 240, 0.8); max-height: 38vh; overflow: auto; }
+#cell-hud .c-pkeys h3 { grid-column: 1 / -1; margin: 0 0 4px; font-size: 11px; letter-spacing: 0.2em; color: var(--cell, #30ffd0); }
+#cell-hud .c-pkeys b { display: inline-block; min-width: 2.2em; margin-right: 6px; padding: 0 4px; border: 1px solid rgba(232, 230, 240, 0.35); color: #fff; font-weight: 600; }
+body.touch #cell-hud .c-pkeys { display: none; }
+/* With the console / ISR preview squares up in the corner, the subtitles sit under them
+   (they used to cover the squares), and the partner card steps down under the subtitles. */
+body:has(#cell-hud.has-pip) #cell-subs { top: 136px; }
+body:has(#cell-subs.on) #cell-hud.has-pip .c-partner { top: 182px !important; }
+body.touch:has(#cell-hud.has-pip) #cell-subs { top: 6px; }
+body.touch:has(#cell-subs.on) #cell-hud.has-pip .c-partner { top: 52px !important; }

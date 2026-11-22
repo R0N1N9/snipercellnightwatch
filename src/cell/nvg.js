@@ -93,9 +93,11 @@ export const NVG = {
     this.nvgHand.rotation.set(-1.0 + 0.9 * k, 0.4 - 0.3 * k, 0.3);
     // Goggles: visible while they move across your eyes.
     const flip = ease((t - 0.26) / (SWITCH - 0.26));
-    const ang = A.to ? -1.5 * (1 - flip) : -1.5 * flip; // 0 = over the eyes, -1.5 = flipped up
+    // 0 = over the eyes, +1.5 = hinged up over the brow (out of view). (It used to swing the
+    // other way, down and back through your face, which flashed a dark slab across the screen.)
+    const ang = A.to ? 1.5 * (1 - flip) : 1.5 * flip;
     this.nvgPivot.rotation.x = ang;
-    this.nvgPivot.visible = t > 0.18 && t < SWITCH + (A.to ? 0.02 : 0.25);
+    this.nvgPivot.visible = t > 0.18 && t < SWITCH + (A.to ? 0.02 : 0.05) && ang < 1.3;
     if (!A.switched && t >= SWITCH) {
       A.switched = true;
       this.nv = A.to;

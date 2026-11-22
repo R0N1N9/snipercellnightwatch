@@ -543,6 +543,7 @@ export const Kit2 = {
     for (const f of fresh) this._called.add(f.g.id);
     if (this._ctCd > 0) return;
     if (Math.random() < 0.5) return;
+    if (!this.radio || !this.radio.free()) return; // busy net: skip it without spending the cooldown
     this._ctCd = 40;
     fresh.sort((a, b) => a.d - b.d);
     const f = fresh[0];

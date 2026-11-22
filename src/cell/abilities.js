@@ -15,7 +15,8 @@ import * as THREE from 'three';
 
 export const HINTS = {
   deadeye: ['DEADEYE (H)', 'The three closest enemies in your line of sight are marked automatically. Pull the trigger: Ra drops the rifle to his left hand, draws the M50 and drops all three, one after another. 60 s cooldown.'],
-  execute: ['MARK & EXECUTE (T)', 'Mark enemies (Q), then press T: Ra snaps through every marked target in line of sight, one suppressed shot each. Earn charges with silent takedowns.'],
+  ping: ['PING & MARK (Q)', 'Tap Q on an enemy to mark it for both of you (open ground: a LOOK HERE ping). Hold Q for the ping wheel: drag to a call and let go. T marks a sync target.'],
+  ifak: ['IFAK (G)', 'G (or the IFAK button) patches you straight back to full health. You carry one; supply crates carry more. Hold E on a downed partner to use it on them.'],
   lure: ['STICKY GRENADE (X)', 'Throw it overhand. It sticks to the first enemy (or surface) it hits and blows two seconds later. Loud. Supply crates carry one more.'],
   camo: ['ACTIVE CAMO (F)', 'Breaks line of sight: guards, cameras and drones can\u2019t see you past arm\u2019s length. Moving drains it; hold still and it slowly recharges even while on. Firing breaks it.'],
   rounds: ['ROUNDS (Z)', 'Pick a magazine: Standard goes through bodies; Explosive sticks and blows; Penetrator punches through walls and shields; EMP kills electronics and radios.'],
@@ -78,7 +79,7 @@ export const Abilities = {
       if (B.t >= BREATH.dur) { B.on = false; B.cd = BREATH.cd; B.t = 0; }
     } else if (B.on) { B.on = false; B.cd = Math.max(B.cd, BREATH.cd * (B.t / BREATH.dur)); B.t = 0; }
     act.breath = B.on;
-    if (I.pressed('Backquote') || I.pressed('cell-laser')) { this.laserOn = !this.laserOn; this.hud.flash(this.laserOn ? 'LASER ON' : 'LASER OFF', 'dim', 0.7); if (this.laserOn) this._hint('laser'); }
+    if (I.pressed('Backquote') || I.pressed('IntlBackslash') || I.pressed('cell-laser')) { this.laserOn = !this.laserOn; this.hud.flash(this.laserOn ? 'LASER ON' : 'LASER OFF', 'dim', 0.7); if (this.laserOn) this._hint('laser'); }
   },
 
   // Per-frame (all clients, after the update): ghillie, overwatch, lasers, darts.
@@ -295,16 +296,21 @@ export const Abilities = {
       if (d < 0.01) { dx = -Math.sin(a.yaw || 0); dz = -Math.cos(a.yaw || 0); d = 1; }
       dx /= d; dz /= d;
       const L = Math.min(1.85, d); // a rope: it pulls him, never pushes
-      g.x = a.pos.x + dx * L; g.z = a.pos.z + dz * L;
-      g.y = this.fac.groundAt(g.x, g.z, a.pos.y + 0.5, 0.6);
+      const nx = a.pos.x + dx * L, nz = a.pos.z + dz * L;
+      // He can't be pulled through a wall: he snags on it, and if you walk off he slips free.
+      const by = (g.y || 0) + 0.35;
+      if (!this.fac.ray({ x: g.x, y: by, z: g.z }, { x: nx, y: by, z: nz }, 'solid')) {
+        g.x = nx; g.z = nz;
+        g.y = this.fac.groundAt(g.x, g.z, Math.max(g.y || 0, a.pos.y) + 0.5, 0.6);
+      } else if (d > 3.2) { ob.drag[role] = 0; if (role === this.role) this.hud.flash('THE BODY SNAGGED', 'dim', 0.8); return true; }
       g.yaw = Math.atan2(dx, dz); g.look = 0;
-      g.found = false;
       this.prompts[role] = { label: 'Dragging the body — press E to put it down', p: 0, key: 'drag' };
       return true;
     }
     if (!opt) return false;
     for (const g of S.guards) {
       if (g.state !== 'dead' || g.tower) continue;
+      if (Object.values(ob.drag).includes(g.id)) continue; // your partner already has him
       if (Math.hypot(g.x - a.pos.x, g.z - a.pos.z) > 1.8 || Math.abs(g.y - a.pos.y) > 1.2) continue;
       opt('drag', 'E — drag the body', 0, () => { ob.drag[role] = g.id; if (role === this.role) this._hint('drag'); });
       break;

@@ -96,7 +96,7 @@ Object.assign(Spatial, {
       if (busy(g)) return 0;
       const d = Math.hypot(g.x - ear.x, (g.y || 0) - ear.y, g.z - ear.z);
       if (d > (mood === 'shout' ? 70 : 45)) return 0;
-      const go = () => { const len = F.chatter(at(g), g.type, mood, !heard(g, (g.y || 0) + 1.5)); sp.vbusy.set(g.id, this.t + len + 0.2); };
+      const go = () => { if (this.ended) return; const len = F.chatter(at(g), g.type, mood, !heard(g, (g.y || 0) + 1.5)); sp.vbusy.set(g.id, this.t + len + 0.2); };
       if (delay > 0) { sp.vbusy.set(g.id, this.t + delay + 1); setTimeout(go, delay * 1000); } else go();
       return 1;
     };

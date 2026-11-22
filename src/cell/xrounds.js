@@ -163,8 +163,9 @@ export const XRounds = {
     }
     if (X && X.menu) { this._amT = (this._amT || 0) - dt; if (this._amT <= 0) { this._amT = 0.3; this._ammoPaint(); } }
     const S = this.sentinel;
+    const frozen = this.ended || (this.paused && this.solo); // the fuse waits while the world is paused
     for (const c of this.xcharges) {
-      c.t -= dt;
+      if (!frozen) c.t -= dt;
       if (c.id) {
         const e = S.byId(c.id);
         if (e) { c.x = e.x + c.ox; c.y = (e.y || 0) + c.oy; c.z = e.z + c.oz; }

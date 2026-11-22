@@ -78,13 +78,13 @@ export const KitMethods = {
     if (live && !tab && !quad && shooterKit) {
       if (I.pressed('KeyH') || I.pressed('cell-deadeye')) this._deadeye();
       if (I.pressed('KeyX') || I.pressed('cell-lure')) this._throwLure();
-      if (I.pressed('KeyZ') || I.pressed('cell-xr')) this._roundsCycle();
+      if (I.pressed('cell-xr')) this._roundsCycle(); // (desktop: hold R, in cell.js; Z is prone)
       if (this.xr && this.xr.menu) for (let i = 1; i <= 4; i++) if (I.pressed('Digit' + i)) { this._ammoPick(['std', 'xr', 'pen', 'emp'][i - 1]); act.slot1 = act.slot2 = false; }
     }
     // Downed: V / PING / HELP calls for a pickup on your position.
     this._helpCd = Math.max(0, (this._helpCd || 0) - dt);
     if (this.downed && !this.kia && (I.pressed('KeyQ') || I.pressed('cell-ping') || I.pressed('cell-help'))) this._pickupCall();
-    // Ping wheel: V / middle mouse / PING (touch). Tap = smart ping, hold = wheel.
+    // Ping wheel: Q / middle mouse / PING (touch). Tap = smart ping, hold = wheel.
     const held = (I.held('KeyQ') || this._mmb || I.held('T:cell-ping')) && !tab && live;
     if (held) {
       this._pingT = (this._pingT || 0) + dt;
@@ -311,7 +311,7 @@ export const KitMethods = {
         this._xrStick(L.p, enemy, { fuse: KIT.lure.fuse, r: KIT.lure.radius });
       }
     }
-    this.lures = this.lures.filter((L) => { if (!L.done) return true; this.scene.remove(L.mesh); return false; });
+    this.lures = this.lures.filter((L) => { if (!L.done) return true; this.scene.remove(L.mesh); L.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); return false; });
   },
 
   // ---- MARK & EXECUTE: snap headshots on up to three marked targets -------------------
@@ -393,6 +393,7 @@ export const KitMethods = {
     return L;
   },
   _smartPing() {
+    this._hint && this._hint('ping');
     const e = this._crosshairEnemy();
     if (e) this._wheelPick('enemy', { x: e.x, z: e.z }, e.id);
     else {
@@ -448,7 +449,7 @@ export const KitMethods = {
   },
 
   _pickupCall() {
-    if (this._helpCd > 0) return;
+    if (this._helpCd > 0) { this.hud.flash(`HELP CALLED \u00B7 ${Math.ceil(this._helpCd)} s`, 'dim', 0.6); return; }
     this._helpCd = 6;
     const P = this.player.pos;
     this._call('pickup', { x: P.x, z: P.z });
