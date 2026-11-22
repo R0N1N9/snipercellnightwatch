@@ -62,7 +62,7 @@
           <label class="field"><span>Time of day <em>(host picks)</em></span>
             <select id="in-pal"><option value="dusk">Dusk</option><option value="golden">Golden hour</option></select></label>
           <label class="field"><span>Graphics style <em>(host picks · duel &amp; NightWatch)</em></span>
-            <select id="in-look"><option value="inked">Inked (black outlines, cel shading)</option><option value="og">OG (original look)</option></select></label>
+            <select id="in-look"><option value="inked">Inked (black outlines, cel shading)</option><option value="hero">Hero (toon ramps, rim light, outlines)</option><option value="og">OG (original look)</option></select></label>
           <label class="field"><span>Graphics quality</span>
             <select id="in-quality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
           <label class="field"><span>Sensitivity <em id="sens-val">1.0</em></span><input id="in-sens" type="range" min="0.3" max="2.5" step="0.05" value="1" /></label>
@@ -116,7 +116,7 @@
           <label class="field"><span>Callsign for this role</span><input id="in-cell-name" maxlength="14" autocomplete="off" /></label>
           <div class="seg" id="cell-diff"><button data-d="recruit">Recruit</button><button data-d="operative">Operative</button><button data-d="ghost">Ghost</button></div>
           <div class="seg" id="cell-layout" title="Compound layout: the host's applies to both"><button data-lay="standard">Standard layout</button><button data-lay="random">Random layout</button></div>
-          <div class="seg" id="cell-look" title="Graphics: the host's look applies to both"><button data-look="inked">Inked</button><button data-look="og">OG graphics</button></div>
+          <div class="seg" id="cell-look" title="Graphics: the host's look applies to both"><button data-look="inked">Inked</button><button data-look="hero">Hero</button><button data-look="og">OG graphics</button></div>
           <button id="btn-cell-stage">Staging area · loadout</button>
           <button id="btn-cell-voice">Radio voices: ON</button>
           <button id="btn-cell-solo" class="primary">Solo · AI partner</button>

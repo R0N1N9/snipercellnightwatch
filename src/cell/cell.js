@@ -55,7 +55,7 @@ import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildP9, buildKnife, normLoadou
 import { ISR, ISR_FOV } from './isr.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
 import { AtmosFX } from '../atmofx.js';
-import { applyLook } from '../look.js';
+import { applyLook, OUTLINE_RES } from '../look.js';
 import { Chat } from './chat.js';
 
 export const MISSIONS = {
@@ -386,7 +386,7 @@ export class CellGame {
     if (this.mission === 'nightwatch') Object.assign(OBJECTIVES[2], { hint: 'Search the office desk drawers (E). Each rack-room door takes its own colour-tagged keycard. The Overseer (violet juggernaut) carries a master badge.' });
     // Halo-style ballistics for this mode: instant, straight, no sway. The graphics look is the
     // host's (it rides in the cell hello), as in the valley.
-    this.look = look === 'og' ? 'og' : 'inked';
+    this.look = look === 'og' ? 'og' : look === 'hero' ? 'hero' : 'inked';
     applyRules({ preset: 'halo', look: this.look });
     RULES.zooms = null;
     RULES.hitbox = 1.15;
@@ -538,6 +538,7 @@ export class CellGame {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight, false);
+    OUTLINE_RES.value.set(innerWidth, innerHeight);
     this._initComposer();
     this.composer.setPixelRatio(this.pr);
     this.composer.setSize(innerWidth, innerHeight);
@@ -3042,7 +3043,7 @@ export class CellGame {
     u.uFar.value = this.camera.far;
     // Cel shading for the Inked look; re-swept now and then for meshes added since (drops, bodies).
     this._lookSweep = (this._lookSweep || 0) - dt;
-    if (this._lookSweep <= 0) { this._lookSweep = 1; applyLook(this.scene, this.look); }
+    if (this._lookSweep <= 0) { this._lookSweep = 1; applyLook(this.scene, this.look, { outlines: this.quality !== 'low' }); }
     const P = this.player;
     const quad = this.quad && this.quad.active;
     const isr = this.isr.active;
