@@ -44,6 +44,7 @@ export const PRESETS = {
 export const LOOKS = {
   inked: { name: 'Inked', sub: 'cel + ink', desc: 'Bold black ink lines around everything and flat, cel-shaded color. The default.' },
   og: { name: 'OG', sub: 'original', desc: 'The original look: soft shading, a light silhouette outline and a filmic grade.' },
+  hero: { name: 'Hero', sub: 'toon + outlines', desc: 'Inked, plus a shading ramp per material, a moon rim, a small specular hit and crisp outlines around every figure, gun and prop.' },
 };
 
 export const DEFAULT_RULES = { preset: 'halo', ...PRESETS.halo, autoZero: true, look: 'inked' };
@@ -60,7 +61,7 @@ export function normalizeRules(r) {
   out.range = r && ['auto', 'close', 'medium', 'long', 'extreme'].includes(r.range) ? r.range : 'close';
   out.styleRange = (p && p.range) || 'long';
   // Graphics look (src/look.js): the host's choice, like everything else here. Inked by default.
-  out.look = r && r.look === 'og' ? 'og' : 'inked';
+  out.look = r && ['og', 'hero'].includes(r.look) ? r.look : 'inked';
   if (r && r.preset === 'custom') {
     const num = (v, d, lo, hi) => (typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
     out.preset = 'custom';

@@ -55,7 +55,8 @@ import { SMG, MAGNUM, P9, buildSMG, buildMagnum, buildP9, buildKnife, normLoadou
 import { ISR, ISR_FOV } from './isr.js';
 import { addStrobes, blinkStrobes, IRLaser, ghostAvatar, tickGhosts, IR_LAYER } from './irfx.js';
 import { AtmosFX } from '../atmofx.js';
-import { applyLook } from '../look.js';
+import { applyLook, OUTLINE_RES } from '../look.js';
+import { heroCellAvatar, heroOutlineRes } from '../hero/game-avatar.js';
 import { Chat } from './chat.js';
 
 export const MISSIONS = {
@@ -386,7 +387,9 @@ export class CellGame {
     if (this.mission === 'nightwatch') Object.assign(OBJECTIVES[2], { hint: 'Search the office desk drawers (E). Each rack-room door takes its own colour-tagged keycard. The Overseer (violet juggernaut) carries a master badge.' });
     // Halo-style ballistics for this mode: instant, straight, no sway. The graphics look is the
     // host's (it rides in the cell hello), as in the valley.
-    this.look = look === 'og' ? 'og' : 'inked';
+    this.look = look === 'og' ? 'og' : look === 'hero' ? 'hero' : 'inked';
+    // Player models: the hero rig (default) or the classic canon avatar. Camera: first or third person.
+    try { this.heroModels = localStorage.getItem('draxxed.cellModels') !== 'classic'; this.tps = localStorage.getItem('draxxed.cellCamera') === 'third'; } catch { this.heroModels = true; this.tps = false; }
     applyRules({ preset: 'halo', look: this.look });
     RULES.zooms = null;
     RULES.hitbox = 1.15;
@@ -538,6 +541,8 @@ export class CellGame {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight, false);
+    OUTLINE_RES.value.set(innerWidth, innerHeight);
+    heroOutlineRes(innerWidth, innerHeight);
     this._initComposer();
     this.composer.setPixelRatio(this.pr);
     this.composer.setSize(innerWidth, innerHeight);
@@ -645,10 +650,23 @@ export class CellGame {
     return cellLook(role);
   }
 
+  setCamera(third) {
+    this.tps = !!third;
+    try { localStorage.setItem('draxxed.cellCamera', this.tps ? 'third' : 'first'); } catch {}
+    this._tpsCam = null;
+    if (this.hud && this.hud.syncCamera) this.hud.syncCamera();
+  }
+
+  _makeAvatar(role, seed) {
+    if (this.heroModels) return heroCellAvatar(role);
+    const a = new Avatar(ROLES[role].color, seed);
+    a.setLook(this._look(role));
+    return a;
+  }
+
   _setupPartner() {
     const r = this.partnerRole;
-    const av = new Avatar(ROLES[r].color, r === 'shooter' ? 7 : 11);
-    av.setLook(this._look(r));
+    const av = this._makeAvatar(r, r === 'shooter' ? 7 : 11);
     this.scene.add(av.root);
     this.cloakMat = cloakMaterial();
     const ai = this.aiPartner;
@@ -659,8 +677,7 @@ export class CellGame {
       hp: 100, downed: false, kia: false, alive: true, tablet: false, e: false, quad: null, seen: ai, ammo: 1, lastT: 0,
     };
     // Your own (local) operator model, used when you are down and the camera pulls out.
-    this.selfAvatar = new Avatar(ROLES[this.role].color, 3);
-    this.selfAvatar.setLook(this._look(this.role));
+    this.selfAvatar = this._makeAvatar(this.role, 3);
     this.selfAvatar.setVisible(false);
     this.scene.add(this.selfAvatar.root);
     this.quadObj = buildDrone();
@@ -1188,6 +1205,7 @@ export class CellGame {
       else this._raise('tablet', () => this.tablet.open());
     }
     if ((I.pressed('KeyL') || I.pressed('cell-light')) && !tab) this._wlToggle();
+    if (I.pressed('Period')) this.setCamera(!this.tps);
     // N: on the KR-50's scope it flips the optic between night vision and plain glass;
     // otherwise it's the goggles.
     if (I.pressed('KeyN') || I.pressed('cell-nv')) {
@@ -1426,7 +1444,29 @@ export class CellGame {
       this.camera.position.copy(tgt).add(back);
       this.camera.lookAt(tgt.x, tgt.y + 0.6, tgt.z);
       this.camera.fov = WEAPON.baseFov;
+    } else if ((this._tpsOn = this.tps && live && !tab && !seat && !this.devAnim && !(P.def.scope && P.scopeT > 0.3) && !(this.bino && this.bino.on) && !(this.knifeT > 0) && !(this.dragK > 0.5))) {
+      // Third person: over the right shoulder, pulled in by walls, aimed at whatever your shot would hit so
+      // the crosshair stays true (shots still leave from your eye).
+      const eye = P.eyePos(new THREE.Vector3()), fwd = P.aimDir(new THREE.Vector3());
+      const flat = new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = new THREE.Vector3(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
+      const dist = P.stance === 2 ? 1.9 : P.stance === 1 ? 2.3 : 2.75;
+      const want = eye.clone().addScaledVector(flat, -dist).addScaledVector(right, 0.78).add(new THREE.Vector3(0, 0.32 - fwd.y * 0.6, 0));
+      const block = this.fac.ray(eye, want, 'shot');
+      if (block) want.lerpVectors(eye, want, Math.max(0.12, block.t - 0.06));
+      const kk = 1 - Math.exp(-dt * 20);
+      if (!this._tpsCam || this._tpsCam.distanceTo(want) > 3) this._tpsCam = want.clone(); else this._tpsCam.lerp(want, kk);
+      this.camera.position.copy(this._tpsCam);
+      const hit = this.fac.ray(eye, eye.clone().addScaledVector(fwd, 300), 'shot');
+      const tgt = hit ? hit.point : eye.clone().addScaledVector(fwd, 300);
+      this.camera.lookAt(tgt);
+      const k = this.camKick || 0; this.camera.rotateX(k);
+      this.camKick = k * Math.exp(-dt * 11); this.camKickYaw = (this.camKickYaw || 0) * Math.exp(-dt * 11);
+      this.camera.fov = P.fov();
+      // A soft cool fill from over the shoulder so your own figure reads at night (third person only).
+      if (!this._tpsFill) { this._tpsFill = new THREE.PointLight('#9fb6ff', 0, 6, 1.6); this.scene.add(this._tpsFill); }
+      this._tpsFill.position.copy(this._tpsCam).add(new THREE.Vector3(0, 0.4, 0)); this._tpsFill.intensity = 3.2;
     } else {
+      if (this._tpsFill) this._tpsFill.intensity = 0;
       P.eyePos(this.camera.position);
       // Recoil kick on top of your aim, settling back over ~0.25 s.
       const k = this.camKick || 0, ky = this.camKickYaw || 0;
@@ -1440,7 +1480,7 @@ export class CellGame {
     // First-person weapon.
     const scopedRifle = P.def.scope && P.scopeT > 0.6;
     this.viewmodelVisible = live && !quad && !tab && !seat && !isr && !this.devAnim && !(this.dragK > 0.5);
-    this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !this.tdAnim && !(this.bino && this.bino.on) && !this.knifeEq;
+    this.viewmodel.visible = this.viewmodelVisible && !scopedRifle && !(this.knifeT > 0) && !this.tdAnim && !(this.bino && this.bino.on) && !this.knifeEq && !this._tpsOn;
     // Suppressor cans (mid-gesture the can shows while it's in your hand).
     const supU = this._supTick(dt), SA = this.supAnim;
     const canShow = (w) => (SA && SA.w === w ? (SA.to ? supU > 0.18 : supU < 0.82) : !!w.sup);
@@ -1588,6 +1628,7 @@ export class CellGame {
   }
 
   _fire() {
+    if (this.selfAvatar && this.selfAvatar.hero) this.selfAvatar.hero.fire();   // third person: the gun comes up and kicks
     this.input.rumble(this.player.def.slot === 'rifle' ? 0.8 : 0.35, 0.5, this.player.def.slot === 'rifle' ? 140 : 60);
     const P = this.player, def = P.def;
     const rifle = def.slot === 'rifle';
@@ -2888,9 +2929,12 @@ export class CellGame {
     else if (this.quad && this.quad.parked) { this.quadObj.visible = true; this.quadObj.position.set(this.quad.x, this.quad.y, this.quad.z); this.quadObj.rotation.y = this.quad.yaw; }
     else if (!(this.quad && this.quad.active)) this.quadObj.visible = false;
     // Your own body when down (third person).
-    const showSelf = (this.downed && !this.kia) || this.isr.active || !!(this.quad && this.quad.active);
+    const showSelf = (this.downed && !this.kia) || this.isr.active || !!(this.quad && this.quad.active) || !!this._tpsOn;
     this.selfAvatar.setVisible(showSelf);
-    if (showSelf) this.selfAvatar.update(dt, { p: this.player.pos, yaw: this.player.yaw, pitch: 0, st: this.downed ? 2 : 1, moving: false, w: true });
+    if (this._tpsOn && !this.downed) {
+      const P = this.player;
+      this.selfAvatar.update(dt, { p: P.pos, yaw: P.yaw, pitch: P.pitch, st: P.stance, moving: P.moving, sprint: P.sprinting && P.moving, ads: P.scopeT > 0.15 });
+    } else if (showSelf) this.selfAvatar.update(dt, { p: this.player.pos, yaw: this.player.yaw, pitch: 0, st: this.downed ? 2 : 1, moving: false, w: true });
   }
 
   // The detector going off: buzzer and a red strobe on its arch.
@@ -3042,7 +3086,7 @@ export class CellGame {
     u.uFar.value = this.camera.far;
     // Cel shading for the Inked look; re-swept now and then for meshes added since (drops, bodies).
     this._lookSweep = (this._lookSweep || 0) - dt;
-    if (this._lookSweep <= 0) { this._lookSweep = 1; applyLook(this.scene, this.look); }
+    if (this._lookSweep <= 0) { this._lookSweep = 1; applyLook(this.scene, this.look, { outlines: this.quality !== 'low' }); }
     const P = this.player;
     const quad = this.quad && this.quad.active;
     const isr = this.isr.active;
@@ -3143,7 +3187,7 @@ class CellHud {
       <div class="c-kit"></div>
       <div class="c-req"><span class="c-req-t"></span><button class="c-req-y">\u2713 <small>Y</small></button><button class="c-req-n">\u2715 <small>U</small></button></div>
       <div class="c-intro"><div class="c-intro-k">KESTREL RIDGE // DC-3</div><h1></h1><p class="c-intro-l"></p><p class="c-intro-r"></p></div>
-      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="c-cant">Pistol hold: CENTRE</button><button class="ghost c-exit">Exit to main menu</button><div class="c-pkeys"></div></div></div>
+      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="c-cant">Pistol hold: CENTRE</button><button class="c-tps">Camera: FIRST PERSON</button><button class="c-models">Player models: HERO</button><button class="ghost c-exit">Exit to main menu</button><div class="c-pkeys"></div></div></div>
       <div class="c-debrief"></div>`;
     document.body.appendChild(root);
     document.body.classList.add('cell-mode', 'cell-' + game.role);
@@ -3244,6 +3288,16 @@ class CellHud {
       if (box) box.checked = game.settings.pistolCant;
       cantLabel();
     };
+    // Camera (first / third person, also the . key) and player models (hero rig / classic; next mission).
+    const tpsBtn = $('.c-tps');
+    const tpsLabel = () => { tpsBtn.textContent = `Camera: ${game.tps ? 'THIRD PERSON' : 'FIRST PERSON'} (.)`; };
+    this.syncCamera = tpsLabel; tpsLabel();
+    tpsBtn.onclick = () => game.setCamera(!game.tps);
+    const mdBtn = $('.c-models');
+    let mdNext = game.heroModels;
+    const mdLabel = () => { mdBtn.textContent = `Player models: ${mdNext ? 'HERO' : 'CLASSIC'}${mdNext !== game.heroModels ? ' (next mission)' : ''}`; };
+    mdLabel();
+    mdBtn.onclick = () => { mdNext = !mdNext; try { localStorage.setItem('draxxed.cellModels', mdNext ? 'hero' : 'classic'); } catch {} mdLabel(); };
     $('.c-pnote').textContent = game.solo ? 'Solo: the mission is paused.' : 'Co-op: the mission keeps running while you are in this menu \u2014 find cover first.';
     this._touch();
   }

@@ -30,7 +30,7 @@ import { ViewModel } from './viewmodel.js';
 import { WEAPONS } from './weapons.js';
 import { Supply } from './supply.js';
 import { RULES, rulesLabel } from './rules.js';
-import { applyLook } from './look.js';
+import { applyLook, OUTLINE_RES } from './look.js';
 import { PALETTES as PALS } from './atmosphere.js';
 import { AtmosFX } from './atmofx.js';
 import { hazeUniforms as HZ } from './atmosphere.js';
@@ -258,19 +258,19 @@ export class Game {
   // Graphics look (host's RULES.look, see look.js). Follows the rules if they change, and now and
   // then re-sweeps the scene so meshes added since (avatars, chickens, drops) get the same shading.
   _syncLook(dt) {
-    const look = RULES.look === 'og' ? 'og' : 'inked';
+    const look = RULES.look === 'og' ? 'og' : RULES.look === 'hero' ? 'hero' : 'inked';
     this.lookSweep -= dt;
     if (look === this.look && (look === 'og' || this.lookSweep > 0)) return;
     if (look !== this.look) {
       this.look = look;
-      const inked = look === 'inked';
+      const inked = look !== 'og';
       if (this.bloom) this.bloom.strength = inked ? 0.33 : 0.55;
       // Grass stays out of the ink: inked, every clump would turn into a black dash.
       const grass = this.world.grass && this.world.grass.mesh;
       if (grass) { grass.material.depthWrite = !inked; grass.renderOrder = inked ? 2 : 0; }
     }
     this.lookSweep = 1;
-    applyLook(this.scene, look);
+    applyLook(this.scene, look, { outlines: this.quality !== 'low' });
   }
 
   // -------------------------------------------------------------------------
@@ -311,6 +311,7 @@ export class Game {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight, false);
+    OUTLINE_RES.value.set(innerWidth, innerHeight);
     this._initComposer();
     if (this.composer) {
       this.composer.setPixelRatio(this.pr);
