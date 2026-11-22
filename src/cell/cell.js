@@ -465,6 +465,7 @@ export class CellGame {
     if (this.mission === 'nightwatch') this.comms('Officers spook when they\u2019re alone. Juggernauts\u2019 shells break \u2014 then they charge. Bulwarks: shoot the port in the wall.', 'dim');
     // The night soundscape (wind, insects, distant sounds; air handling indoors). No hum.
     this.ambient = new Ambience(this.audio);
+    this.input.onPad = () => { this._toast('Controller connected. OPTIONS pauses; the pause menu lists every button.', 'cyan'); this.audio.click(); };
     // Doors and lights changing state (host or guest alike) make their sounds where they are.
     this.fac.onDoor = (d, open) => { if (this.t > 1) this.foley.door({ x: d.x, y: (d.y || 0) + 1.2, z: d.z }, d.kind, open); };
     this.fac.onLight = (L, on) => {
@@ -1083,6 +1084,10 @@ export class CellGame {
     this.t += dt;
     hazeUniforms.uTime.value = this.t;
     if (this.cine.active) return this._cineFrame(dt);
+    // Controller: read it before the frame's actions. [] uses things when there's a prompt.
+    { const pr = this.prompts[this.role]; this.input.useAvail = !!(pr && pr.key && pr.key !== 'revivex') || !!(this.obj.drag && this.obj.drag[this.role]); }
+    this.input.pollPad(dt);
+    if (this.input.pressed('PadStart') && !this.ended && !(this.tablet && this.tablet.visible)) this.hud.setPause(!this.paused);
     const a = this.input.actions;
     if (this.net) this.net.tick(dt);
     this.chat.update();
@@ -1526,6 +1531,9 @@ export class CellGame {
   _nvScopeGlow(dt) {
     const kr = this.viewmodel.models.kr50, U = kr && kr.userData;
     if (!U || !U.eye) return;
+    // Camo swaps every viewmodel material for the shimmer (which has no colour to set): the
+    // eyepiece just goes dark with the rest of the gun.
+    if (this._vmCloak || !U.eye.material.color) return;
     const on = this.scopeNV !== false, cur = this.viewmodel.current === 'kr50';
     if ((on && !this._nvLensOn) || (cur && !this._nvLensCur)) this._nvFlash = 1;
     this._nvLensOn = on; this._nvLensCur = cur;
@@ -1580,6 +1588,7 @@ export class CellGame {
   }
 
   _fire() {
+    this.input.rumble(this.player.def.slot === 'rifle' ? 0.8 : 0.35, 0.5, this.player.def.slot === 'rifle' ? 140 : 60);
     const P = this.player, def = P.def;
     const rifle = def.slot === 'rifle';
     const sup = rifle || !!P.w.sup;
@@ -1911,6 +1920,7 @@ export class CellGame {
     if ((this.role === 'spotter' || this.operative) && this.loadout.spotter.perk === 'armor') dmg *= 0.8;
     this.hp -= dmg;
     this.audio.hurt && this.audio.hurt(dmg >= 40);
+    this.input.rumble(dmg >= 40 ? 1 : 0.6, 0.8, dmg >= 40 ? 260 : 140);
     if (this.obj.ifak && this.obj.ifak[this.role] > 0 && this.hp > 0 && this.hp < this.maxHp * 0.7) this._hint && this._hint('ifak');
     this.hud.damage(Math.atan2(from.x - this.player.pos.x, from.z - this.player.pos.z) - this.player.yaw);
     this.dmgFx = 1;
@@ -3163,11 +3173,18 @@ class CellHud {
     spotterKeys.splice(4, 0, K('G', 'IFAK'));
     const keys = game.operative && game.role === 'shooter' ? [...shooterKeys, K('Y', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys;
     this.el.keys.innerHTML = keys.join('');
+    // The same strip for a controller (PlayStation names; Xbox: A B X Y / RT LT RB LB).
+    const sh = game.role === 'shooter';
+    const padKeys = [K('R2', 'fire'), K('L2', 'aim / scope'), K('R1', 'ping / mark (hold: wheel)'), K('L1', sh ? 'camo' : 'recon drone'), K('\u25A1', sh ? 'use / reload (hold: rounds)' : 'use / reload'), K('\u25B3', 'next weapon'), K('\u25CB', 'crouch (hold: prone)'), K('\u2715', 'jump'), K('L3', 'sprint' + (sh ? ' / breath' : '')), K('R3', 'knife'), K('\u2191', 'NV'), K('\u2193', 'IFAK'), K('\u2190', sh ? 'sticky' : 'binoculars'), K('\u2192', 'sync'), K('PAD', sh ? 'deadeye' : 'hack phone'), K('CREATE', sh ? 'map' : 'tablet'), K('OPTIONS', 'pause')];
+    this._keysKbm = this.el.keys.innerHTML;
+    this._keysPad = padKeys.join('');
+    this._padSection = '<h3>CONTROLLER (PS5 / XBOX)</h3>' + padKeys.map((k) => `<span>${k}</span>`).join('');
     // Pause menu: every control, in two columns, mouse and movement first.
     const mac = /Mac/i.test(navigator.platform || navigator.userAgent);
     const base = [K('Mouse', 'aim'), K('Left click', 'fire'), K(mac ? 'Right / Ctrl-click' : 'Right click', 'scope / aim down sights'), K('Scroll', 'zoom (scoped) / next weapon'), K('WASD', 'move'), K('Shift', 'sprint'), K('C', 'crouch'), K('Z', 'prone'), K('Space', 'jump'), K('R', game.role === 'shooter' ? 'reload \u00B7 hold: next round type' : 'reload'), K('`', 'laser')];
     const pk = $('.c-pkeys');
     if (pk) pk.innerHTML = '<h3>CONTROLS</h3>' + [...base, ...keys.filter((k) => !/>(Esc|`)</.test(k))].map((k) => `<span>${k}</span>`).join('');
+    if (pk) pk.innerHTML += this._padSection;
     this.objective(0, OBJECTIVES[0], false);
     // Spotter (and lone operative): picture-in-picture squares for the console and the drone.
     const pipOn = game.role === 'spotter' || game.operative;
@@ -3469,6 +3486,17 @@ class CellHud {
     setTimeout(() => el.classList.remove('on', 'out'), 6000);
   }
 
+  // Per frame: the key strip follows whatever you're playing with (controller or keyboard).
+  _padLegend() {
+    const pad = this.g.input.usingPad;
+    if (pad === this._legendPad) return;
+    this._legendPad = pad;
+    this.el.keys.innerHTML = pad ? this._keysPad : this._keysKbm;
+    this.el.keys.classList.remove('gone');
+    clearTimeout(this._keysGone);
+    this._keysGone = setTimeout(() => this.el.keys.classList.add('gone'), 25000);
+  }
+
   setPause(on) {
     this.el.pause.classList.toggle('on', on);
     this.g.paused = on;
@@ -3607,6 +3635,7 @@ class CellHud {
         if (el && (el.style.display === 'none') === on) el.style.display = on ? '' : 'none';
       }
     }
+    this._padLegend();
     // Touch swap button names the weapon in your hands (KR-50, K9, M50, P-9, KNIFE, BINOS);
     // tap for the next one, hold for the wheel.
     if (!this.elSwap) this.elSwap = document.getElementById('pill-swap') || 0;
