@@ -1870,7 +1870,8 @@ export class Sentinel {
           }
         }
       } else {
-        d.locked = false;
+        // The lock (and its toast) re-arms only once it has properly lost you.
+        if (d.aw < 0.3) d.locked = false;
         d.aw = Math.max(0, d.aw - 0.03);
       }
     }
@@ -1905,7 +1906,7 @@ export class Sentinel {
         this.lkpT = 6;
         for (const g of this.guards) if (g.state !== 'dead' && g.state !== 'alert' && g.state !== 'berserk' && Math.hypot(g.x - c.x, g.z - c.z) < 34) { g.convergeT = 0.4; g.convergeAt = { ...this.lkp }; }
       }
-    } else { c.aw = Math.max(0, c.aw - 0.05); c.confirmed = false; }
+    } else { c.aw = Math.max(0, c.aw - 0.05); if (c.aw < 0.3) c.confirmed = false; } // re-arm the toast only once it has lost you
   }
 
   // ---- intel ---------------------------------------------------------------------

@@ -340,7 +340,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Commands at the crosshair:** outside the tablet, number keys **1–9** fire the tablet's payloads (same numbering: scan, jam, EMP, supply, take out the lights, spoof cams, decoy, recon drone, medevac) at the spot you're aiming at, with the phone animation. **0** (or ISR SWEEP on the press-and-hold wheel) calls an **ISR sweep** on the ground under your crosshair.
 - **Command wheel (touch):** press and hold on empty screen, drag toward a command and lift: it drops on your crosshair. Hold TAB / HACK and aim at open ground for the same commands as a list.
 - **Recon drone:** F (desktop) tosses it up out of your left hand before the feed cuts in. Hold F to recall it: it flies home with a RECALLING overlay on screen. Enemies inside its faint, breathing red view cone are marked, and both players can see the cone from outside.
-- **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. G takes the sticks; hold G recalls it.
+- **Recon drone to a spot:** drag RECON DRONE from the tablet onto the map (or fire the drone command at your crosshair) and it launches, flies itself there at about 9 m and holds, marking what it sees. F takes the sticks; hold F recalls it.
 - **Thermal binoculars (X, or the weapon-swap button on touch):** the spotter picks a primary in staging: the binoculars (default, in hand at the start) or the K9 HUSH SMG; the P-9 is the secondary. With the SMG there are no binoculars at all. Swap from the P-9 to binoculars held low in both hands. Raise them (scope) for a grey thermal view where every warm body glows red, and every enemy in the viewfinder is marked, at any range.
 - **Binocular view:** two big overlapping lenses (a Venn-diagram viewfinder, rimmed only on the outside) that fill most of the screen. Like night vision, the whole world stays visible: a bright grey thermal picture with warm bodies in red, only lightly dimmed outside the lenses. Zoom through four steps with the mouse wheel, + / −, or the touch ZOOM buttons; the readout shows the magnification.
 - **Laser rangefinder:** the binoculars show a live range under the crosshair (TARGET when it's on an enemy). Press **R** (or **LASE** on touch) to lase the target and send the sniper a **firing call**: the range from the sniper's position, a lead call if the target is walking, and "send it" (the KR-50 is hitscan, so there's no holdover). The target gets a yellow bracket with the range and lead on both players' screens for 15 s. Lasing a brute, titan or the overseer also marks its **weak points** (head; a titan's power pack, a brute's spine) for 20 s. With AI Ra, lasing a target marks it for him.
@@ -348,7 +348,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Nano drones (thermal binoculars):** you carry three nano drones; each one used reloads on its own 15 s timer. With the binoculars raised, **look at an enemy** for a moment to mark it (or tap it); you can mark as many as you have drones. While the binoculars are up, **FIRE becomes SWARM** (E works too): the swarm streams out and each marked target drops silently about 1.5 s later, any enemy type. Anyone who sees a body fall can still react. When sent, the swarm pours up out of your backpack, hangs overhead for a moment, then streaks to each target (about a second) and wraps its head.
 - **Tablet:** pinch, scroll or double-tap to zoom the map (it zooms around your fingers / cursor). **Drag a payload** from the side panel onto the map to drop it there; the shooter can drag a request onto the map the same way.
 - **TAB:**
-  - **Tap** for the tablet. Tap again for the ISR view, and again to return to first person.
+  - **Tap** for the tablet, tap again to close it. **I** opens the ISR view.
   - **Hold** (or press **H**, or tap the **📱 HACK** ability button / HACK on the touch wheel) for **quickhacks**: your left hand brings up your phone and the HUD switches to scan mode (time slows in solo). Everything hackable in view gets tagged.
   - Look at a target, pick a hack (mouse wheel or 1/2) and click or press E. Your thumb taps the screen and the hack uploads.
   - Hacks: loop a camera, short-circuit a drone or **DISRUPT** (18 BW: hack a patrol drone or a spotlight heli out of the sky; drones can be hacked from further away), open an electronic door, cut a light, set off an IoT device, or jam a guard's comms / reboot his optics (blind for 6 s).
@@ -357,7 +357,7 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
   - Quickhacks still work when ICE knocks the console offline.
 - **Lock-pick set:** mechanical locks (maintenance and side doors) can't be hacked; the spotter picks them in person. Electronic locks (front, dock) open over the network, from the console or a quickhack.
 - **CYBER OPS tablet:** a map of both floors, with payloads (pulse scan, jam, EMP, supply drop, take out the lights, spoof cameras, decoy, quad, medevac), door and camera hacks, and camera feeds.
-- **Recon quad (Q):**
+- **Recon quad (F; a lone operative uses Y):**
   - **Neurolink:** every enemy the quad can see within 45 m is marked for the team, with a lock-on animation and a red silhouette through walls. The mark stays as long as the quad keeps line of sight.
   - **Controls:** tap F to park it; parked, it keeps marking. Tap F again to fly it. **Hold F** (or RECALL) for a quick calldown. (A lone operative uses Y.)
   - **Battery:** long-lasting; it recharges while the quad is home.
@@ -377,11 +377,11 @@ The **Staging area · Loadout** screen shows each operator in full kit on a turn
 - **Bleeding out:** a downed operator has 30 s.
 - **IFAK:** each operator starts with one, and every supply crate adds one (up to 3). Use it on yourself (**G**, or tap the **✚ IFAK** button bottom left on touch) to go straight back to full health, or hold E on a downed partner to get them up.
 - **Medevac drone:** flies to whoever is down, or else whoever is hurt worst, and patches them up to full health.
-- **Calling for help:** while downed, press **V** or **HELP** to radio for a pickup. An AI partner sends the medevac drone.
+- **Calling for help:** while downed, press **Q** or **HELP** to radio for a pickup. An AI partner sends the medevac drone.
 
 ### Comms
 
-- **Pings and requests:** tap V or PING for a quick ping. Hold for the wheel: LOOK, ENEMY, MOVE, HOLD, ON ME, COVER, SYNC and SNIPER POS, plus SUPPLY, SCAN, EMP, DECOY, LIGHTS and DRONE requests. The spotter approves with Y / SEND.
+- **Pings and requests:** tap Q or PING for a quick ping. Hold for the wheel: LOOK, ENEMY, MOVE, HOLD, ON ME, COVER, SYNC and SNIPER POS, plus SUPPLY, SCAN, EMP, DECOY, LIGHTS and DRONE requests. The spotter approves with Y / SEND.
 - **Radio:** operators and ISR Overwatch talk over a tactical squad net, in short, clipped lines with a beat between transmissions. Turn **Radio voices** off on the NightWatch screen or in the pause menu to get subtitles only. Ra and Rōnin swapped voices: Ra now speaks with the voice Rōnin used to have, and the other way round. Every operator line is recorded, including the binocular firing calls and range callouts, which are strung together from recorded pieces ("Target, X-ray." + "150 meters." + "Walking left, lead him." + "Send it."), so they're always in the operator's own voice. If a line ever has no recording and the device has no suitable male voice, it shows as a subtitle only: it never falls back to the device's default voice.
   - Every scripted line is pre-recorded with neural male voices, one per speaker: Ra (deep American), Rōnin (American) and Overwatch (a low, calm American dispatcher). Voices are pitched down with their character preserved, at a natural, unhurried pace.
   - The recordings get a radio treatment: mostly the natural voice with a lighter Codec2 digital-radio layer, band-limited to radio width (300–3400 Hz), with presence and compression.

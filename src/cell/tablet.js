@@ -463,7 +463,13 @@ export class Tablet {
     const g = this.g, ob = g.obj, S = g.sentinel, spot = this.spot, P = this.parts;
     const pend = g.requests.filter((r) => r.st === 'pending');
     P.reqs.style.display = pend.length ? '' : 'none';
-    P.reqs.innerHTML = pend.length ? '<div class="ct-h">INCOMING REQUESTS</div>' + pend.map((r) => `<div class="ct-req"><b>${esc(REQ_NAME[r.k] || r.k)}</b><span>${Math.ceil(r.t)}s</span><button data-q="${r.id}" data-ok="1">SEND</button><button data-q="${r.id}" data-ok="0">DENY</button></div>`).join('') : '';
+    // Rebuild the request rows only when the set changes (a rebuild under a finger eats the
+    // tap); otherwise just tick the countdowns.
+    const ids = pend.map((r) => r.id).join(',');
+    if (ids !== this._reqIds) {
+      this._reqIds = ids;
+      P.reqs.innerHTML = pend.length ? '<div class="ct-h">INCOMING REQUESTS</div>' + pend.map((r) => `<div class="ct-req"><b>${esc(REQ_NAME[r.k] || r.k)}</b><span data-t="${r.id}">${Math.ceil(r.t)}s</span><button data-q="${r.id}" data-ok="1">SEND</button><button data-q="${r.id}" data-ok="0">DENY</button></div>`).join('') : '';
+    } else for (const r of pend) { const sp = P.reqs.querySelector(`[data-t="${r.id}"]`); const tx = `${Math.ceil(r.t)}s`; if (sp && sp.textContent !== tx) sp.textContent = tx; }
     if (!spot) for (const b of P.pay.querySelectorAll('[data-r]')) b.classList.toggle('sel', this.reqSel === b.dataset.r);
     const o = OBJECTIVES[ob.step];
     const sec = S.alarmLabel;

@@ -745,6 +745,7 @@ export class CellGame {
     this.sentinel.applySnap(m.s);
     const prevStep = this.obj.step;
     Object.assign(this.obj, m.o);
+    { const Q = this._ifakPend; if (Q && this.obj.ifak) { if (this.t < Q.until) this.obj.ifak[this.role] = Math.min(this.obj.ifak[this.role] || 0, Q.n); else this._ifakPend = null; } }
     if (this.obj.step !== prevStep) this._stepChanged(prevStep);
     for (const [id, fl] of m.dr) {
       const d = this.fac.doors[id];
@@ -1148,7 +1149,7 @@ export class CellGame {
     const tab = this.tablet.visible;
     let quad = this.quad && this.quad.active;
     // Keys for this mode.
-    // TAB: the spotter taps it for the tablet (tap again: ISR, again: back to first person)
+    // TAB: the spotter taps it for the tablet (tap again to close; I is the ISR view)
     // and holds it for quickhacks (phone out). The shooter's TAB is just the map.
     if (this.role === 'spotter' || this.operative) {
       // TAB toggles the tablet (ISR is a button inside it, or I).
@@ -1357,6 +1358,16 @@ export class CellGame {
     if (this.role === 'spotter') { act.slot1 = act.slot2 = act.swap = false; if (!P.scoped) act.zoomIn = act.zoomOut = false; }
     act.zeroUp = act.zeroDown = false;
     act.breath = !!(this.ab && this.ab.breath.on);
+    // Sniper on desktop: tap R reloads, hold R loads the next round type (Z stays prone).
+    if ((this.role === 'shooter' || this.operative) && this.xr) {
+      if (I.pressed('KeyR')) { this._rHold = 0; this._rDone = false; }
+      let tap = false;
+      if (this._rHold != null) {
+        if (I.held('KeyR')) { this._rHold += dt; if (this._rHold > 0.35 && !this._rDone) { this._rDone = true; this._roundsCycle(); } }
+        else { tap = !this._rDone; this._rHold = null; }
+      }
+      act.reload = I.pressed('reload') || tap;
+    }
     // Dragging a body: both hands on him, so no sprint, no gun, a slow walk.
     const dragging = !!(this.obj.drag && this.obj.drag[this.role]);
     P.noSprint = (!!this.obj.drive && this.obj.drive === this.role) || dragging;
@@ -1900,6 +1911,7 @@ export class CellGame {
     if ((this.role === 'spotter' || this.operative) && this.loadout.spotter.perk === 'armor') dmg *= 0.8;
     this.hp -= dmg;
     this.audio.hurt && this.audio.hurt(dmg >= 40);
+    if (this.obj.ifak && this.obj.ifak[this.role] > 0 && this.hp > 0 && this.hp < this.maxHp * 0.7) this._hint && this._hint('ifak');
     this.hud.damage(Math.atan2(from.x - this.player.pos.x, from.z - this.player.pos.z) - this.player.yaw);
     this.dmgFx = 1;
     if (this.hp <= 0) {
@@ -1974,7 +1986,9 @@ export class CellGame {
     if (this.downed || this.kia) return;
     if (n <= 0) { this.hud.flash('NO IFAK', 'red', 0.8); return; }
     if (this.hp >= this.maxHp) { this.hud.flash('ALREADY AT FULL HEALTH', 'dim', 0.8); return; }
-    if (this.isHost) ob.ifak[this.role] = n - 1; else { ob.ifak[this.role] = n - 1; this._broadcast({ k: 'ifakuse', role: this.role }); }
+    // Guest: the host's count can lag a round trip behind; hold ours down until it catches up
+    // (so a snapshot can't hand back the IFAK you just used).
+    if (this.isHost) ob.ifak[this.role] = n - 1; else { ob.ifak[this.role] = n - 1; this._ifakPend = { n: n - 1, until: this.t + 3 }; this._broadcast({ k: 'ifakuse', role: this.role }); }
     this.hp = this.maxHp;
     this.dmgFx = 0;
     this.audio.click();
@@ -2065,8 +2079,8 @@ export class CellGame {
     if (auto) this.audio.startLoop('quad', new THREE.Vector3(this.quad.x, this.quad.y, this.quad.z), 'rotor', 0.22);
     // By hand: tossed up out of the left hand, then the feed cuts in.
     else this._raise('drone', () => { const q = this.quad; if (!q || !q.launching) return; q.launching = false; q.active = true; this.post.uniforms.uStatic.value = 1; this.audio.startLoop('quad', new THREE.Vector3(q.x, q.y, q.z), 'rotor', 0.22); });
-    if (auto) this.comms('Recon drone en route to the mark. F to take it, hold F to recall.', 'cyan', this.name);
-    else this.comms('Recon drone up. Look at enemies to neurolink them. F park \u00B7 hold F recall \u00B7 SPACE/C climb.', 'cyan', this.name);
+    if (auto) this.comms(`Recon drone en route to the mark. ${this.operative ? 'Y' : 'F'} to take it, hold to recall.`, 'cyan', this.name);
+    else this.comms(`Recon drone up. Look at enemies to neurolink them. ${this.operative ? 'Y' : 'F'} park \u00B7 hold ${this.operative ? 'Y' : 'F'} recall \u00B7 SPACE/C climb.`, 'cyan', this.name);
   }
   // Send the quad to a spot: launch it there, or redirect it if it's already up.
   _quadTo(at) {
@@ -2102,7 +2116,7 @@ export class CellGame {
       q.yaw = Math.atan2(-dx, -dz);
     } else {
       q.auto = null;
-      this.comms('Recon drone on station. It keeps marking. G to take it.', 'cyan', this.name);
+      this.comms(`Recon drone on station. It keeps marking. ${this.operative ? 'Y' : 'F'} to take it.`, 'cyan', this.name);
       this.sfx.ui(true);
     }
     this.audio.updateLoop('quad', new THREE.Vector3(q.x, q.y, q.z));
@@ -2117,7 +2131,7 @@ export class CellGame {
     q.active = false;
     q.parked = true;
     this.sfx.ui(false);
-    this.comms('Recon drone parked. It keeps marking. F to fly it, hold F to recall.', 'cyan', this.name);
+    this.comms(`Recon drone parked. It keeps marking. ${this.operative ? 'Y' : 'F'} to fly it, hold to recall.`, 'cyan', this.name);
   }
   _resumeQuad() {
     const q = this.quad;
@@ -2277,6 +2291,8 @@ export class CellGame {
   _medevacTick(dt) {
     const m = this.medevac;
     if (!m) return;
+    // Someone went down since it was called: they come first.
+    { const dn = this.downedAgent(); if (dn) m.role = dn; }
     const tgt = this.agentPos(m.role);
     const goal = { x: tgt.x, y: tgt.y + 1.2, z: tgt.z };
     const cruise = this.fac.insideBuilding(tgt.x, tgt.z) ? 0 : 14;
@@ -2467,7 +2483,7 @@ export class CellGame {
     const ob = this.obj, S = this.sentinel, role = a.role, p = a.pos, T = this.fac.target;
     let best = null;
     const opt = (key, label, dur, fn, auto = false) => { if (!best) best = { key, label, dur, fn, auto }; };
-    if (!a.alive || a.downed) { this.prompts[role] = a.downed ? { label: 'DOWNED — waiting for a revive', p: 0 } : null; return; }
+    if (!a.alive || a.downed) { if (ob.drag) ob.drag[role] = 0; this.prompts[role] = a.downed ? { label: 'DOWNED — waiting for a revive', p: 0 } : null; return; }
     if (this._dragInteract(a, held, null)) return;
     this._vanInteract(a, held, dt, opt);
     const sameFloor = (y) => Math.abs(y - p.y) < 1.6;
@@ -2821,6 +2837,7 @@ export class CellGame {
   _end(win, info) {
     if (this.ended) return;
     this.ended = { win, info };
+    if (this.foley) this.foley.stopAll(); // no brute growl droning through the outro
     if (this.tablet.visible) this.tablet.close();
     if (this.quad && this.quad.active) this._endQuad();
     document.exitPointerLock && document.exitPointerLock();
@@ -3116,7 +3133,7 @@ class CellHud {
       <div class="c-kit"></div>
       <div class="c-req"><span class="c-req-t"></span><button class="c-req-y">\u2713 <small>Y</small></button><button class="c-req-n">\u2715 <small>U</small></button></div>
       <div class="c-intro"><div class="c-intro-k">KESTREL RIDGE // DC-3</div><h1></h1><p class="c-intro-l"></p><p class="c-intro-r"></p></div>
-      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="c-cant">Pistol hold: CENTRE</button><button class="ghost c-exit">Exit to main menu</button></div></div>
+      <div class="c-pause"><div class="c-card"><h2>PAUSED</h2><p class="c-pnote"></p><button class="primary c-resume">Resume</button><button class="c-voice">Radio voices: ON</button><button class="c-bcam">Partner bodycam: OFF</button><button class="c-cant">Pistol hold: CENTRE</button><button class="ghost c-exit">Exit to main menu</button><div class="c-pkeys"></div></div></div>
       <div class="c-debrief"></div>`;
     document.body.appendChild(root);
     document.body.classList.add('cell-mode', 'cell-' + game.role);
@@ -3141,7 +3158,16 @@ class CellHud {
     spotterKeys.push(K('L', 'light'), K('I', 'ISR'));
     spotterKeys.push(K('\u21B5', 'chat'));
     if (game.net) { shooterKeys.push(K('M', 'mic'), K('K', 'talk')); spotterKeys.push(K('M', 'mic'), K('K', 'talk')); }
-    this.el.keys.innerHTML = (game.operative && game.role === 'shooter' ? [...shooterKeys, K('Y', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys).join('');
+    // Keys the strip leaves out for space: the full list lives in the pause menu.
+    shooterKeys.splice(4, 0, K('G', 'IFAK'), K('R', 'reload (hold: rounds)'));
+    spotterKeys.splice(4, 0, K('G', 'IFAK'));
+    const keys = game.operative && game.role === 'shooter' ? [...shooterKeys, K('Y', 'recon drone')] : game.role === 'shooter' ? shooterKeys : spotterKeys;
+    this.el.keys.innerHTML = keys.join('');
+    // Pause menu: every control, in two columns, mouse and movement first.
+    const mac = /Mac/i.test(navigator.platform || navigator.userAgent);
+    const base = [K('Mouse', 'aim'), K('Left click', 'fire'), K(mac ? 'Right / Ctrl-click' : 'Right click', 'scope / aim down sights'), K('Scroll', 'zoom (scoped) / next weapon'), K('WASD', 'move'), K('Shift', 'sprint'), K('C', 'crouch'), K('Z', 'prone'), K('Space', 'jump'), K('R', game.role === 'shooter' ? 'reload \u00B7 hold: next round type' : 'reload'), K('`', 'laser')];
+    const pk = $('.c-pkeys');
+    if (pk) pk.innerHTML = '<h3>CONTROLS</h3>' + [...base, ...keys.filter((k) => !/>(Esc|`)</.test(k))].map((k) => `<span>${k}</span>`).join('');
     this.objective(0, OBJECTIVES[0], false);
     // Spotter (and lone operative): picture-in-picture squares for the console and the drone.
     const pipOn = game.role === 'spotter' || game.operative;
@@ -3634,7 +3660,7 @@ class CellHud {
     this.el.amS.classList.toggle('loud', sec && !w.sup);
     // Prompt.
     let pr = g.prompts[g.role];
-    if (g.downed && !g.kia) pr = { label: `BLEEDING OUT ${Math.ceil(g.bleed)} s — ${g.solo ? 'medevac drone is your only way up' : (g.obj.ifak && g.obj.ifak[g.partnerRole] > 0 ? g.partnerName + ' can patch you up with an IFAK' : g.partnerName + ' is out of IFAKs \u2014 medevac only')} \u00B7 V / HELP: call for pickup`, p: g.bleed / BLEED };
+    if (g.downed && !g.kia) pr = { label: `BLEEDING OUT ${Math.ceil(g.bleed)} s — ${g.solo ? 'medevac drone is your only way up' : (g.obj.ifak && g.obj.ifak[g.partnerRole] > 0 ? g.partnerName + ' can patch you up with an IFAK' : g.partnerName + ' is out of IFAKs \u2014 medevac only')} \u00B7 ${g.input.touch ? 'HELP' : 'Q'}: call for pickup`, p: g.bleed / BLEED };
     if (g.kia) pr = { label: `KIA — watching ${g.partnerName}`, p: 0 };
     this.el.prompt.classList.toggle('on', !!pr && !g.tablet.visible);
     if (pr) { this.el.promptT.textContent = pr.label; this.el.promptB.style.width = `${Math.round((pr.p || 0) * 100)}%`; this.el.prompt.classList.toggle('bar', pr.p > 0); }
@@ -3959,7 +3985,7 @@ class CellHud {
     }
     c.fillText(`ALT ${Math.round(I.pos.y)} m \u00B7 SLANT ${Math.round(I.slant())} m \u00B7 SPI ${Math.round(I.spi.x)} ${Math.round(-I.spi.z)}`, m + 10, m + 38);
     c.textAlign = 'right';
-    c.fillText(`MOUSE/DRAG SLEW \u00B7 WHEEL / +\u2212 / [ ] / PINCH ZOOM \u00B7 N IR/EO \u00B7 F TAG \u00B7 P SWEEP${I.sweepCd > 0 ? ' ' + Math.ceil(I.sweepCd) + 's' : ''} \u00B7 V PING \u00B7 I EXIT`, W - m - 10, H - m - 12);
+    c.fillText(`MOUSE/DRAG SLEW \u00B7 WHEEL / +\u2212 / [ ] / PINCH ZOOM \u00B7 N IR/EO \u00B7 Q TAG \u00B7 P SWEEP${I.sweepCd > 0 ? ' ' + Math.ceil(I.sweepCd) + 's' : ''} \u00B7 I EXIT`, W - m - 10, H - m - 12);
     c.textAlign = 'center';
   }
 
