@@ -74,7 +74,7 @@ export class Radio {
     // American English first (US radio dispatch), keeping the quality order within each group.
     const us = (v) => (/en[-_]US/i.test(v.lang) ? 0 : 1);
     ranked.sort((a, b) => us(a) - us(b));
-    const pool = ranked.length ? ranked : V.length ? V : this.voices;
+    const pool = ranked.length ? ranked : V;
     this._cast = { shooter: pool[0] || null, spotter: pool[1] || pool[0] || null, isr: pool[2] || pool[0] || null };
     return this._cast;
   }
@@ -88,10 +88,12 @@ export class Radio {
     return !this.busy && !this.q.length && performance.now() - (this._lastLow || -1e9) > 6000;
   }
 
-  say(who, text, prio = false, keep = false, low = false) {
+  // parts: for lines with numbers in them, the recorded fragments to string together (the
+  // subtitle still shows `text`).
+  say(who, text, prio = false, keep = false, low = false, parts = null) {
     if (!this.enabled || !text) return;
     if (low) { if (!this.free()) return; this._lastLow = performance.now(); }
-    const item = { who, text, t: performance.now(), keep };
+    const item = { who, text, t: performance.now(), keep, parts };
     if (this.vo && window.__voMiss && !this._recorded(item)) window.__voMiss.push(`${who}: ${text}`); // test hook: lines with no clip
     if (prio) this.q.unshift(item); else this.q.push(item);
     // Too much chatter queued: drop the oldest throwaway line.
@@ -149,12 +151,16 @@ export class Radio {
   _recorded(item) {
     const V = this.vo && this.vo[VOICE_OF[item.who] || item.who];
     if (!V || !this.a || !this.a.ctx) return null;
-    return V[normLine(item.text)] || null;
+    const whole = V[normLine(item.text)];
+    if (whole || !item.parts) return whole || null;
+    const clips = item.parts.map((p) => V[normLine(p)]);
+    return clips.every(Boolean) ? clips : null;
   }
 
   // Fetch + decode (cached; the oldest buffers are dropped past 48) and play a recording just
   // after the key-up. Resolves with its duration.
   async _play(rel) {
+    if (Array.isArray(rel)) return this._playParts(rel);
     const A = this.a, ctx = A.ctx;
     let b = this.buf.get(rel);
     if (!b) {
@@ -175,6 +181,36 @@ export class Radio {
     return b.duration + 0.1;
   }
 
+  // Several clips as one transmission: decoded, then laid end to end with a hair of space.
+  async _playParts(rels) {
+    const A = this.a, ctx = A.ctx;
+    const bufs = [];
+    for (const rel of rels) {
+      let b = this.buf.get(rel);
+      if (!b) {
+        const r = await fetch(VO_DIR + rel);
+        if (!r.ok) throw new Error('missing');
+        const ab = await r.arrayBuffer();
+        b = await new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej));
+        this.buf.set(rel, b);
+        if (this.buf.size > 48) this.buf.delete(this.buf.keys().next().value);
+      }
+      bufs.push(b);
+    }
+    const g = ctx.createGain();
+    g.gain.value = 1.15;
+    g.connect(A.master);
+    let at = ctx.currentTime + 0.1;
+    for (const b of bufs) {
+      const src = ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(g);
+      src.start(at);
+      at += b.duration + 0.04;
+    }
+    return at - ctx.currentTime;
+  }
+
   _speak(item, S, finish) {
     try {
       if (!window.speechSynthesis) throw new Error('no tts');
@@ -182,7 +218,10 @@ export class Radio {
       const u = new SpeechSynthesisUtterance(item.text.replace(/\.\s*$/, ''));
       const vk = VOICE_OF[item.who] || item.who, SV = SPEAKERS[vk] || S;
       const v = this._casting()[vk] || this._casting().shooter;
-      if (v) { u.voice = v; u.lang = v.lang; }
+      // No suitable male voice on this device: subtitles and static only, never the device's
+      // default voice (often a woman's), so every line stays in the operator's voice or none.
+      if (!v) throw new Error('no voice');
+      u.voice = v; u.lang = v.lang;
       u.pitch = SV.pitch;
       u.rate = SV.rate * (0.96 + Math.random() * 0.08);
       u.volume = 1;

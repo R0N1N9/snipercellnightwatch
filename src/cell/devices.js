@@ -232,7 +232,7 @@ export const Devices = {
     if (i >= 0) { N.marks.splice(i, 1); this.audio.click(); return; }
     if (N.marks.length >= N.ch) { this.hud.flash(N.ch ? `ONLY ${N.ch} NANO DRONE${N.ch > 1 ? 'S' : ''} READY` : 'NANO DRONES RELOADING', 'red', 0.8); return; }
     N.marks.push(id);
-    this.audio.click();
+    this.audio.scan ? this.audio.scan() : this.audio.click();
     this.hud.flash(`MARKED ${N.marks.length}/${N.ch} · SWARM TO SEND`, 'cyan', 0.7);
   },
   _nanoSend() {
@@ -278,11 +278,15 @@ export const Devices = {
       lead = `walking ${side}, lead him`;
     }
     const name = { guard: 'X-ray', scav: 'officer', bulwark: 'bulwark', jugg: 'brute', overseer: 'overseer', titan: 'titan' }[e.type] || 'X-ray';
-    const line = `Target, ${name}. ${dS} meters. ${lead.charAt(0).toUpperCase() + lead.slice(1)}. Send it.`;
+    // Spoken from recorded fragments in the spotter's own voice (range called to the nearest
+    // 10 m, 50 m past 500), so the subtitle matches what's said.
+    const said = callRange(dS), Lead = lead.charAt(0).toUpperCase() + lead.slice(1);
+    const line = `Target, ${name}. ${said} meters. ${Lead}. Send it.`;
+    const parts = [`Target, ${name}.`, `${said} meters.`, `${Lead}.`, 'Send it.'];
     this.hud.flash(`LASED ${Math.round(T.d)} m \u00B7 FIRING CALL SENT`, 'cyan', 1.2);
     this.comms(line, ROLES_COLOR_SAFE(this.role), this.name);
-    this._voice && this._voice('me', line);
-    const call = { id: e.id, d: dS, lead, heavy, line };
+    this._voice && this._voice('me', line, false, false, parts);
+    const call = { id: e.id, d: dS, lead, heavy, line, parts };
     this._onFireCall(call, true);
     this._broadcast({ k: 'fcall', ...call });
     // Solo with AI Ra: lasing it is the same as marking it for him.
@@ -294,7 +298,7 @@ export const Devices = {
     if (c.heavy) { this.weak = this.weak || {}; this.weak[c.id] = 20; }
     if (!mine) {
       this.comms(c.line, '#ffd040', this.partnerName);
-      this._voice && this._voice('partner', c.line);
+      this._voice && this._voice('partner', c.line, false, false, c.parts || null);
       this.hud.flash(`FIRING CALL \u00B7 ${c.d} m \u00B7 ${c.lead.toUpperCase()}`, 'amber', 1.6);
     }
   },
@@ -570,4 +574,10 @@ export const Devices = {
 
 export function installDevices(Cls) {
   for (const k of Object.keys(Devices)) Cls.prototype[k] = Devices[k];
+}
+
+// A called range as the recordings have it: nearest 10 m up to 500, nearest 50 m to 1000.
+export function callRange(d) {
+  const r = d <= 500 ? Math.max(10, Math.round(d / 10) * 10) : Math.min(1000, Math.round(d / 50) * 50);
+  return r;
 }

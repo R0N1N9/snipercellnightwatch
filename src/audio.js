@@ -326,6 +326,47 @@ export class Audio {
     }
   }
 
+  // Spotting an enemy (Sniper Cell): a digital scan, recon-drone style. A quick upward sweep
+  // through a resonant filter, a stutter of data blips, and a soft electronic "lock" tone.
+  scan(strong = true) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = this.now;
+    const out = ctx.createGain();
+    out.gain.value = strong ? 0.55 : 0.35;
+    out.connect(this.master);
+    // The sweep: filtered noise with its band racing upward.
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 9;
+    bp.frequency.setValueAtTime(500, t); bp.frequency.exponentialRampToValueAtTime(6500, t + 0.22);
+    const sg = ctx.createGain();
+    sg.gain.setValueAtTime(0.0001, t); sg.gain.exponentialRampToValueAtTime(0.5, t + 0.04); sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    src.connect(bp).connect(sg).connect(out);
+    src.start(t, Math.random()); src.stop(t + 0.3);
+    // A thin carrier riding the sweep (the "scanner" whine).
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(2400, t + 0.22);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3000;
+    og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.05, t + 0.03); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    o.connect(lp).connect(og).connect(out); o.start(t); o.stop(t + 0.26);
+    // Data stutter: a few quick square blips at stepped pitches.
+    const steps = [1760, 2637, 2093, 3136];
+    for (let i = 0; i < 4; i++) {
+      const b = ctx.createOscillator(), bg = ctx.createGain(), s = t + 0.2 + i * 0.035;
+      b.type = 'square'; b.frequency.value = steps[i];
+      bg.gain.setValueAtTime(0.0001, s); bg.gain.exponentialRampToValueAtTime(0.035, s + 0.003); bg.gain.exponentialRampToValueAtTime(0.0001, s + 0.025);
+      b.connect(bg).connect(out); b.start(s); b.stop(s + 0.03);
+    }
+    // The lock: a short, soft two-tone confirm.
+    for (const [d, f] of [[0.36, 1318], [0.4, 1976]]) {
+      const c = ctx.createOscillator(), cg = ctx.createGain();
+      c.type = 'triangle'; c.frequency.value = f;
+      cg.gain.setValueAtTime(0.0001, t + d); cg.gain.exponentialRampToValueAtTime(0.06, t + d + 0.006); cg.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.12);
+      c.connect(cg).connect(out); c.start(t + d); c.stop(t + d + 0.14);
+    }
+  }
+
   // Chicken noises (Pollo Hermano). kind: 'squawk' (launch / hurt), 'cluck' (idle), 'peck'.
   chicken(pos, kind = 'squawk', delay = 0) {
     if (!this.ctx) return;
