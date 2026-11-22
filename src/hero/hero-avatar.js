@@ -96,17 +96,15 @@ export class HeroAvatar {
     this.nods = null;
     if (hat === 'helmet') { this.nods = boneOf('nods', this.head, 0, 0.07, -0.135); this._nvg(this.nods, M); }
     this.aim = boneOf('aim', chest, 0, 0.3, -0.01);
-    this.guns = { vx7: heroVX7(gunOpts), x4: heroX4() };
-    if (item) this.guns.item = item === 'shield' ? heroShieldKit() : heroTablet();
-    // Any gun meeting the contract (hero-guns-*.js builders, adaptGun()): held like the X4 if compact, else like the VX-7.
+    // Guns are built on first use (setGun), not all up front: a figure that only ever carries a K9 never pays
+    // for the VX-7, the X4 and the tablet. Any gun meeting the contract (hero-guns-*.js, adaptGun()) is held like
+    // the X4 if compact, else like the VX-7.
     const custom = gun && gun.isObject3D ? gun : null;
-    if (custom) { custom.userData.at = custom.userData.at || GUN_AT[custom.userData.compact ? 'x4' : 'vx7'].clone(); this.guns.custom = custom; }
-    for (const [k, g] of Object.entries(this.guns)) {
-      const w = boneOf('gun-' + k, this.aim); w.add(g); w.position.copy(g.userData.at || GUN_AT[k]); g.userData.wrap = w;
-      for (const h of [g.userData.handR, g.userData.handL]) this._glove(g, h, M);
-      const mz = new THREE.Object3D(); mz.position.copy(g.userData.muzzle); g.add(mz); g.userData.muzzleObj = mz;
-      for (const h of [g.userData.handR, g.userData.handL]) { const wr = new THREE.Object3D(); wr.position.copy(h.wrist); g.add(wr); h.wristObj = wr; }
-    }
+    this._gunMake = { vx7: () => heroVX7(gunOpts), x4: () => heroX4() };
+    if (item) this._gunMake.item = () => (item === 'shield' ? heroShieldKit() : heroTablet());
+    if (custom) this._gunMake.custom = () => { custom.userData.at = custom.userData.at || GUN_AT[custom.userData.compact ? 'x4' : 'vx7'].clone(); return custom; };
+    this.guns = {};
+    this._mountGun(item ? 'item' : custom ? 'custom' : this._gunMake[gun] ? gun : 'vx7', false);
     // Arms: segments placed every frame.
     this.arms = [1, -1].map((side) => {
       const k = K(this.body);
@@ -126,7 +124,7 @@ export class HeroAvatar {
     this._outlined = false; this.outlines(outlines);
     // State.
     this.cur = { ...POSE[0] }; this.phase = 0; this.lowK = 0; this.adsK = 0; this.recoil = 0; this.nodsK = nods ? 1 : 0; this.nodsDown = nods; this.t = 0;
-    this.setGun(item ? 'item' : custom ? 'custom' : gun);
+    this.setGun(item ? 'item' : custom ? 'custom' : this.guns[gun] ? gun : 'vx7');
   }
 
   // ---- build ----------------------------------------------------------------------------------
@@ -335,7 +333,25 @@ export class HeroAvatar {
   }
 
   // ---- API ------------------------------------------------------------------------------------
-  setGun(k) { this.gunKey = k; for (const [n, g] of Object.entries(this.guns)) g.userData.wrap.visible = n === k; this.gun = this.guns[k]; }
+  _mountGun(k, late) {
+    const g = this._gunMake[k](), M = this.M;
+    const w = boneOf('gun-' + k, this.aim); w.add(g); w.position.copy(g.userData.at || GUN_AT[k]); g.userData.wrap = w;
+    for (const h of [g.userData.handR, g.userData.handL]) this._glove(g, h, M);
+    const mz = new THREE.Object3D(); mz.position.copy(g.userData.muzzle); g.add(mz); g.userData.muzzleObj = mz;
+    for (const h of [g.userData.handR, g.userData.handL]) { const wr = new THREE.Object3D(); wr.position.copy(h.wrist); g.add(wr); h.wristObj = wr; }
+    this.guns[k] = g;
+    if (late) {
+      // Built after the constructor: merge its static parts like every other bone, then outline it if the rig is.
+      this.root.updateMatrixWorld(true); bake(w);
+      w.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
+      if (this._outlined) { outline(w); w.traverse((o) => { if (o.userData.isHull) o.visible = this.outlinesOn; }); }
+    }
+    return g;
+  }
+  setGun(k) {
+    if (!this.guns[k]) { if (!this._gunMake[k]) return; this._mountGun(k, true); }
+    this.gunKey = k; for (const [n, g] of Object.entries(this.guns)) g.userData.wrap.visible = n === k; this.gun = this.guns[k];
+  }
   setNods(down) { this.nodsDown = down; }
   outlines(on) {
     if (on && !this._outlined) { outline(this.root); this._outlined = true; }
