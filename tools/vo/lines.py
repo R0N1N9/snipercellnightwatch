@@ -211,6 +211,12 @@ METERS = list(range(10, 501, 10)) + list(range(550, 1001, 50))
 OP += [f'Target, {n}.' for n in TARGETS]
 OP += [f'{m} meters.' for m in METERS]
 OP += ['Dead on.', 'Walking left, lead him.', 'Walking right, lead him.', 'Send it.', 'X-ray marked.']
+# Contact callouts relative to where you're looking: left, right or dead ahead on your screen.
+SIDES = ['left', 'right', 'ahead']
+OP += [f'Contact {d}.' for d in SIDES]
+OP += [f'Contact {d}, {b}.' for d in SIDES for b in BANDS]
+OP += [f'Multiple contacts {d}, {b}.' for d in SIDES for b in BANDS]
+OP += [f'Eyes on {w}, {d}.' for w in WHAT for d in SIDES]
 
 ISR = [
     'Green light. Jump.',

@@ -517,8 +517,9 @@ export const Kit2 = {
   },
 
   // ---- "Contact" callouts -------------------------------------------------------------------
-  // Now and then an operator calls a fresh enemy in their field of view: direction and range,
-  // over the radio, like a squad would. Each enemy is called once.
+  // Now and then an operator calls a fresh enemy in their field of view: which side of the
+  // screen (left / right / ahead) and range, over the radio, like a squad would. Each enemy is
+  // called once; at most one call every 40 s (half are skipped), and only on a quiet net.
   _contactTick(dt) {
     this._ctT = (this._ctT || 0) - dt;
     this._ctCd = Math.max(0, (this._ctCd || 0) - dt);
@@ -545,16 +546,18 @@ export const Kit2 = {
     this._ctCd = 40;
     fresh.sort((a, b) => a.d - b.d);
     const f = fresh[0];
-    const ang = Math.atan2(f.g.x - P.pos.x, -(f.g.z - P.pos.z));
-    const dirs = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
-    const comp = dirs[((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8];
+    // Which side of your screen it's on: left, right, or ahead (within ~10 deg of the crosshair).
+    const vx = f.g.x - o.x, vz = f.g.z - o.z, fl = Math.hypot(dir.x, dir.z) || 1;
+    const fx = dir.x / fl, fz = dir.z / fl;
+    const across = vx * -fz + vz * fx, along = vx * fx + vz * fz;
+    const side = Math.abs(Math.atan2(across, along)) < 0.17 ? 'ahead' : across > 0 ? 'right' : 'left';
     // Range in bands (close / mid / long), so every callout has a recorded radio line.
     const band = f.d < 30 ? 'close' : f.d < 80 ? 'mid range' : 'long range';
     const what = { scav: 'an officer', jugg: 'a juggernaut', bulwark: 'a bulwark', titan: 'a titan', overseer: 'the Overseer', guard: 'a tango' }[f.g.type] || 'a tango';
     const n = fresh.length;
     const lines = n > 1
-      ? [`Multiple contacts, ${comp}, ${band}.`]
-      : [`Contact, ${comp}, ${band}.`, `Eyes on ${what}, ${comp}.`, 'Contact.'];
+      ? [`Multiple contacts ${side}, ${band}.`]
+      : [`Contact ${side}, ${band}.`, `Eyes on ${what}, ${side}.`, `Contact ${side}.`];
     this._radio('me', lines[Math.floor(Math.random() * lines.length)], true);
   },
 };
